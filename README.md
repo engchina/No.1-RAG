@@ -1,4 +1,4 @@
-# No.1 RAG
+# Aim for No. 1 RAG
 
 ## Setup
 
