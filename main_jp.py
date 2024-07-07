@@ -103,10 +103,7 @@ def get_doc_list() -> List[Tuple[str, str]]:
             try:
                 cursor.execute(f"""
 SELECT
-    substr(
-        replace(JSON_VALUE(cmetadata, '$.source'), '\\', '/'),
-        instr(replace(JSON_VALUE(cmetadata, '$.source'), '\\', '/'), '/', -1) + 1
-    ) AS name,
+    json_value(cmetadata, '$.file_name') name,
     id
 FROM
     {DEFAULT_COLLECTION_NAME}_collection
@@ -129,15 +126,13 @@ def get_server_path(doc_id: str) -> str:
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
             cursor.execute(f"""
-SELECT JSON_VALUE(cmetadata, '$.server_path') AS server_path
+SELECT json_value(cmetadata, '$.server_path') AS server_path
 FROM {DEFAULT_COLLECTION_NAME}_collection
 WHERE id = :doc_id """, doc_id=doc_id)
             return cursor.fetchone()[0]
 
 
 async def command_r_task(query_text, command_r_checkbox):
-    # command_r_response = ""
-
     system_prompt = "You are a helpful assistant. \
             Please respond to me in the same language I use for my messages. \
             If I switch languages, please switch your responses accordingly."
@@ -154,13 +149,10 @@ async def command_r_task(query_text, command_r_checkbox):
             HumanMessage(content=query_text),
         ]
         async for chunk in command_r_16k.astream(messages):
-            # command_r_response += chunk.content
             yield chunk.content
 
 
 async def command_r_plus_task(query_text, command_r_plus_checkbox):
-    # command_r_plus_response = ""
-
     system_prompt = "You are a helpful assistant. \
             Please respond to me in the same language I use for my messages. \
             If I switch languages, please switch your responses accordingly."
@@ -177,17 +169,137 @@ async def command_r_plus_task(query_text, command_r_plus_checkbox):
             HumanMessage(content=query_text),
         ]
         async for chunk in command_r_plus.astream(messages):
-            # command_r_plus_response += chunk.content
             yield chunk.content
 
 
-async def chat(query_text, command_r_checkbox, command_r_plus_checkbox):
+async def openai_gpt4o_task(query_text, openai_gpt4o_checkbox):
+    system_prompt = "You are a helpful assistant. \
+            Please respond to me in the same language I use for my messages. \
+            If I switch languages, please switch your responses accordingly."
+
+    if openai_gpt4o_checkbox:
+        openai_gpt4o = ChatOpenAI(
+            model="gpt-4o",
+            temperature=0,
+            max_tokens=None,
+            timeout=None,
+            max_retries=2,
+            api_key=os.environ["OPENAI_API_KEY"],
+            base_url=os.environ["OPENAI_BASE_URL"]
+        )
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=query_text),
+        ]
+        async for chunk in openai_gpt4o.astream(messages):
+            yield chunk.content
+
+
+async def openai_gpt4_task(query_text, openai_gpt4_checkbox):
+    system_prompt = "You are a helpful assistant. \
+            Please respond to me in the same language I use for my messages. \
+            If I switch languages, please switch your responses accordingly."
+
+    if openai_gpt4_checkbox:
+        openai_gpt4 = ChatOpenAI(
+            model="gpt-4",
+            temperature=0,
+            max_tokens=None,
+            timeout=None,
+            max_retries=2,
+            api_key=os.environ["OPENAI_API_KEY"],
+            base_url=os.environ["OPENAI_BASE_URL"]
+        )
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=query_text),
+        ]
+        async for chunk in openai_gpt4.astream(messages):
+            yield chunk.content
+
+
+async def claude_3_opus_task(query_text, claude_3_opus_checkbox):
+    system_prompt = "You are a helpful assistant. \
+            Please respond to me in the same language I use for my messages. \
+            If I switch languages, please switch your responses accordingly."
+
+    if claude_3_opus_checkbox:
+        claude_3_opus = ChatAnthropic(
+            model="claude-3-opus-20240229",
+            temperature=0,
+            max_tokens=1024,
+            timeout=None,
+            max_retries=2,
+        )
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=query_text),
+        ]
+        async for chunk in claude_3_opus.astream(messages):
+            yield chunk.content
+
+
+async def claude_3_sonnet_task(query_text, claude_3_sonnet_checkbox):
+    system_prompt = "You are a helpful assistant. \
+            Please respond to me in the same language I use for my messages. \
+            If I switch languages, please switch your responses accordingly."
+
+    if claude_3_sonnet_checkbox:
+        claude_3_sonnet = ChatAnthropic(
+            model="claude-3-5-sonnet-20240620",
+            temperature=0,
+            max_tokens=1024,
+            timeout=None,
+            max_retries=2,
+        )
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=query_text),
+        ]
+        async for chunk in claude_3_sonnet.astream(messages):
+            yield chunk.content
+
+
+async def claude_3_haiku_task(query_text, claude_3_haiku_checkbox):
+    system_prompt = "You are a helpful assistant. \
+            Please respond to me in the same language I use for my messages. \
+            If I switch languages, please switch your responses accordingly."
+
+    if claude_3_haiku_checkbox:
+        claude_3_haiku = ChatAnthropic(
+            model="claude-3-haiku-20240229",
+            temperature=0,
+            max_tokens=1024,
+            timeout=None,
+            max_retries=2,
+        )
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=query_text),
+        ]
+        async for chunk in claude_3_haiku.astream(messages):
+            yield chunk.content
+
+
+async def chat(query_text, command_r_checkbox, command_r_plus_checkbox,
+               openai_gpt4o_gen_checkbox, openai_gpt4_gen_checkbox,
+               claude_3_opus_checkbox, claude_3_sonnet_checkbox, claude_3_haiku_checkbox):
     command_r_gen = command_r_task(query_text, command_r_checkbox)
     command_r_plus_gen = command_r_plus_task(query_text, command_r_plus_checkbox)
+    openai_gpt4o_gen = openai_gpt4o_task(query_text, openai_gpt4o_gen_checkbox)
+    openai_gpt4_gen = openai_gpt4_task(query_text, openai_gpt4_gen_checkbox)
+    claude_3_opus_gen = claude_3_opus_task(query_text, claude_3_opus_checkbox)
+    claude_3_sonnet_gen = claude_3_sonnet_task(query_text, claude_3_sonnet_checkbox)
+    claude_3_haiku_gen = claude_3_haiku_task(query_text, claude_3_haiku_checkbox)
 
     while True:
         command_r_response = ""
         command_r_plus_response = ""
+        openai_gpt4o_gen_response = ""
+        openai_gpt4_gen_response = ""
+        claude_3_opus_gen_response = ""
+        claude_3_sonnet_gen_response = ""
+        claude_3_haiku_gen_response = ""
 
         try:
             command_r_response = await anext(command_r_gen)
@@ -199,22 +311,59 @@ async def chat(query_text, command_r_checkbox, command_r_plus_checkbox):
         except StopAsyncIteration:
             pass
 
-        if not command_r_response and not command_r_plus_response:
+        try:
+            openai_gpt4o_gen_response = await anext(openai_gpt4o_gen)
+        except StopAsyncIteration:
+            pass
+
+        try:
+            openai_gpt4_gen_response = await anext(openai_gpt4_gen)
+        except StopAsyncIteration:
+            pass
+
+        try:
+            claude_3_opus_gen_response = await anext(claude_3_opus_gen)
+        except StopAsyncIteration:
+            pass
+
+        try:
+            claude_3_sonnet_gen_response = await anext(claude_3_sonnet_gen)
+        except StopAsyncIteration:
+            pass
+
+        try:
+            claude_3_haiku_gen_response = await anext(claude_3_haiku_gen)
+        except StopAsyncIteration:
+            pass
+
+        if not command_r_response and not command_r_plus_response and not openai_gpt4o_gen_response and not openai_gpt4_gen_response and not claude_3_opus_gen_response and not claude_3_sonnet_gen_response and not claude_3_haiku_gen_response:
             break
 
-        yield command_r_response, command_r_plus_response
+        yield command_r_response, command_r_plus_response, openai_gpt4o_gen_response, openai_gpt4_gen_response, claude_3_opus_gen_response, claude_3_sonnet_gen_response, claude_3_haiku_gen_response
 
 
-async def chat_stream(query_text, command_r_checkbox, command_r_plus_checkbox):
+async def chat_stream(query_text, command_r_checkbox, command_r_plus_checkbox, openai_gpt4o_checkbox,
+                      openai_gpt4_checkbox, claude_3_opus_checkbox, claude_3_sonnet_checkbox, claude_3_haiku_checkbox):
     # ChatOCIGenAI
     command_r_response = ""
     command_r_plus_response = ""
-    async for r, r_plus in chat(query_text, command_r_checkbox, command_r_plus_checkbox):
-        # print(f"Command-R: {r}")
-        # print(f"Command-R Plus: {r_plus}")
+    openai_gpt4o_response = ""
+    openai_gpt4_response = ""
+    claude_3_opus_response = ""
+    claude_3_sonnet_response = ""
+    claude_3_haiku_response = ""
+    async for r, r_plus, gpt4o, gpt4, opus, sonnet, haiku in chat(query_text, command_r_checkbox,
+                                                                  command_r_plus_checkbox, openai_gpt4o_checkbox,
+                                                                  openai_gpt4_checkbox, claude_3_opus_checkbox,
+                                                                  claude_3_sonnet_checkbox, claude_3_haiku_checkbox):
         command_r_response += r
         command_r_plus_response += r_plus
-        yield command_r_response, command_r_plus_response
+        openai_gpt4o_response += gpt4o
+        openai_gpt4_response += gpt4
+        claude_3_opus_response += opus
+        claude_3_sonnet_response += sonnet
+        claude_3_haiku_response += haiku
+        yield command_r_response, command_r_plus_response, openai_gpt4o_response, openai_gpt4_response, claude_3_opus_response, claude_3_sonnet_response, claude_3_haiku_response
 
 
 def create_oci_cred(user_ocid, tenancy_ocid, compartment_ocid, fingerprint, private_key_file):
@@ -271,6 +420,64 @@ END;
 
 
 def create_table():
+    # Drop the preference if it exists
+    check_preference_sql = """
+SELECT PRE_NAME FROM CTX_PREFERENCES WHERE PRE_NAME = 'WORLD_LEXER' AND PRE_OWNER = USER
+"""
+
+    drop_preference_plsql = """
+-- Drop Preference        
+BEGIN
+  CTX_DDL.DROP_PREFERENCE('world_lexer');
+END;
+"""
+
+    create_preference_plsql = """
+-- Create Preference    
+BEGIN
+  CTX_DDL.CREATE_PREFERENCE('world_lexer','WORLD_LEXER');
+END;
+"""
+
+    # Drop the index if it exists
+    check_index_sql = f"""
+SELECT INDEX_NAME FROM USER_INDEXES WHERE INDEX_NAME = '{DEFAULT_COLLECTION_NAME.upper()}_EMBED_DATA_IDX'
+"""
+
+    drop_index_sql = f"""
+-- Drop Index
+DROP INDEX {DEFAULT_COLLECTION_NAME.upper()}_EMBED_DATA_IDX
+"""
+
+    create_index_sql = f"""
+-- Create Index
+-- CREATE INDEX {DEFAULT_COLLECTION_NAME}_embed_data_idx ON {DEFAULT_COLLECTION_NAME}_embedding(embed_data) INDEXTYPE IS CTXSYS.CONTEXT PARAMETERS ('LEXER world_lexer sync (on commit)')
+CREATE INDEX {DEFAULT_COLLECTION_NAME}_embed_data_idx ON {DEFAULT_COLLECTION_NAME}_embedding(embed_data) INDEXTYPE IS CTXSYS.CONTEXT PARAMETERS ('LEXER world_lexer sync (every "freq=minutely; interval=1")')
+"""
+
+    output_sql_text = f"""
+-- Create Collection Table
+CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_collection (
+    id VARCHAR2(200),
+    data BLOB,
+    cmetadata CLOB
+); 
+"""
+
+    output_sql_text += f"""
+-- Create Embedding Table  
+CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_embedding (
+    doc_id VARCHAR2(200),
+    embed_id NUMBER,
+    embed_data VARCHAR2(2000),
+    embed_vector VECTOR(embedding_dim, FLOAT32),
+    cmetadata CLOB
+);
+"""
+
+    output_sql_text += "\n" + create_preference_plsql.strip() + "\n"
+    output_sql_text += "\n" + create_index_sql.strip() + ";"
+
     # Initialize OracleVS
     MyOracleVS(
         client=pool.acquire(),
@@ -280,32 +487,25 @@ def create_table():
         params={"pre_delete_collection": True}
     )
 
-    drop_and_create_table_sql = f"""
--- Drop Collection Table
-DROP TABLE {DEFAULT_COLLECTION_NAME}_collection PURGE;
+    with pool.acquire() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute(check_preference_sql)
+            if cursor.fetchone():
+                cursor.execute(drop_preference_plsql)
+            else:
+                print("Preference 'WORLD_LEXER' does not exist.")
+            cursor.execute(create_preference_plsql)
 
--- Drop Embedding Table
-DROP TABLE {DEFAULT_COLLECTION_NAME}_embedding PURGE;
-
--- Create Collection Table
-CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_collection (
-    id VARCHAR2(200),
-    data BLOB,
-    cmetadata CLOB
-)
-
--- Create Embedding Table  
-CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_embedding (
-    doc_id VARCHAR2(200),
-    embed_id NUMBER,
-    embed_data VARCHAR2(2000),
-    embed_vector VECTOR(embedding_dim, FLOAT32),
-    cmetadata CLOB
-)
-    """
+            # cursor.execute(check_index_sql)
+            # if cursor.fetchone():
+            #     cursor.execute(drop_index_sql)
+            # else:
+            #     print(f"Index '{DEFAULT_COLLECTION_NAME.upper()}_EMBED_DATA_IDX' does not exist.")
+            cursor.execute(create_index_sql)
+            conn.commit()
 
     gr.Info("テーブルの作成が完了しました")
-    return gr.Accordion(), gr.Textbox(value=drop_and_create_table_sql.strip())
+    return gr.Accordion(), gr.Textbox(value=output_sql_text.strip())
 
 
 # def test_oci_cred(test_query_text):
@@ -416,11 +616,12 @@ def load_document(file_path, server_directory):
         with conn.cursor() as cursor:
             cursor.setinputsizes(**{"data": oracledb.DB_TYPE_BLOB})
             load_document_sql = f"""
+-- (DON'T execute on sqlplus)Insert to table {DEFAULT_COLLECTION_NAME}_collection
 INSERT INTO {DEFAULT_COLLECTION_NAME}_collection(id, data, cmetadata)
 VALUES (:id, to_blob(:data), :cmetadata) """
-            output_sql_text = load_document_sql.replace(":id", str(doc_id))
+            output_sql_text = load_document_sql.replace(":id", "'" + str(doc_id) + "'")
             output_sql_text = output_sql_text.replace(":data", "'...'")
-            output_sql_text = output_sql_text.replace(":cmetadata", json.dumps(collection_cmeta))
+            output_sql_text = output_sql_text.replace(":cmetadata", "'" + json.dumps(collection_cmeta) + "'") + ";"
             cursor.execute(load_document_sql, {
                 'id': doc_id,
                 'data': contents,
@@ -429,8 +630,9 @@ VALUES (:id, to_blob(:data), :cmetadata) """
             conn.commit()
 
             select_contents_sql = f"""
+-- Select data from table {DEFAULT_COLLECTION_NAME}_collection
 SELECT dbms_vector_chain.utl_to_text(dt.data) from {DEFAULT_COLLECTION_NAME}_collection dt WHERE dt.id = :doc_id """
-            output_sql_text += "\n" + select_contents_sql.replace(":doc_id", "'" + str(doc_id) + "'")
+            output_sql_text += "\n" + select_contents_sql.replace(":doc_id", "'" + str(doc_id) + "'") + ";"
             cursor.execute(select_contents_sql, {'doc_id': doc_id})
             result = cursor.fetchone()
             contents = result[0].read()
@@ -462,16 +664,19 @@ def split_document(doc_id, chunks_by, chunks_max_size,
 
             # print(f"{parameter_str}")
             select_chunks_sql = f"""
+-- Select chunks            
 SELECT
-    JSON_VALUE(ct.column_value, '$.chunk_id')     AS chunk_id,
-    JSON_VALUE(ct.column_value, '$.chunk_offset') AS chunk_offset,
-    JSON_VALUE(ct.column_value, '$.chunk_length') AS chunk_length,
-    JSON_VALUE(ct.column_value, '$.chunk_data')   AS chunk_data
+    json_value(ct.column_value, '$.chunk_id')     AS chunk_id,
+    json_value(ct.column_value, '$.chunk_offset') AS chunk_offset,
+    json_value(ct.column_value, '$.chunk_length') AS chunk_length,
+    json_value(ct.column_value, '$.chunk_data')   AS chunk_data
 FROM
-    {DEFAULT_COLLECTION_NAME}_collection dt, dbms_vector_chain.utl_to_chunks(REPLACE(REPLACE(dbms_vector_chain.utl_to_text(dt.data), '...', ''),'..', ''),
-                                                          JSON(
-                                                            :parameter_str
-                                                            )
+    {DEFAULT_COLLECTION_NAME}_collection dt, 
+    dbms_vector_chain.utl_to_chunks(
+        dbms_vector_chain.utl_to_text(dt.data),
+        JSON(
+            :parameter_str
+        )
     ) ct
     CROSS JOIN
         JSON_TABLE ( ct.column_value, '$[*]'
@@ -484,7 +689,7 @@ WHERE
             # cursor.setinputsizes(oracledb.DB_TYPE_VECTOR)
             utl_to_chunks_sql_output = "\n" + select_chunks_sql.replace(':parameter_str',
                                                                         "'" + parameter_str + "'").replace(
-                ':doc_id', "'" + str(doc_id) + "'")
+                ':doc_id', "'" + str(doc_id) + "'") + ";"
             # print(f"{utl_to_chunks_sql_output=}")
             cursor.execute(select_chunks_sql,
                            [parameter_str, doc_id])
@@ -553,16 +758,19 @@ def embed_save_document(doc_id, chunks_by, chunks_max_size,
 
             # print(f"{parameter_str}")
             select_chunks_sql = f"""
+-- Select chunks
 SELECT
-    JSON_VALUE(ct.column_value, '$.chunk_id')     AS chunk_id,
-    JSON_VALUE(ct.column_value, '$.chunk_offset') AS chunk_offset,
-    JSON_VALUE(ct.column_value, '$.chunk_length') AS chunk_length,
-    JSON_VALUE(ct.column_value, '$.chunk_data')   AS chunk_data
+    json_value(ct.column_value, '$.chunk_id')     AS chunk_id,
+    json_value(ct.column_value, '$.chunk_offset') AS chunk_offset,
+    json_value(ct.column_value, '$.chunk_length') AS chunk_length,
+    json_value(ct.column_value, '$.chunk_data')   AS chunk_data
 FROM
-    {DEFAULT_COLLECTION_NAME}_collection dt, dbms_vector_chain.utl_to_chunks(REPLACE(REPLACE(dbms_vector_chain.utl_to_text(dt.data), '...', ''),'..', ''),
-                                                          JSON(
-                                                            :parameter_str
-                                                            )
+    {DEFAULT_COLLECTION_NAME}_collection dt, 
+    dbms_vector_chain.utl_to_chunks(
+        dbms_vector_chain.utl_to_text(dt.data),
+        JSON(
+            :parameter_str
+        )
     ) ct
     CROSS JOIN
         JSON_TABLE ( ct.column_value, '$[*]'
@@ -576,7 +784,7 @@ WHERE
             utl_to_chunks_sql_output = "\n" + select_chunks_sql.replace(':parameter_str',
                                                                         "'" + parameter_str + "'").replace(
                 ':doc_id', "'" +
-                           str(doc_id) + "'")
+                           str(doc_id) + "'") + ";"
             # print(f"{utl_to_chunks_sql_output=}")
             cursor.execute(select_chunks_sql,
                            [parameter_str, doc_id])
@@ -588,10 +796,11 @@ WHERE
                                'CHUNK_OFFSET': row[1], 'CHUNK_LENGTH': row[2], 'CHUNK_DATA': row[3]})
 
             delete_sql = f"""
+-- Delete chunks
 DELETE FROM {DEFAULT_COLLECTION_NAME}_embedding WHERE doc_id = :doc_id """
             cursor.execute(delete_sql,
                            [doc_id])
-            utl_to_chunks_sql_output += "\n" + delete_sql.replace(':doc_id', "'" + str(doc_id) + "'")
+            utl_to_chunks_sql_output += "\n" + delete_sql.replace(':doc_id', "'" + str(doc_id) + "'") + ";"
 
             # embed_save_sql = """
             #     INSERT INTO doc_chunks (
@@ -628,6 +837,7 @@ DELETE FROM {DEFAULT_COLLECTION_NAME}_embedding WHERE doc_id = :doc_id """
             # """
             # For oracle 23ai bug
             embed_save_sql = f"""
+-- Insert chunks
 INSERT INTO {DEFAULT_COLLECTION_NAME}_embedding (
 doc_id,
 embed_id,
@@ -647,10 +857,11 @@ FROM
             et.chunk_data embed_data
         FROM
             {DEFAULT_COLLECTION_NAME}_collection dt,
-            dbms_vector_chain.utl_to_chunks(dbms_vector_chain.utl_to_text(dt.data),
-                                                                                JSON(
-                                                                                  :parameter_str
-                                                                                )
+            dbms_vector_chain.utl_to_chunks(
+                dbms_vector_chain.utl_to_text(dt.data),
+                JSON(
+                    :parameter_str
+                )
             ) t,
             JSON_TABLE ( t.column_value, '$[*]'
                     COLUMNS (
@@ -669,10 +880,12 @@ FROM
             to_vector(et.column_value) embed_vector
         FROM
             {DEFAULT_COLLECTION_NAME}_collection dt,
-            dbms_vector_chain.utl_to_embeddings(dbms_vector_chain.utl_to_chunks(dbms_vector_chain.utl_to_text(dt.data),
-                                                                                JSON(
-                                                                                  :parameter_str
-                                                                                )
+            dbms_vector_chain.utl_to_embeddings(
+                dbms_vector_chain.utl_to_chunks(
+                    dbms_vector_chain.utl_to_text(dt.data),
+                    JSON(
+                        :parameter_str
+                    )
             ),JSON(
                   '{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}'
               )
@@ -684,8 +897,9 @@ WHERE
     t_chunk.doc_id = t_embed.doc_id AND t_chunk.embed_id = t_embed.embed_id
             """
             utl_to_chunks_sql_output += (
-                "\n" + embed_save_sql.replace(':parameter_str', "'" + parameter_str + "'")
-                .replace(':doc_id', "'" + str(doc_id) + "'"))
+                                                "\n" + embed_save_sql.replace(':parameter_str',
+                                                                              "'" + parameter_str + "'")
+                                                .replace(':doc_id', "'" + str(doc_id) + "'")) + ";"
             print(f"{utl_to_chunks_sql_output=}")
             cursor.execute(embed_save_sql,
                            [parameter_str, doc_id, parameter_str, doc_id])
@@ -763,7 +977,8 @@ def chat_document(question_embedding_model_checkbox_group_input, reranker_model_
     gpt_result = "Not queried."
 
     # chat_llm = command_r_chat
-    chat_llm = claude_opus_chat
+    # chat_llm = claude_opus_chat
+    chat_llm = gpt_chat
 
     # RAG-Fusion
     if generate_query_radio_input == "Sub-Query":
@@ -790,7 +1005,7 @@ def chat_document(question_embedding_model_checkbox_group_input, reranker_model_
         ])
 
         generate_sub_queries_chain = (
-            sub_query_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+                sub_query_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         sub_queries = generate_sub_queries_chain.invoke({"original_query": query_text_input})
         print(f"{sub_queries=}")
@@ -817,7 +1032,7 @@ def chat_document(question_embedding_model_checkbox_group_input, reranker_model_
         ])
 
         generate_rag_fusion_queries_chain = (
-            rag_fusion_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+                rag_fusion_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         rag_fusion_queries = generate_rag_fusion_queries_chain.invoke({"original_query": query_text_input})
         print(f"{rag_fusion_queries=}")
@@ -837,7 +1052,7 @@ def chat_document(question_embedding_model_checkbox_group_input, reranker_model_
         ])
 
         generate_hyde_answers_chain = (
-            hyde_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+                hyde_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         hyde_answers = generate_hyde_answers_chain.invoke({"original_query": query_text_input})
         print(f"{hyde_answers=}")
@@ -857,7 +1072,7 @@ def chat_document(question_embedding_model_checkbox_group_input, reranker_model_
         ])
 
         generate_step_back_queries_chain = (
-            step_back_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+                step_back_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         step_back_queries = generate_step_back_queries_chain.invoke({"original_query": query_text_input})
         print(f"{step_back_queries=}")
@@ -868,10 +1083,7 @@ def chat_document(question_embedding_model_checkbox_group_input, reranker_model_
             sub_query3_text_input = re.sub(r'^3\. ', '', step_back_queries[2])
     elif generate_query_radio_input == "Customized-Multi-Step-Query":
         select_multi_step_query_sql = f"""
-            SELECT substr(
-                replace(JSON_VALUE(dt.cmetadata, '$.source'), '\\', '/'),
-                instr(replace(JSON_VALUE(dt.cmetadata, '$.source'), '\\', '/'), '/', -1) + 1
-            ) AS name, dc.embed_id embed_id, dc.embed_data embed_data, dc.doc_id doc_id
+            SELECT json_value(dt.cmetadata, '$.file_name') name, dc.embed_id embed_id, dc.embed_data embed_data, dc.doc_id doc_id
             FROM {DEFAULT_COLLECTION_NAME}_embedding dc, {DEFAULT_COLLECTION_NAME}_collection dt
             WHERE dc.doc_id = dt.id
             ORDER BY vector_distance(dc.embed_vector , (
@@ -927,6 +1139,7 @@ def chat_document(question_embedding_model_checkbox_group_input, reranker_model_
     doc_ids_str = ','.join([str(doc_id) for doc_id in doc_id_checkbox_group_input])
     # print(f"{doc_ids_str=}")
     with_sql = """
+-- Select data
 WITH offsets AS (
         SELECT level - (:extend_around_chunk_size / 2 + 1) AS offset
         FROM dual
@@ -941,7 +1154,9 @@ selected_embed_ids AS
                 AND vector_distance(dc.embed_vector, (
                         SELECT to_vector(et.embed_vector) embed_vector
                         FROM
-                            dbms_vector_chain.utl_to_embeddings(:query_text, JSON('{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}')) t,
+                            dbms_vector_chain.utl_to_embeddings(
+                                    :query_text, 
+                                    JSON('{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}')) t,
                             JSON_TABLE ( t.column_value, '$[*]'
                                     COLUMNS (
                                         embed_id NUMBER PATH '$.embed_id',
@@ -963,7 +1178,9 @@ selected_embed_ids AS
                 SELECT dc.doc_id doc_id, dc.embed_id embed_id, vector_distance(dc.embed_vector, (
                         SELECT to_vector(et.embed_vector) embed_vector
                         FROM
-                            dbms_vector_chain.utl_to_embeddings(:query_text, JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
+                            dbms_vector_chain.utl_to_embeddings(
+                                    :query_text, 
+                                    JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
                             JSON_TABLE ( t.column_value, '$[*]'
                                     COLUMNS (
                                         embed_id NUMBER PATH '$.embed_id',
@@ -997,10 +1214,7 @@ selected_results AS
 ),
 aggregated_results AS
 (
-        SELECT substr(
-            replace(JSON_VALUE(dt.cmetadata, '$.source'), '\\', '/'),
-            instr(replace(JSON_VALUE(dt.cmetadata, '$.source'), '\\', '/'), '/', -1) + 1
-        ) AS name, dc.embed_id embed_id, dc.embed_data embed_data, dc.doc_id doc_id, MIN(s.vector_distance) vector_distance
+        SELECT json_value(dt.cmetadata, '$.file_name') name, dc.embed_id embed_id, dc.embed_data embed_data, dc.doc_id doc_id, MIN(s.vector_distance) vector_distance
         FROM selected_results s, {DEFAULT_COLLECTION_NAME}_embedding dc, {DEFAULT_COLLECTION_NAME}_collection dt
         WHERE s.adjusted_embed_id = dc.embed_id AND s.doc_id = dt.id and dc.doc_id = dt.id  
         GROUP BY dc.doc_id, name, dc.embed_id, dc.embed_data
@@ -1089,7 +1303,9 @@ ORDER BY
                 SELECT dc.doc_id doc_id, dc.embed_id embed_id, vector_distance(dc.embed_vector, (
                         SELECT to_vector(et.embed_vector) embed_vector
                         FROM
-                            dbms_vector_chain.utl_to_embeddings(:query_text, JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
+                            dbms_vector_chain.utl_to_embeddings(
+                                    :query_text, 
+                                    JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
                             JSON_TABLE ( t.column_value, '$[*]'
                                     COLUMNS (
                                         embed_id NUMBER PATH '$.embed_id',
@@ -1148,6 +1364,7 @@ ORDER BY
         # For the purpose of display, ensure the value is properly quoted if it's a string
         display_value = f"'{value}'" if isinstance(value, str) else str(value)
         query_sql_output = query_sql_output.replace(placeholder, display_value)
+    query_sql_output = query_sql_output.strip() + ";"
 
     # Now query_sql_output contains the SQL command with parameter values inserted
     print(f"\nQUERY_SQL_OUTPUT:\n{query_sql_output}")
@@ -1164,7 +1381,8 @@ ORDER BY
                     columns=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "KEY_WORDS"])
 
                 return (gr.Textbox(value=query_sql_output.strip()), gr.Markdown("**検索結果数**: " + str(
-                    docs_dataframe.shape[0]) + "   |   **検索キーワード**: (" + str(len(search_texts)) + ")[" + ', '.join(
+                    docs_dataframe.shape[0]) + "   |   **検索キーワード**: (" + str(
+                    len(search_texts)) + ")[" + ', '.join(
                     search_texts) + "]", visible=True),
                         gr.Dataframe(value=docs_dataframe, wrap=True,
                                      column_widths=["4%", "68%", "6%", "8%", "6%", "8%"]),
@@ -1193,7 +1411,8 @@ ORDER BY
                               'DISTANCE': '-' if str(doc[4]) == '999999.0' else str(doc[4]),
                               'score': ce_score} for doc, ce_score in zip(unranked_docs, ranked_scores)]
                 docs_dataframe = pd.DataFrame(docs_data)
-                docs_dataframe = docs_dataframe.sort_values(by='score', ascending=False).head(reranker_top_k_slider_input).drop(
+                docs_dataframe = docs_dataframe.sort_values(by='score', ascending=False).head(
+                    reranker_top_k_slider_input).drop(
                     columns=['score'])
             elif 'BAAI/' in reranker_model_radio_input or 'maidalun1020/' in reranker_model_radio_input:
                 unranked = []
@@ -1208,7 +1427,8 @@ ORDER BY
                               'DISTANCE': '-' if str(doc[4]) == '999999.0' else str(doc[4]),
                               'score': ce_score} for doc, ce_score in zip(unranked_docs, ce_scores)]
                 docs_dataframe = pd.DataFrame(docs_data)
-                docs_dataframe = docs_dataframe.sort_values(by='score', ascending=False).head(reranker_top_k_slider_input).drop(
+                docs_dataframe = docs_dataframe.sort_values(by='score', ascending=False).head(
+                    reranker_top_k_slider_input).drop(
                     columns=['score'])
             else:
                 docs_data = [{'CONTENT': doc[2],
@@ -1221,10 +1441,7 @@ ORDER BY
                 filtered_doc_ids = ','.join([source.split(':')[0] for source in docs_dataframe['SOURCE'].tolist()])
                 select_extend_first_chunk_sql = f"""
         SELECT 
-                substr(
-                    replace(JSON_VALUE(dt.cmetadata, '$.source'), '\\', '/'),
-                    instr(replace(JSON_VALUE(dt.cmetadata, '$.source'), '\\', '/'), '/', -1) + 1
-                ) AS name,
+                json_value(dt.cmetadata, '$.file_name') name,
                 MIN(dc.embed_id) embed_id,
                 RTRIM(XMLCAST(XMLAGG(XMLELEMENT(e, dc.embed_data || ',') ORDER BY dc.embed_id) AS CLOB), ',') AS embed_data,
                 dc.doc_id doc_id,
@@ -1242,13 +1459,15 @@ ORDER BY
         """
                 select_extend_first_chunk_sql = (select_extend_first_chunk_sql
                                                  .replace(':filtered_doc_ids', filtered_doc_ids)
-                                                 .replace(':extend_first_chunk_size', str(extend_first_chunk_size_input)))
+                                                 .replace(':extend_first_chunk_size',
+                                                          str(extend_first_chunk_size_input)))
                 print(f"{select_extend_first_chunk_sql=}")
                 cursor.execute(select_extend_first_chunk_sql)
                 first_chunks_df = pd.DataFrame(columns=docs_dataframe.columns)
                 for row in cursor:
                     new_data = pd.DataFrame(
-                        {'CONTENT': row[2].read(), 'EMBED_ID': row[1], 'SOURCE': str(row[3]) + ":" + row[0], 'DISTANCE': '-'},
+                        {'CONTENT': row[2].read(), 'EMBED_ID': row[1], 'SOURCE': str(row[3]) + ":" + row[0],
+                         'DISTANCE': '-'},
                         index=[2])
                     first_chunks_df = pd.concat([new_data, first_chunks_df], ignore_index=True)
                 print(f"{first_chunks_df=}")
@@ -1416,6 +1635,7 @@ def delete_document(server_directory, doc_ids):
     if not server_directory or not doc_ids:
         raise ValueError("Please enter server_directory and doc_ids")
 
+    output_sql = ""
     with pool.acquire() as conn, conn.cursor() as cursor:
         for doc_id in filter(bool, doc_ids):
             server_path = get_server_path(doc_id)
@@ -1425,20 +1645,23 @@ def delete_document(server_directory, doc_ids):
             else:
                 print(f"File {doc_id} not found")
 
-            cursor.execute(f"""
-                DELETE FROM {DEFAULT_COLLECTION_NAME}_embedding
-                WHERE doc_id = :doc_id
-            """, doc_id=doc_id)
+            delete_embedding_sql = f"""
+DELETE FROM {DEFAULT_COLLECTION_NAME}_embedding
+WHERE doc_id = :doc_id """
+            delete_collection_sql = f"""
+DELETE FROM {DEFAULT_COLLECTION_NAME}_collection
+WHERE id = :doc_id """
+            output_sql += delete_embedding_sql.strip().replace(":doc_id", "'" + doc_id + "'") + "\n"
+            output_sql += delete_collection_sql.strip().replace(":doc_id", "'" + doc_id + "'")
+            cursor.execute(delete_embedding_sql, doc_id=doc_id)
+            cursor.execute(delete_collection_sql, doc_id=doc_id)
 
-            cursor.execute(f"""
-                DELETE FROM {DEFAULT_COLLECTION_NAME}_collection
-                WHERE id = :doc_id
-            """, doc_id=doc_id)
-
-        conn.commit()
+            conn.commit()
 
     doc_list = get_doc_list()
-    return gr.Radio(doc_list), gr.CheckboxGroup(choices=doc_list, value=""), gr.CheckboxGroup(choices=doc_list)
+    return gr.Textbox(value=output_sql), gr.Radio(doc_list), gr.CheckboxGroup(choices=doc_list,
+                                                                              value=""), gr.CheckboxGroup(
+        choices=doc_list)
 
 
 # def chat_document_stream(similarity_top_k, similarity_threshold,
@@ -1548,8 +1771,8 @@ def delete_document(server_directory, doc_ids):
 #         aggregated_results AS
 #         (
 #                 SELECT substr(
-#                         replace(JSON_VALUE(dt.cmetadata, '$.source'), '\\', '/'),
-#                         instr(replace(JSON_VALUE(dt.cmetadata, '$.source'), '\\', '/'), '/', -1) + 1
+#                         replace(json_value(dt.cmetadata, '$.source'), '\\', '/'),
+#                         instr(replace(json_value(dt.cmetadata, '$.source'), '\\', '/'), '/', -1) + 1
 #                     ) name, dc.embed_id embed_id, dc.embed_data embed_data, dc.doc_id doc_id, MIN(s.vector_distance) vector_distance
 #                 FROM selected_results s, {DEFAULT_COLLECTION_NAME}_embedding dc, {DEFAULT_COLLECTION_NAME}_collection dt
 #                 WHERE s.adjusted_embed_id = dc.embed_id AND s.doc_id = dt.id and dc.doc_id = dt.id
@@ -1799,8 +2022,8 @@ def delete_document(server_directory, doc_ids):
 #                 select_extend_first_n_chunk_sql = f"""
 #                     SELECT
 #                             substr(
-#                                 replace(JSON_VALUE(dt.cmetadata, '$.source'), '\\', '/'),
-#                                 instr(replace(JSON_VALUE(dt.cmetadata, '$.source'), '\\', '/'), '/', -1) + 1
+#                                 replace(json_value(dt.cmetadata, '$.source'), '\\', '/'),
+#                                 instr(replace(json_value(dt.cmetadata, '$.source'), '\\', '/'), '/', -1) + 1
 #                             ) name,
 #                             MIN(dc.embed_id) embed_id,
 #                             RTRIM(XMLCAST(XMLAGG(XMLELEMENT(e, dc.embed_data || ',') ORDER BY dc.embed_id) AS CLOB), ',') AS embed_data,
@@ -1905,6 +2128,7 @@ with gr.Blocks(css=custom_css) as app:
                         with gr.Column():
                             tab_chat_with_command_r_checkbox = gr.Checkbox(label="Command-R", value=False)
                     with gr.Accordion(label="Command-R メッセージ",
+                                      visible=False,
                                       open=False) as tab_chat_with_llm_command_r_accordion:
                         tab_chat_with_command_r_answer_text = gr.Textbox(label="LLM メッセージ", show_label=False,
                                                                          lines=5, max_lines=5,
@@ -1916,6 +2140,7 @@ with gr.Blocks(css=custom_css) as app:
                         with gr.Column():
                             tab_chat_with_command_r_plus_checkbox = gr.Checkbox(label="Command-R+", value=False)
                     with gr.Accordion(label="Command-R+ メッセージ",
+                                      visible=False,
                                       open=False) as tab_chat_with_llm_command_r_plus_accordion:
                         tab_chat_with_command_r_plus_answer_text = gr.Textbox(label="LLM メッセージ", show_label=False,
                                                                               lines=5, max_lines=5,
@@ -1923,7 +2148,67 @@ with gr.Blocks(css=custom_css) as app:
                                                                               show_copy_button=True)
             with gr.Row():
                 with gr.Column():
-                    tab_chat_with_llm_query_text = gr.Textbox(label="ユーザー・メッセージ", lines=2, max_lines=5)
+                    with gr.Row():
+                        with gr.Column():
+                            tab_chat_with_openai_gpt4o_checkbox = gr.Checkbox(label="OpenAI gpt-4o", value=False)
+                    with gr.Accordion(label="OpenAI gpt-4o メッセージ",
+                                      visible=False,
+                                      open=False) as tab_chat_with_llm_openai_gpt4o_accordion:
+                        tab_chat_with_openai_gpt4o_answer_text = gr.Textbox(label="LLM メッセージ", show_label=False,
+                                                                            lines=5, max_lines=5,
+                                                                            autoscroll=True, interactive=False,
+                                                                            show_copy_button=True)
+            with gr.Row():
+                with gr.Column():
+                    with gr.Row():
+                        with gr.Column():
+                            tab_chat_with_openai_gpt4_checkbox = gr.Checkbox(label="OpenAI gpt-4", value=False)
+                    with gr.Accordion(label="OpenAI gpt-4 メッセージ",
+                                      visible=False,
+                                      open=False) as tab_chat_with_llm_openai_gpt4_accordion:
+                        tab_chat_with_openai_gpt4_answer_text = gr.Textbox(label="LLM メッセージ", show_label=False,
+                                                                           lines=5, max_lines=5,
+                                                                           autoscroll=True, interactive=False,
+                                                                           show_copy_button=True)
+            with gr.Row():
+                with gr.Column():
+                    with gr.Row():
+                        with gr.Column():
+                            tab_chat_with_claude_3_opus_checkbox = gr.Checkbox(label="Claude 3 Opus", value=False)
+                    with gr.Accordion(label="Claude 3 Opus メッセージ",
+                                      visible=False,
+                                      open=False) as tab_chat_with_llm_claude_3_opus_accordion:
+                        tab_chat_with_claude_3_opus_answer_text = gr.Textbox(label="LLM メッセージ", show_label=False,
+                                                                             lines=5, max_lines=5,
+                                                                             autoscroll=True, interactive=False,
+                                                                             show_copy_button=True)
+            with gr.Row():
+                with gr.Column():
+                    with gr.Row():
+                        with gr.Column():
+                            tab_chat_with_claude_3_sonnet_checkbox = gr.Checkbox(label="Claude 3.5 Sonnet", value=False)
+                    with gr.Accordion(label="Claude 3.5 Sonnet メッセージ",
+                                      visible=False,
+                                      open=False) as tab_chat_with_llm_claude_3_sonnet_accordion:
+                        tab_chat_with_claude_3_sonnet_answer_text = gr.Textbox(label="LLM メッセージ", show_label=False,
+                                                                               lines=5, max_lines=5,
+                                                                               autoscroll=True, interactive=False,
+                                                                               show_copy_button=True)
+            with gr.Row():
+                with gr.Column():
+                    with gr.Row():
+                        with gr.Column():
+                            tab_chat_with_claude_3_haiku_checkbox = gr.Checkbox(label="Claude 3 Haiku", value=False)
+                    with gr.Accordion(label="Claude 3 Haiku メッセージ",
+                                      visible=False,
+                                      open=False) as tab_chat_with_llm_claude_3_haiku_accordion:
+                        tab_chat_with_claude_3_haiku_answer_text = gr.Textbox(label="LLM メッセージ", show_label=False,
+                                                                              lines=5, max_lines=5,
+                                                                              autoscroll=True, interactive=False,
+                                                                              show_copy_button=True)
+            with gr.Row():
+                with gr.Column():
+                    tab_chat_with_llm_query_text = gr.Textbox(label="ユーザー・メッセージ*", lines=2, max_lines=5)
             with gr.Row():
                 with gr.Column():
                     tab_chat_with_llm_clear_button = gr.ClearButton(value="クリア")
@@ -1939,22 +2224,24 @@ with gr.Blocks(css=custom_css) as app:
                                                           show_copy_button=True)
             with gr.Row():
                 with gr.Column():
-                    tab_create_oci_cred_user_ocid_text = gr.Textbox(label="User OCID", lines=1, interactive=True)
+                    tab_create_oci_cred_user_ocid_text = gr.Textbox(label="User OCID*", lines=1, interactive=True)
             with gr.Row():
                 with gr.Column():
-                    tab_create_oci_cred_tenancy_ocid_text = gr.Textbox(label="Tenancy OCID", lines=1, interactive=True)
+                    tab_create_oci_cred_tenancy_ocid_text = gr.Textbox(label="Tenancy OCID*", lines=1, interactive=True)
             with gr.Row():
                 with gr.Column():
-                    tab_create_oci_cred_compartment_ocid_text = gr.Textbox(label="Compartment OCID", lines=1,
+                    tab_create_oci_cred_compartment_ocid_text = gr.Textbox(label="Compartment OCID*", lines=1,
                                                                            interactive=True)
             with gr.Row():
                 with gr.Column():
-                    tab_create_oci_cred_fingerprint_text = gr.Textbox(label="Fingerprint", lines=1, interactive=True)
+                    tab_create_oci_cred_fingerprint_text = gr.Textbox(label="Fingerprint*", lines=1, interactive=True)
             with gr.Row():
                 with gr.Column():
-                    tab_create_oci_cred_private_key_file = gr.File(label="Private Key", file_types=[".pem"],
+                    tab_create_oci_cred_private_key_file = gr.File(label="Private Key*", file_types=[".pem"],
                                                                    type="filepath", interactive=True)
             with gr.Row():
+                with gr.Column():
+                    tab_create_oci_clear_button = gr.ClearButton(value="クリア")
                 with gr.Column():
                     tab_create_oci_cred_button = gr.Button(value="作成/再作成", variant="primary")
             with gr.Accordion(label="OCI_CREDのテスト", open=False) as tab_create_oci_cred_test_accordion:
@@ -1964,7 +2251,8 @@ with gr.Blocks(css=custom_css) as app:
                                                                          value="こんにちわ")
                 with gr.Row():
                     with gr.Column():
-                        tab_create_oci_cred_test_vector_text = gr.Textbox(label="ベクトル", lines=10, max_lines=10)
+                        tab_create_oci_cred_test_vector_text = gr.Textbox(label="ベクトル", lines=10, max_lines=10,
+                                                                          autoscroll=False)
                 with gr.Row():
                     with gr.Column():
                         tab_create_oci_cred_test_button = gr.Button(value="テスト", variant="primary")
@@ -1977,8 +2265,10 @@ with gr.Blocks(css=custom_css) as app:
                 with gr.Column():
                     tab_create_table_button = gr.Button(value="作成/再作成", variant="primary")
         with gr.TabItem(label="Step-1.ドキュメントの読込み") as tab_load_document:
-            with gr.Row():
-                tab_load_document_output_sql_text = gr.Textbox(label="生成されたSQL", lines=10, show_copy_button=True)
+            with gr.Accordion(label="使用されたSQL", open=False) as tab_load_document_sql_accordion:
+                tab_load_document_output_sql_text = gr.Textbox(label="使用されたSQL", show_label=False, lines=10,
+                                                               autoscroll=False,
+                                                               show_copy_button=True)
             with gr.Row():
                 with gr.Column():
                     tab_load_document_doc_id_text = gr.Textbox(label="Doc ID", lines=1, interactive=False)
@@ -2045,8 +2335,10 @@ with gr.Blocks(css=custom_css) as app:
         #         with gr.Column():
         #             tab2_embed_and_save_button = gr.Button(value="嵌入和存储", variant="primary")
         with gr.TabItem(label="Step-2.ドキュメントの分割・ベクトル化・保存") as tab_split_document:
-            with gr.Row():
-                tab_split_document_output_sql_text = gr.Textbox(label="生成されたSQL", lines=10, show_copy_button=True)
+            with gr.Accordion(label="使用されたSQL", open=False) as tab_split_document_sql_accordion:
+                tab_split_document_output_sql_text = gr.Textbox(label="使用されたSQL", show_label=False, lines=10,
+                                                                autoscroll=False,
+                                                                show_copy_button=True)
             with gr.Row():
                 tab_split_document_chunks_count = gr.Textbox(label="チャンク数", lines=1)
             with gr.Row():
@@ -2054,7 +2346,7 @@ with gr.Blocks(css=custom_css) as app:
                     label="チャンク結果",
                     headers=["CHUNK_ID", "CHUNK_OFFSET", "CHUNK_LENGTH", "CHUNK_DATA"],
                     datatype=["str", "str", "str", "str"],
-                    row_count=10,
+                    row_count=20,
                     col_count=(4, "fixed"),
                     wrap=True,
                     column_widths=["10%", "10%", "10%", "70%"]
@@ -2064,7 +2356,7 @@ with gr.Blocks(css=custom_css) as app:
                     # doc_id_text = gr.Textbox(label="Doc ID*", lines=1)
                     tab_split_document_doc_id_radio = gr.Radio(
                         choices=get_doc_list(),
-                        label="Doc ID*"
+                        label="ドキュメント*"
                     )
             with gr.Accordion("UTL_TO_CHUNKS 設定*"):
                 with gr.Row():
@@ -2139,6 +2431,9 @@ with gr.Blocks(css=custom_css) as app:
                         value="ベクトル化して保存（データ量が多いと時間がかかる）",
                         variant="primary")
         with gr.TabItem(label="Step-3.ドキュメントの削除(オプション)") as tab_delete_document:
+            with gr.Accordion(label="使用されたSQL", open=False) as tab_delete_document_sql_accordion:
+                tab_delete_document_delete_sql = gr.Textbox(label="生成されたSQL", show_label=False, lines=10,
+                                                            autoscroll=False, show_copy_button=True)
             with gr.Row():
                 with gr.Column():
                     tab_delete_document_server_directory_text = gr.Text(label="サーバー・ディレクトリ*",
@@ -2148,14 +2443,16 @@ with gr.Blocks(css=custom_css) as app:
                     # doc_id_text = gr.Textbox(label="Doc ID*", lines=1)
                     tab_delete_document_doc_ids_checkbox_group = gr.CheckboxGroup(
                         choices=get_doc_list(),
-                        label="Doc ID*"
+                        label="ドキュメント*"
                     )
             with gr.Row():
                 with gr.Column():
                     tab_delete_document_delete_button = gr.Button(value="削除", variant="primary")
         with gr.TabItem(label="Step-4.ドキュメントとチャット") as tab_chat_document:
-            with gr.Row() as searched_sql_row:
-                tab_chat_document_output_sql_text = gr.Textbox(label="生成されたSQL", lines=10, show_copy_button=True)
+            with gr.Accordion(label="使用されたSQL", open=False) as tab_chat_document_sql_accordion:
+                tab_chat_document_output_sql_text = gr.Textbox(label="使用されたSQL", show_label=False, lines=25,
+                                                               max_lines=25, autoscroll=False,
+                                                               show_copy_button=True)
             with gr.Row() as tab_chat_document_searched_data_summary_row:
                 with gr.Column():
                     tab_chat_document_searched_data_summary_text = gr.Markdown(value="", visible=False)
@@ -2196,7 +2493,7 @@ with gr.Blocks(css=custom_css) as app:
                                                                       max_lines=10,
                                                                       autoscroll=False, interactive=False,
                                                                       show_copy_button=True)
-            with gr.Accordion("Doc ID*", open=True):
+            with gr.Accordion("ドキュメント*", open=True):
                 with gr.Row():
                     with gr.Column():
                         tab_chat_document_doc_id_all_checkbox = gr.Checkbox(label="全部", value=True)
@@ -2205,7 +2502,7 @@ with gr.Blocks(css=custom_css) as app:
                         # doc_id_text = gr.Textbox(label="Doc ID*", lines=1)
                         tab_chat_document_doc_id_checkbox_group = gr.CheckboxGroup(
                             choices=get_doc_list(),
-                            label="Doc ID*",
+                            label="ドキュメント*",
                             show_label=False,
                             interactive=False
                         )
@@ -2393,27 +2690,71 @@ with gr.Blocks(css=custom_css) as app:
             #         gr.Examples(examples=[],
             #                     inputs=tab4_query_text)
 
-    tab_chat_with_command_r_checkbox.change(lambda x: gr.Accordion(open=True) if x else gr.Accordion(open=False),
-                                            [tab_chat_with_command_r_checkbox], [tab_chat_with_llm_command_r_accordion])
-    tab_chat_with_command_r_plus_checkbox.change(lambda x: gr.Accordion(open=True) if x else gr.Accordion(open=False),
-                                                 [tab_chat_with_command_r_plus_checkbox],
-                                                 [tab_chat_with_llm_command_r_plus_accordion])
+    tab_chat_with_command_r_checkbox.change(
+        lambda x: gr.Accordion(visible=True, open=True) if x else gr.Accordion(visible=False, open=False),
+        [tab_chat_with_command_r_checkbox], [tab_chat_with_llm_command_r_accordion])
+    tab_chat_with_command_r_plus_checkbox.change(
+        lambda x: gr.Accordion(visible=True, open=True) if x else gr.Accordion(visible=False, open=False),
+        [tab_chat_with_command_r_plus_checkbox],
+        [tab_chat_with_llm_command_r_plus_accordion])
+    tab_chat_with_openai_gpt4o_checkbox.change(
+        lambda x: gr.Accordion(visible=True, open=True) if x else gr.Accordion(visible=False, open=False),
+        [tab_chat_with_openai_gpt4o_checkbox],
+        [tab_chat_with_llm_openai_gpt4o_accordion])
+    tab_chat_with_openai_gpt4_checkbox.change(
+        lambda x: gr.Accordion(visible=True, open=True) if x else gr.Accordion(visible=False, open=False),
+        [tab_chat_with_openai_gpt4_checkbox],
+        [tab_chat_with_llm_openai_gpt4_accordion])
+    tab_chat_with_claude_3_opus_checkbox.change(
+        lambda x: gr.Accordion(visible=True, open=True) if x else gr.Accordion(visible=False, open=False),
+        [tab_chat_with_claude_3_opus_checkbox],
+        [tab_chat_with_llm_claude_3_opus_accordion])
+    tab_chat_with_claude_3_sonnet_checkbox.change(
+        lambda x: gr.Accordion(visible=True, open=True) if x else gr.Accordion(visible=False, open=False),
+        [tab_chat_with_claude_3_sonnet_checkbox],
+        [tab_chat_with_llm_claude_3_sonnet_accordion])
+    tab_chat_with_claude_3_haiku_checkbox.change(
+        lambda x: gr.Accordion(visible=True, open=True) if x else gr.Accordion(visible=False, open=False),
+        [tab_chat_with_claude_3_haiku_checkbox],
+        [tab_chat_with_llm_claude_3_haiku_accordion])
     tab_chat_with_llm_clear_button.add(
-        [tab_chat_with_llm_query_text, tab_chat_with_command_r_checkbox, tab_chat_with_command_r_answer_text,
-         tab_chat_with_command_r_plus_checkbox, tab_chat_with_command_r_plus_answer_text])
+        [tab_chat_with_llm_query_text, tab_chat_with_command_r_checkbox, tab_chat_with_command_r_plus_checkbox,
+         tab_chat_with_openai_gpt4o_checkbox, tab_chat_with_openai_gpt4_checkbox,
+         tab_chat_with_claude_3_opus_checkbox, tab_chat_with_claude_3_sonnet_checkbox,
+         tab_chat_with_claude_3_haiku_checkbox,
+         tab_chat_with_command_r_answer_text, tab_chat_with_command_r_plus_answer_text,
+         tab_chat_with_openai_gpt4o_answer_text, tab_chat_with_openai_gpt4_answer_text,
+         tab_chat_with_claude_3_opus_answer_text, tab_chat_with_claude_3_sonnet_answer_text,
+         tab_chat_with_claude_3_haiku_answer_text
+         ])
     tab_chat_with_llm_chat_button.click(chat_stream,
-                                        inputs=[tab_chat_with_llm_query_text, tab_chat_with_command_r_checkbox,
-                                                tab_chat_with_command_r_plus_checkbox],
+                                        inputs=[tab_chat_with_llm_query_text,
+                                                tab_chat_with_command_r_checkbox,
+                                                tab_chat_with_command_r_plus_checkbox,
+                                                tab_chat_with_openai_gpt4o_checkbox,
+                                                tab_chat_with_openai_gpt4_checkbox,
+                                                tab_chat_with_claude_3_opus_checkbox,
+                                                tab_chat_with_claude_3_sonnet_checkbox,
+                                                tab_chat_with_claude_3_haiku_checkbox],
                                         outputs=[tab_chat_with_command_r_answer_text,
-                                                 tab_chat_with_command_r_plus_answer_text])
-    tab_create_table_button.click(create_table, [], [tab_create_table_sql_accordion, tab_create_table_sql_text])
+                                                 tab_chat_with_command_r_plus_answer_text,
+                                                 tab_chat_with_openai_gpt4o_answer_text,
+                                                 tab_chat_with_openai_gpt4_answer_text,
+                                                 tab_chat_with_claude_3_opus_answer_text,
+                                                 tab_chat_with_claude_3_sonnet_answer_text,
+                                                 tab_chat_with_claude_3_haiku_answer_text
+                                                 ])
     tab_create_oci_cred_button.click(create_oci_cred,
                                      [tab_create_oci_cred_user_ocid_text, tab_create_oci_cred_tenancy_ocid_text,
                                       tab_create_oci_cred_compartment_ocid_text, tab_create_oci_cred_fingerprint_text,
                                       tab_create_oci_cred_private_key_file],
                                      [tab_create_oci_cred_sql_accordion, tab_create_oci_cred_sql_text])
+    tab_create_oci_clear_button.add([tab_create_oci_cred_user_ocid_text, tab_create_oci_cred_tenancy_ocid_text,
+                                     tab_create_oci_cred_compartment_ocid_text, tab_create_oci_cred_fingerprint_text,
+                                     tab_create_oci_cred_private_key_file])
     tab_create_oci_cred_test_button.click(test_oci_cred, [tab_create_oci_cred_test_query_text],
                                           [tab_create_oci_cred_test_vector_text])
+    tab_create_table_button.click(create_table, [], [tab_create_table_sql_accordion, tab_create_table_sql_text])
     tab_load_document_load_button.click(load_document,
                                         inputs=[tab_load_document_file_text, tab_load_document_server_directory_text],
                                         outputs=[tab_load_document_output_sql_text, tab_load_document_doc_id_text,
@@ -2469,7 +2810,8 @@ with gr.Blocks(css=custom_css) as app:
     tab_delete_document_delete_button.click(delete_document,
                                             inputs=[tab_delete_document_server_directory_text,
                                                     tab_delete_document_doc_ids_checkbox_group],
-                                            outputs=[tab_split_document_doc_id_radio,
+                                            outputs=[tab_delete_document_delete_sql,
+                                                     tab_split_document_doc_id_radio,
                                                      tab_delete_document_doc_ids_checkbox_group])
     tab_chat_document.select(refresh_doc_list,
                              outputs=[tab_split_document_doc_id_radio, tab_delete_document_doc_ids_checkbox_group,
