@@ -18,15 +18,21 @@ from langchain_cohere import ChatCohere
 from langchain_community.chat_models import ChatOCIGenAI
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_community.embeddings import OCIGenAIEmbeddings
-from langchain_community.vectorstores.utils import DistanceStrategy
+from langchain_community.vectorstores.utils import DistanceStrategy, filter_complex_metadata
+from langchain_core.documents import Document
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from oracledb import DatabaseError
+from unstructured.chunking.title import chunk_by_title
+from unstructured.documents.elements import Table
+from unstructured.partition.auto import partition
 
 from my_langchain_community.vectorstores import MyOracleVS
-from utils.snow_flake_generator import generate_unique_id
+from utils.common_util import get_dict_value
+from utils.generator_util import generate_unique_id
+from utils.pdf_parser_util import parser_pdf
 
 custom_css = """
 body {
@@ -130,6 +136,36 @@ SELECT json_value(cmetadata, '$.server_path') AS server_path
 FROM {DEFAULT_COLLECTION_NAME}_collection
 WHERE id = :doc_id """, doc_id=doc_id)
             return cursor.fetchone()[0]
+
+
+def process_text_chunks(unstructured_chunks):
+    """
+    处理文本块并创建带有元数据的字典列表。
+
+    Args:
+    unstructured_chunks (list): 包含文本块的列表。每个文本块应该有一个'text'属性。
+
+    Returns:
+    list: 包含处理后的文本块信息的字典列表。
+    """
+    chunks = []
+    chunk_id = 1
+    start_offset = 1
+
+    for chunk in unstructured_chunks:
+        chunk_length = len(chunk.text)
+        chunks.append({
+            'CHUNK_ID': chunk_id,
+            'CHUNK_OFFSET': start_offset,
+            'CHUNK_LENGTH': chunk_length,
+            'CHUNK_DATA': chunk.text
+        })
+
+        # 更新 ID 和偏移量
+        chunk_id += 1
+        start_offset += chunk_length
+
+    return chunks
 
 
 async def command_r_task(query_text, command_r_checkbox):
@@ -596,17 +632,26 @@ def load_document(file_path, server_directory):
     shutil.copy(file_path.name, server_path)
 
     collection_cmeta = {}
-    if file_extension == ".pdf":
-        loader = PyMuPDFLoader(file_path.name)
-        documents = loader.load()
-        # collection_cmeta = documents[0].metadata
-        # collection_cmeta.pop('page', None)
-        contents = "".join(fc.page_content for fc in documents)
-        pages_count = len(documents)
-    else:
-        with open(server_path, 'rb') as file:
-            contents = file.read()
-        pages_count = 1
+    # if file_extension == ".pdf":
+    #     loader = PyMuPDFLoader(file_path.name)
+    #     documents = loader.load()
+    #     # collection_cmeta = documents[0].metadata
+    #     # collection_cmeta.pop('page', None)
+    #     contents = "".join(fc.page_content for fc in documents)
+    #     pages_count = len(documents)
+    # else:
+    #     with open(server_path, 'rb') as file:
+    #         contents = file.read()
+    #     pages_count = 1
+
+    # https://docs.unstructured.io/open-source/core-functionality/overview
+    pages_count = 1
+    elements = partition(filename=server_path,
+                         strategy='hi_res',
+                         languages=["jpn", "eng", "chi_sim"]
+                         )
+    original_contents = "\n\n".join([str(el) for el in elements])
+    print(f"{original_contents=}")
 
     collection_cmeta['file_name'] = file_name
     collection_cmeta['source'] = server_path
@@ -624,28 +669,28 @@ VALUES (:id, to_blob(:data), :cmetadata) """
             output_sql_text = output_sql_text.replace(":cmetadata", "'" + json.dumps(collection_cmeta) + "'") + ";"
             cursor.execute(load_document_sql, {
                 'id': doc_id,
-                'data': contents,
+                'data': original_contents,
                 'cmetadata': json.dumps(collection_cmeta)
             })
             conn.commit()
 
-            select_contents_sql = f"""
--- Select data from table {DEFAULT_COLLECTION_NAME}_collection
-SELECT dbms_vector_chain.utl_to_text(dt.data) from {DEFAULT_COLLECTION_NAME}_collection dt WHERE dt.id = :doc_id """
-            output_sql_text += "\n" + select_contents_sql.replace(":doc_id", "'" + str(doc_id) + "'") + ";"
-            cursor.execute(select_contents_sql, {'doc_id': doc_id})
-            result = cursor.fetchone()
-            contents = result[0].read()
+    #             select_contents_sql = f"""
+    # -- Select data from table {DEFAULT_COLLECTION_NAME}_collection
+    # SELECT dbms_vector_chain.utl_to_text(dt.data) from {DEFAULT_COLLECTION_NAME}_collection dt WHERE dt.id = :doc_id """
+    #             output_sql_text += "\n" + select_contents_sql.replace(":doc_id", "'" + str(doc_id) + "'") + ";"
+    #             cursor.execute(select_contents_sql, {'doc_id': doc_id})
+    #             result = cursor.fetchone()
+    #             contents = result[0].read()
 
     return gr.Textbox(value=output_sql_text.strip()), gr.Textbox(value=doc_id), gr.Textbox(
-        value=str(pages_count)), gr.Textbox(value=contents)
+        value=str(pages_count)), gr.Textbox(value=original_contents)
 
 
-def split_document(doc_id, chunks_by, chunks_max_size,
-                   chunks_overlap_size,
-                   chunks_split_by, chunks_split_by_custom,
-                   chunks_language, chunks_normalize,
-                   chunks_normalize_options):
+def split_document_by_oracle(doc_id, chunks_by, chunks_max_size,
+                             chunks_overlap_size,
+                             chunks_split_by, chunks_split_by_custom,
+                             chunks_language, chunks_normalize,
+                             chunks_normalize_options):
     # print(f"{chunks_normalize_options=}")
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
@@ -705,6 +750,86 @@ WHERE
         value=chunks_dataframe)
 
 
+def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
+                                   chunks_overlap_size,
+                                   chunks_split_by, chunks_split_by_custom,
+                                   chunks_language, chunks_normalize,
+                                   chunks_normalize_options):
+    # print(f"{chunks_normalize_options=}")
+    output_sql = ""
+    server_path = get_server_path(doc_id)
+
+    page_table_documents = parser_pdf(server_path)
+    elements = partition(filename=server_path,
+                         strategy='hi_res',
+                         languages=["jpn", "eng", "chi_sim"]
+                         )
+
+    prev_page_number = 0
+    table_idx = 1
+    for el in elements:
+        # print(f"{el.category=}")
+        # print(f"{el.text=}")
+        print(f"{el.metadata.page_number=}")
+        page_number = el.metadata.page_number
+        if prev_page_number != page_number:
+            prev_page_number = page_number
+            table_idx = 1
+        print(f"{type(el.category)=}")
+        if el.category == "Table":
+            table_id = f"page_{page_number}_table_{table_idx}"
+            print(f"{table_id=}")
+            print(f"{page_table_documents=}")
+            if page_table_documents:
+                page_table_document = get_dict_value(page_table_documents, table_id)
+                print(f"{page_table_document=}")
+                if page_table_document:
+                    page_content = get_dict_value(page_table_document, "page_content")
+                    table_to_markdown = get_dict_value(page_table_document, "table_to_markdown")
+                    if page_content and table_to_markdown:
+                        print(f"Before: {el.text=}")
+                        el.text = page_content + "\n" + table_to_markdown + "\n"
+                        print(f"After: {el.text=}")
+            table_idx += 1
+
+    unstructured_chunks = chunk_by_title(elements, combine_text_under_n_chars=100, include_orig_elements=True,
+                                         max_characters=int(chunks_max_size),
+                                         multipage_sections=True, new_after_n_chars=int(chunks_max_size),
+                                         overlap=int(float(chunks_max_size) * (float(chunks_overlap_size) / 100)))
+
+    chunks = process_text_chunks(unstructured_chunks)
+    chunks_dataframe = pd.DataFrame(chunks)
+
+    with pool.acquire() as conn:
+        with conn.cursor() as cursor:
+            delete_sql = f"""
+-- Delete chunks
+DELETE FROM {DEFAULT_COLLECTION_NAME}_embedding WHERE doc_id = :doc_id """
+            cursor.execute(delete_sql,
+                           [doc_id])
+            output_sql += delete_sql.replace(':doc_id', "'" + str(doc_id) + "'").lstrip() + ";"
+
+            save_chunks_sql = f"""
+-- Insert chunks(Only for Reference)
+INSERT INTO {DEFAULT_COLLECTION_NAME}_embedding (
+doc_id,
+embed_id,
+embed_data
+)
+VALUES (:doc_id, :embed_id, :embed_data) """
+            output_sql += "\n" + save_chunks_sql.replace(':doc_id', "'" + str(doc_id) + "'") + ";"
+            print(f"{output_sql=}")
+            # 准备批量插入的数据
+            data_to_insert = [(doc_id, chunk['CHUNK_ID'], chunk['CHUNK_DATA']) for chunk in chunks]
+
+            # 执行批量插入
+            cursor.executemany(save_chunks_sql, data_to_insert)
+            conn.commit()
+
+    return gr.Textbox(value=output_sql), gr.Textbox(value=str(chunks_dataframe.shape[0])), gr.Dataframe(
+        value=chunks_dataframe)
+
+
 # def split_document(chunk_size, chunk_overlap, doc_id):
 #     if not all([chunk_size, chunk_overlap, doc_id]):
 #         raise gr.Error("Please enter chunk_size, chunk_overlap, and doc_id")
@@ -735,179 +860,200 @@ WHERE
 #     )
 
 
-def embed_save_document(doc_id, chunks_by, chunks_max_size,
-                        chunks_overlap_size,
-                        chunks_split_by, chunks_split_by_custom,
-                        chunks_language, chunks_normalize,
-                        chunks_normalize_options):
-    # print(f"{chunks_normalize_options=}")
+# def embed_save_document_by_oracle(doc_id, chunks_by, chunks_max_size,
+#                         chunks_overlap_size,
+#                         chunks_split_by, chunks_split_by_custom,
+#                         chunks_language, chunks_normalize,
+#                         chunks_normalize_options):
+#     # print(f"{chunks_normalize_options=}")
+#     with pool.acquire() as conn:
+#         with conn.cursor() as cursor:
+#             parameter_str = '{"by": "' + chunks_by + '","max": "' + str(
+#                 chunks_max_size) + '", "overlap": "' + str(
+#                 int(int(
+#                     chunks_max_size) * chunks_overlap_size / 100)) + '", "split": "' + chunks_split_by + '", '
+#             if chunks_split_by == "CUSTOM":
+#                 parameter_str += '"custom_list": [' + chunks_split_by_custom + '], '
+#             parameter_str += '"language": "' + chunks_language + '", '
+#             if chunks_normalize == "NONE" or chunks_normalize == "ALL":
+#                 parameter_str += '"normalize": "' + chunks_normalize + '"}'
+#             else:
+#                 parameter_str += '"normalize": "' + chunks_normalize + '", "norm_options": [' + ", ".join(
+#                     ['"' + s + '"' for s in chunks_normalize_options]) + ']}'
+#
+#             # print(f"{parameter_str}")
+#             select_chunks_sql = f"""
+# -- Select chunks
+# SELECT
+#     json_value(ct.column_value, '$.chunk_id')     AS chunk_id,
+#     json_value(ct.column_value, '$.chunk_offset') AS chunk_offset,
+#     json_value(ct.column_value, '$.chunk_length') AS chunk_length,
+#     json_value(ct.column_value, '$.chunk_data')   AS chunk_data
+# FROM
+#     {DEFAULT_COLLECTION_NAME}_collection dt,
+#     dbms_vector_chain.utl_to_chunks(
+#         dbms_vector_chain.utl_to_text(dt.data),
+#         JSON(
+#             :parameter_str
+#         )
+#     ) ct
+#     CROSS JOIN
+#         JSON_TABLE ( ct.column_value, '$[*]'
+#             COLUMNS (
+#                 column_value VARCHAR2 ( 4000 ) PATH '$'
+#             )
+#         )
+# WHERE
+#     dt.id = :doc_id """
+#             # cursor.setinputsizes(oracledb.DB_TYPE_VECTOR)
+#             utl_to_chunks_sql_output = "\n" + select_chunks_sql.replace(':parameter_str',
+#                                                                         "'" + parameter_str + "'").replace(
+#                 ':doc_id', "'" +
+#                            str(doc_id) + "'") + ";"
+#             # print(f"{utl_to_chunks_sql_output=}")
+#             cursor.execute(select_chunks_sql,
+#                            [parameter_str, doc_id])
+#
+#             chunks = []
+#             for row in cursor:
+#                 # print(f"row: {row}")
+#                 chunks.append({'CHUNK_ID': row[0],
+#                                'CHUNK_OFFSET': row[1], 'CHUNK_LENGTH': row[2], 'CHUNK_DATA': row[3]})
+#
+#             delete_sql = f"""
+# -- Delete chunks
+# DELETE FROM {DEFAULT_COLLECTION_NAME}_embedding WHERE doc_id = :doc_id """
+#             cursor.execute(delete_sql,
+#                            [doc_id])
+#             utl_to_chunks_sql_output += "\n" + delete_sql.replace(':doc_id', "'" + str(doc_id) + "'") + ";"
+#
+#             # embed_save_sql = """
+#             #     INSERT INTO doc_chunks (
+#             #         doc_id,
+#             #         embed_id,
+#             #         embed_data,
+#             #         embed_vector
+#             #     )
+#             #         SELECT
+#             #             dt.id doc_id,
+#             #             et.embed_id,
+#             #             et.embed_data,
+#             #             to_vector(et.embed_vector) embed_vector
+#             #         FROM
+#             #             documentation_tab dt,
+#             #             dbms_vector_chain.utl_to_embeddings(dbms_vector_chain.utl_to_chunks(dbms_vector_chain.utl_to_text(dt.data),
+#             #                                                                                 JSON(
+#             #                                                                                   :parameter_str
+#             #                                                                                 )
+#             #             ),JSON(
+#             #                   '{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}'
+#             #               )
+#             #             ) t,
+#             #             JSON_TABLE ( t.column_value, '$[*]'
+#             #                     COLUMNS (
+#             #                         embed_id NUMBER PATH '$.embed_id',
+#             #                         embed_data VARCHAR2 ( 4000 ) PATH '$.embed_data',
+#             #                         embed_vector CLOB PATH '$.embed_vector'
+#             #                     )
+#             #                 )
+#             #             et
+#             #         WHERE
+#             #             dt.id = :doc_id
+#             # """
+#             # For oracle 23ai bug
+#             embed_save_sql = f"""
+# -- Insert chunks
+# INSERT INTO {DEFAULT_COLLECTION_NAME}_embedding (
+# doc_id,
+# embed_id,
+# embed_data,
+# embed_vector
+# )
+# SELECT
+#     t_chunk.doc_id,
+#     t_chunk.embed_id,
+#     t_chunk.embed_data,
+#     to_vector(t_embed.embed_vector) embed_vector
+# FROM
+#     (
+#         SELECT
+#             dt.id doc_id,
+#             et.chunk_id embed_id,
+#             et.chunk_data embed_data
+#         FROM
+#             {DEFAULT_COLLECTION_NAME}_collection dt,
+#             dbms_vector_chain.utl_to_chunks(
+#                 dbms_vector_chain.utl_to_text(dt.data),
+#                 JSON(
+#                     :parameter_str
+#                 )
+#             ) t,
+#             JSON_TABLE ( t.column_value, '$[*]'
+#                     COLUMNS (
+#                         chunk_id NUMBER PATH '$.chunk_id',
+#                         chunk_data VARCHAR2 ( 4000 ) PATH '$.chunk_data'
+#                     )
+#                 )
+#             et
+#         WHERE
+#             dt.id = :doc_id
+#     ) t_chunk,
+#     (
+#         SELECT
+#             dt.id doc_id,
+#             rownum embed_id,
+#             to_vector(et.column_value) embed_vector
+#         FROM
+#             {DEFAULT_COLLECTION_NAME}_collection dt,
+#             dbms_vector_chain.utl_to_embeddings(
+#                 dbms_vector_chain.utl_to_chunks(
+#                     dbms_vector_chain.utl_to_text(dt.data),
+#                     JSON(
+#                         :parameter_str
+#                     )
+#             ),JSON(
+#                   '{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}'
+#               )
+#             ) et
+#         WHERE
+#             dt.id = :doc_id
+#     ) t_embed
+# WHERE
+#     t_chunk.doc_id = t_embed.doc_id AND t_chunk.embed_id = t_embed.embed_id
+#             """
+#             utl_to_chunks_sql_output += (
+#                                                 "\n" + embed_save_sql.replace(':parameter_str',
+#                                                                               "'" + parameter_str + "'")
+#                                                 .replace(':doc_id', "'" + str(doc_id) + "'")) + ";"
+#             print(f"{utl_to_chunks_sql_output=}")
+#             cursor.execute(embed_save_sql,
+#                            [parameter_str, doc_id, parameter_str, doc_id])
+#             conn.commit()
+#
+#     chunks_dataframe = pd.DataFrame(chunks)
+#     return gr.Textbox(utl_to_chunks_sql_output.strip()), gr.Textbox(value=str(chunks_dataframe.shape[0])), gr.Dataframe(
+#         value=chunks_dataframe)
+
+
+def embed_save_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
+                                        chunks_overlap_size,
+                                        chunks_split_by, chunks_split_by_custom,
+                                        chunks_language, chunks_normalize,
+                                        chunks_normalize_options):
+    output_sql = ""
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
-            parameter_str = '{"by": "' + chunks_by + '","max": "' + str(
-                chunks_max_size) + '", "overlap": "' + str(
-                int(int(
-                    chunks_max_size) * chunks_overlap_size / 100)) + '", "split": "' + chunks_split_by + '", '
-            if chunks_split_by == "CUSTOM":
-                parameter_str += '"custom_list": [' + chunks_split_by_custom + '], '
-            parameter_str += '"language": "' + chunks_language + '", '
-            if chunks_normalize == "NONE" or chunks_normalize == "ALL":
-                parameter_str += '"normalize": "' + chunks_normalize + '"}'
-            else:
-                parameter_str += '"normalize": "' + chunks_normalize + '", "norm_options": [' + ", ".join(
-                    ['"' + s + '"' for s in chunks_normalize_options]) + ']}'
-
-            # print(f"{parameter_str}")
-            select_chunks_sql = f"""
--- Select chunks
-SELECT
-    json_value(ct.column_value, '$.chunk_id')     AS chunk_id,
-    json_value(ct.column_value, '$.chunk_offset') AS chunk_offset,
-    json_value(ct.column_value, '$.chunk_length') AS chunk_length,
-    json_value(ct.column_value, '$.chunk_data')   AS chunk_data
-FROM
-    {DEFAULT_COLLECTION_NAME}_collection dt, 
-    dbms_vector_chain.utl_to_chunks(
-        dbms_vector_chain.utl_to_text(dt.data),
-        JSON(
-            :parameter_str
-        )
-    ) ct
-    CROSS JOIN
-        JSON_TABLE ( ct.column_value, '$[*]'
-            COLUMNS (
-                column_value VARCHAR2 ( 4000 ) PATH '$'
-            )
-        )
-WHERE
-    dt.id = :doc_id """
-            # cursor.setinputsizes(oracledb.DB_TYPE_VECTOR)
-            utl_to_chunks_sql_output = "\n" + select_chunks_sql.replace(':parameter_str',
-                                                                        "'" + parameter_str + "'").replace(
-                ':doc_id', "'" +
-                           str(doc_id) + "'") + ";"
-            # print(f"{utl_to_chunks_sql_output=}")
-            cursor.execute(select_chunks_sql,
-                           [parameter_str, doc_id])
-
-            chunks = []
-            for row in cursor:
-                # print(f"row: {row}")
-                chunks.append({'CHUNK_ID': row[0],
-                               'CHUNK_OFFSET': row[1], 'CHUNK_LENGTH': row[2], 'CHUNK_DATA': row[3]})
-
-            delete_sql = f"""
--- Delete chunks
-DELETE FROM {DEFAULT_COLLECTION_NAME}_embedding WHERE doc_id = :doc_id """
-            cursor.execute(delete_sql,
+            update_sql = f"""
+-- Update chunks
+UPDATE {DEFAULT_COLLECTION_NAME}_embedding 
+SET embed_vector = dbms_vector.utl_to_embedding(embed_data, json('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}'))
+WHERE doc_id = :doc_id """
+            output_sql += update_sql.replace(':doc_id', "'" + str(doc_id) + "'").lstrip() + ";"
+            print(f"{output_sql=}")
+            cursor.execute(update_sql,
                            [doc_id])
-            utl_to_chunks_sql_output += "\n" + delete_sql.replace(':doc_id', "'" + str(doc_id) + "'") + ";"
-
-            # embed_save_sql = """
-            #     INSERT INTO doc_chunks (
-            #         doc_id,
-            #         embed_id,
-            #         embed_data,
-            #         embed_vector
-            #     )
-            #         SELECT
-            #             dt.id doc_id,
-            #             et.embed_id,
-            #             et.embed_data,
-            #             to_vector(et.embed_vector) embed_vector
-            #         FROM
-            #             documentation_tab dt,
-            #             dbms_vector_chain.utl_to_embeddings(dbms_vector_chain.utl_to_chunks(dbms_vector_chain.utl_to_text(dt.data),
-            #                                                                                 JSON(
-            #                                                                                   :parameter_str
-            #                                                                                 )
-            #             ),JSON(
-            #                   '{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}'
-            #               )
-            #             ) t,
-            #             JSON_TABLE ( t.column_value, '$[*]'
-            #                     COLUMNS (
-            #                         embed_id NUMBER PATH '$.embed_id',
-            #                         embed_data VARCHAR2 ( 4000 ) PATH '$.embed_data',
-            #                         embed_vector CLOB PATH '$.embed_vector'
-            #                     )
-            #                 )
-            #             et
-            #         WHERE
-            #             dt.id = :doc_id
-            # """
-            # For oracle 23ai bug
-            embed_save_sql = f"""
--- Insert chunks
-INSERT INTO {DEFAULT_COLLECTION_NAME}_embedding (
-doc_id,
-embed_id,
-embed_data,
-embed_vector
-)
-SELECT
-    t_chunk.doc_id,
-    t_chunk.embed_id,
-    t_chunk.embed_data,
-    to_vector(t_embed.embed_vector) embed_vector
-FROM
-    (
-        SELECT
-            dt.id doc_id,
-            et.chunk_id embed_id,
-            et.chunk_data embed_data
-        FROM
-            {DEFAULT_COLLECTION_NAME}_collection dt,
-            dbms_vector_chain.utl_to_chunks(
-                dbms_vector_chain.utl_to_text(dt.data),
-                JSON(
-                    :parameter_str
-                )
-            ) t,
-            JSON_TABLE ( t.column_value, '$[*]'
-                    COLUMNS (
-                        chunk_id NUMBER PATH '$.chunk_id',
-                        chunk_data VARCHAR2 ( 4000 ) PATH '$.chunk_data'
-                    )
-                )
-            et
-        WHERE
-            dt.id = :doc_id                  
-    ) t_chunk,
-    (
-        SELECT
-            dt.id doc_id,
-            rownum embed_id,
-            to_vector(et.column_value) embed_vector
-        FROM
-            {DEFAULT_COLLECTION_NAME}_collection dt,
-            dbms_vector_chain.utl_to_embeddings(
-                dbms_vector_chain.utl_to_chunks(
-                    dbms_vector_chain.utl_to_text(dt.data),
-                    JSON(
-                        :parameter_str
-                    )
-            ),JSON(
-                  '{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}'
-              )
-            ) et
-        WHERE
-            dt.id = :doc_id                    
-    ) t_embed
-WHERE 
-    t_chunk.doc_id = t_embed.doc_id AND t_chunk.embed_id = t_embed.embed_id
-            """
-            utl_to_chunks_sql_output += (
-                                                "\n" + embed_save_sql.replace(':parameter_str',
-                                                                              "'" + parameter_str + "'")
-                                                .replace(':doc_id', "'" + str(doc_id) + "'")) + ";"
-            print(f"{utl_to_chunks_sql_output=}")
-            cursor.execute(embed_save_sql,
-                           [parameter_str, doc_id, parameter_str, doc_id])
             conn.commit()
-
-    chunks_dataframe = pd.DataFrame(chunks)
-    return gr.Textbox(utl_to_chunks_sql_output.strip()), gr.Textbox(value=str(chunks_dataframe.shape[0])), gr.Dataframe(
-        value=chunks_dataframe)
+    return gr.Textbox(output_sql), gr.Textbox(), gr.Dataframe()
 
 
 def chat_document(question_embedding_model_checkbox_group_input, reranker_model_radio_input,
@@ -2283,8 +2429,10 @@ with gr.Blocks(css=custom_css) as app:
             with gr.Row():
                 with gr.Column():
                     tab_load_document_file_text = gr.File(label="ファイル*",
-                                                          file_types=[".txt", ".pdf", ".doc", ".docx", ".xls", ".xlsx",
-                                                                      ".ppt", ".pptx"], type="filepath")
+                                                          file_types=["txt", "csv", "doc", "docx", "epub", "image",
+                                                                      "md", "msg", "odt", "org", "pdf", "ppt", "pptx",
+                                                                      "rtf", "rst", "tsv", "xls", "xlsx"],
+                                                          type="filepath")
                 with gr.Column():
                     tab_load_document_server_directory_text = gr.Text(label="サーバー・ディレクトリ*",
                                                                       value="/u01/data/no1rag/")
@@ -2764,7 +2912,7 @@ with gr.Blocks(css=custom_css) as app:
     tab_split_document.select(refresh_doc_list,
                               outputs=[tab_split_document_doc_id_radio, tab_delete_document_doc_ids_checkbox_group,
                                        tab_chat_document_doc_id_checkbox_group])
-    tab_split_document_split_button.click(split_document,
+    tab_split_document_split_button.click(split_document_by_unstructured,
                                           inputs=[tab_split_document_doc_id_radio, tab_split_document_chunks_by_radio,
                                                   tab_split_document_chunks_max_text,
                                                   tab_split_document_chunks_overlap_slider,
@@ -2776,7 +2924,7 @@ with gr.Blocks(css=custom_css) as app:
                                           outputs=[tab_split_document_output_sql_text, tab_split_document_chunks_count,
                                                    tab_split_document_chunks_result_dataframe],
                                           )
-    tab_split_document_embed_save_button.click(embed_save_document,
+    tab_split_document_embed_save_button.click(embed_save_document_by_unstructured,
                                                inputs=[tab_split_document_doc_id_radio,
                                                        tab_split_document_chunks_by_radio,
                                                        tab_split_document_chunks_max_text,
