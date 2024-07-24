@@ -1,1 +1,1 @@
-@reboot /bin/bash /home/oracle/No.1-RAG/main.sh
+@reboot /bin/bash /u01/aipoc/No.1-RAG/main.sh
