@@ -403,6 +403,10 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
 
 
 async def chat_stream(system_text, query_text, llm_answer_checkbox):
+    if not llm_answer_checkbox or len(llm_answer_checkbox) == 0:
+        raise gr.Error("LLM モデルを選択してください")
+    if not query_text:
+        raise gr.Error("ユーザー・メッセージを入力してください")
     command_r_user_text = query_text
     command_r_plus_user_text = query_text
     openai_gpt4o_user_text = query_text
@@ -467,6 +471,17 @@ def create_oci_cred(user_ocid, tenancy_ocid, compartment_ocid, fingerprint, priv
 
         processed_key = ''.join(line.strip() for line in lines if not line.startswith('--'))
         return processed_key
+
+    if not user_ocid:
+        raise gr.Error("User OCIDを入力してください")
+    if not tenancy_ocid:
+        raise gr.Error("Tenancy OCIDを入力してください")
+    if not compartment_ocid:
+        raise gr.Error("Compartment OCIDを入力してください")
+    if not fingerprint:
+        raise gr.Error("Fingerprintを入力してください")
+    if not private_key_file:
+        raise gr.Error("Private Keyを入力してください")
 
     private_key = process_private_key(private_key_file.name)
 
@@ -701,7 +716,7 @@ def load_document(file_path, server_directory):
         with conn.cursor() as cursor:
             cursor.setinputsizes(**{"data": oracledb.DB_TYPE_BLOB})
             load_document_sql = f"""
--- (DON'T execute on sqlplus)Insert to table {DEFAULT_COLLECTION_NAME}_collection
+-- (Only for Reference) Insert to table {DEFAULT_COLLECTION_NAME}_collection 
 INSERT INTO {DEFAULT_COLLECTION_NAME}_collection(id, data, cmetadata)
 VALUES (:id, to_blob(:data), :cmetadata) """
             output_sql_text = load_document_sql.replace(":id", "'" + str(doc_id) + "'")
@@ -795,11 +810,15 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
                                    chunks_split_by, chunks_split_by_custom,
                                    chunks_language, chunks_normalize,
                                    chunks_normalize_options):
+    if not doc_id:
+        raise gr.Error("ドキュメントを選択してください")
     # print(f"{chunks_normalize_options=}")
     output_sql = ""
     server_path = get_server_path(doc_id)
 
-    page_table_documents = parser_pdf(server_path)
+    # Use claude to get table data
+    # page_table_documents = parser_pdf(server_path)
+    page_table_documents = {}
     # elements = partition(filename=server_path,
     #                      strategy='hi_res',
     #                      languages=["jpn", "eng", "chi_sim"]
@@ -854,7 +873,7 @@ DELETE FROM {DEFAULT_COLLECTION_NAME}_embedding WHERE doc_id = :doc_id """
             output_sql += delete_sql.replace(':doc_id', "'" + str(doc_id) + "'").lstrip() + ";"
 
             save_chunks_sql = f"""
--- Insert chunks(Only for Reference)
+-- (Only for Reference) Insert chunks
 INSERT INTO {DEFAULT_COLLECTION_NAME}_embedding (
 doc_id,
 embed_id,
@@ -879,6 +898,8 @@ def embed_save_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
                                         chunks_split_by, chunks_split_by_custom,
                                         chunks_language, chunks_normalize,
                                         chunks_normalize_options):
+    if not doc_id:
+        raise gr.Error("ドキュメントを選択してください")
     output_sql = ""
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
@@ -1063,6 +1084,7 @@ def generate_query(query_text, generate_query_radio):
 
 def search_document(reranker_model_radio_input,
                     reranker_top_k_slider_input,
+                    reranker_threshold_slider_input,
                     threshold_value_slider_input,
                     top_k_slider_input, doc_id_all_checkbox_input,
                     doc_id_checkbox_group_input, text_search_checkbox_input, text_search_k_slider_input,
@@ -1378,7 +1400,7 @@ def search_document(reranker_model_radio_input,
     # Now query_sql_output contains the SQL command with parameter values inserted
     print(f"\nQUERY_SQL_OUTPUT:\n{query_sql_output}")
 
-    with pool.acquire() as conn:
+    with (pool.acquire() as conn):
         with conn.cursor() as cursor:
             cursor.execute(complete_sql, params)
             for row in cursor:
@@ -1420,20 +1442,23 @@ def search_document(reranker_model_radio_input,
                               'EMBED_ID': doc[1],
                               'SOURCE': str(doc[3]) + ":" + doc[0],
                               'DISTANCE': '-' if str(doc[4]) == '999999.0' else str(doc[4]),
-                              'score': ce_score} for doc, ce_score in zip(unranked_docs, ranked_scores)]
+                              'SCORE': ce_score} for doc, ce_score in zip(unranked_docs, ranked_scores)]
                 docs_dataframe = pd.DataFrame(docs_data)
-                docs_dataframe = docs_dataframe.sort_values(by='score', ascending=False).head(
-                    reranker_top_k_slider_input).drop(
-                    columns=['score'])
+                docs_dataframe = docs_dataframe[docs_dataframe['SCORE'] >= float(reranker_threshold_slider_input)
+                                                ].sort_values(by='SCORE', ascending=False).head(
+                    reranker_top_k_slider_input)
             else:
                 docs_data = [{'CONTENT': doc[2],
                               'EMBED_ID': doc[1],
                               'SOURCE': str(doc[3]) + ":" + doc[0],
-                              'DISTANCE': '-' if str(doc[4]) == '999999.0' else str(doc[4])} for doc in unranked_docs]
+                              'DISTANCE': '-' if str(doc[4]) == '999999.0' else str(doc[4]),
+                              'SCORE': '-'} for doc in unranked_docs]
                 docs_dataframe = pd.DataFrame(docs_data)
 
             if extend_first_chunk_size_input > 0:
-                filtered_doc_ids = ','.join([source.split(':')[0] for source in docs_dataframe['SOURCE'].tolist()])
+                filtered_doc_ids = "'" + "','".join(
+                    [source.split(':')[0] for source in docs_dataframe['SOURCE'].tolist()]) + "'"
+                print(f"{filtered_doc_ids=}")
                 select_extend_first_chunk_sql = f"""
             SELECT 
                     json_value(dt.cmetadata, '$.file_name') name,
@@ -1462,7 +1487,7 @@ def search_document(reranker_model_radio_input,
                 for row in cursor:
                     new_data = pd.DataFrame(
                         {'CONTENT': row[2].read(), 'EMBED_ID': row[1], 'SOURCE': str(row[3]) + ":" + row[0],
-                         'DISTANCE': '-'},
+                         'DISTANCE': '-', 'SCORE': '-'},
                         index=[2])
                     first_chunks_df = pd.concat([new_data, first_chunks_df], ignore_index=True)
                 print(f"{first_chunks_df=}")
@@ -1519,13 +1544,13 @@ def search_document(reranker_model_radio_input,
 
             if len(docs_dataframe) == 0:
                 docs_dataframe = pd.DataFrame(
-                    columns=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "KEY_WORDS"])
+                    columns=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "SCORE", "KEY_WORDS"])
 
             return (gr.Textbox(value=query_sql_output.strip()), gr.Markdown("**検索結果数**: " + str(
                 docs_dataframe.shape[0]) + "   |   **検索キーワード**: (" + str(len(search_text)) + ")[" + ', '.join(
                 search_text) + "]", visible=True),
                     gr.Dataframe(value=docs_dataframe, wrap=True,
-                                 column_widths=["4%", "68%", "6%", "8%", "6%", "8%"]))
+                                 column_widths=["4%", "62%", "6%", "8%", "6%", "6%", "8%"]))
 
 
 async def chat_document(search_result,
@@ -1693,11 +1718,13 @@ async def eval_ragas(search_result,
         async for r, r_plus, gpt4o, gpt4, opus, sonnet, haiku in chat(system_text, command_r_user_text,
                                                                       command_r_plus_user_text,
                                                                       openai_gpt4o_user_text, openai_gpt4_user_text,
-                                                                      claude_3_opus_user_text, claude_3_sonnet_user_text,
+                                                                      claude_3_opus_user_text,
+                                                                      claude_3_sonnet_user_text,
                                                                       claude_3_haiku_user_text, command_r_checkbox,
                                                                       command_r_plus_checkbox, openai_gpt4o_checkbox,
                                                                       openai_gpt4_checkbox, claude_3_opus_checkbox,
-                                                                      claude_3_sonnet_checkbox, claude_3_haiku_checkbox):
+                                                                      claude_3_sonnet_checkbox,
+                                                                      claude_3_haiku_checkbox):
             command_r_response += r
             command_r_plus_response += r_plus
             openai_gpt4o_response += gpt4o
@@ -1710,8 +1737,11 @@ async def eval_ragas(search_result,
 
 
 def delete_document(server_directory, doc_ids):
-    if not server_directory or not doc_ids:
-        raise ValueError("Please enter server_directory and doc_ids")
+    if not server_directory:
+        raise gr.Error("サーバー・ディレクトリを入力してください")
+    print(f"{doc_ids=}")
+    if not doc_ids or len(doc_ids) == 0 or (len(doc_ids) == 1 and doc_ids[0] == ''):
+        raise gr.Error("ドキュメントを選択してください")
 
     output_sql = ""
     with pool.acquire() as conn, conn.cursor() as cursor:
@@ -1923,7 +1953,8 @@ If I switch languages, please switch your responses accordingly.")
                         choices=get_doc_list(),
                         label="ドキュメント*"
                     )
-            with gr.Accordion("UTL_TO_CHUNKS 設定*"):
+            # with gr.Accordion("UTL_TO_CHUNKS 設定*"):
+            with gr.Accordion("CHUNKS 設定*"):
                 with gr.Row():
                     with gr.Column():
                         tab_split_document_chunks_language_radio = gr.Radio(label="LANGUAGE",
@@ -1943,13 +1974,19 @@ If I switch languages, please switch your responses accordingly.")
                                                                       info="Default value: BY WORDS。データ分割の方法を文字、単語、語彙トークンで指定。BY CHARACTERS: 文字数で計算して分割。BY WORDS: 単語数を計算して分割、単語ごとに空白文字が入る言語が対象、日本語、中国語、タイ語などの場合、各ネイティブ文字は単語（ユニグラム）としてみなされる。BY VOCABULARY: 語彙のトークン数を計算して分割、CREATE_VOCABULARYパッケージを使って、語彙登録が可能。", )
                 with gr.Row():
                     with gr.Column():
-                        tab_split_document_chunks_max_text = gr.Text(label="MAX",
-                                                                     value="256",
-                                                                     lines=1,
-                                                                     info="",
-                                                                     )
+                        # tab_split_document_chunks_max_text = gr.Text(label="Max",
+                        #                                              value="256",
+                        #                                              lines=1,
+                        #                                              info="",
+                        #                                              )
+                        tab_split_document_chunks_max_slider = gr.Slider(label="Max",
+                                                                         value=256,
+                                                                         minimum=100,
+                                                                         maximum=400,
+                                                                         step=1,
+                                                                         )
                     with gr.Column():
-                        tab_split_document_chunks_overlap_slider = gr.Slider(label="OVERLAP(PERCENTAGE of MAX)",
+                        tab_split_document_chunks_overlap_slider = gr.Slider(label="Overlap(Percentage of Max)",
                                                                              minimum=0,
                                                                              maximum=20,
                                                                              step=5,
@@ -2030,13 +2067,13 @@ If I switch languages, please switch your responses accordingly.")
             with gr.Row() as searched_result_row:
                 with gr.Column():
                     tab_chat_document_searched_result_dataframe = gr.Dataframe(
-                        headers=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "KEY_WORDS"],
-                        datatype=["str", "str", "str", "str", "str", "str"],
+                        headers=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "SCORE", "KEY_WORDS"],
+                        datatype=["str", "str", "str", "str", "str", "str", "str"],
                         row_count=10,
                         height=400,
-                        col_count=(6, "fixed"),
+                        col_count=(7, "fixed"),
                         wrap=True,
-                        column_widths=["4%", "68%", "6%", "8%", "6%", "8%"],
+                        column_widths=["4%", "62%", "6%", "8%", "6%", "6%", "8%"],
                         interactive=False,
                     )
             with gr.Row():
@@ -2164,7 +2201,8 @@ If I switch languages, please switch your responses accordingly.")
                 with gr.Column():
                     tab_chat_document_reranker_threshold_slider = gr.Slider(label="Threshold For Rerank Score*",
                                                                             minimum=0.10,
-                                                                            maximum=0.99, step=0.05, value=0.40)
+                                                                            maximum=0.99, step=0.05, value=0.40,
+                                                                            interactive=True)
             with gr.Accordion("Oracle Multi-Vector Similarity Search & Extend Chunks", open=True):
                 with gr.Row():
                     with gr.Column():
@@ -2297,14 +2335,14 @@ Response in Japanese.
                                                  tab_chat_with_claude_3_sonnet_answer_text,
                                                  tab_chat_with_claude_3_haiku_answer_text
                                                  ])
+    tab_create_oci_clear_button.add([tab_create_oci_cred_user_ocid_text, tab_create_oci_cred_tenancy_ocid_text,
+                                     tab_create_oci_cred_compartment_ocid_text, tab_create_oci_cred_fingerprint_text,
+                                     tab_create_oci_cred_private_key_file])
     tab_create_oci_cred_button.click(create_oci_cred,
                                      [tab_create_oci_cred_user_ocid_text, tab_create_oci_cred_tenancy_ocid_text,
                                       tab_create_oci_cred_compartment_ocid_text, tab_create_oci_cred_fingerprint_text,
                                       tab_create_oci_cred_private_key_file],
                                      [tab_create_oci_cred_sql_accordion, tab_create_oci_cred_sql_text])
-    tab_create_oci_clear_button.add([tab_create_oci_cred_user_ocid_text, tab_create_oci_cred_tenancy_ocid_text,
-                                     tab_create_oci_cred_compartment_ocid_text, tab_create_oci_cred_fingerprint_text,
-                                     tab_create_oci_cred_private_key_file])
     tab_create_oci_cred_test_button.click(test_oci_cred, [tab_create_oci_cred_test_query_text],
                                           [tab_create_oci_cred_test_vector_text])
     tab_create_table_button.click(create_table, [], [tab_create_table_sql_accordion, tab_create_table_sql_text])
@@ -2319,7 +2357,7 @@ Response in Japanese.
                                        tab_chat_document_doc_id_checkbox_group])
     tab_split_document_split_button.click(split_document_by_unstructured,
                                           inputs=[tab_split_document_doc_id_radio, tab_split_document_chunks_by_radio,
-                                                  tab_split_document_chunks_max_text,
+                                                  tab_split_document_chunks_max_slider,
                                                   tab_split_document_chunks_overlap_slider,
                                                   tab_split_document_chunks_split_by_radio,
                                                   tab_split_document_chunks_split_by_custom_text,
@@ -2329,10 +2367,10 @@ Response in Japanese.
                                           outputs=[tab_split_document_output_sql_text, tab_split_document_chunks_count,
                                                    tab_split_document_chunks_result_dataframe],
                                           )
-    tab_split_document_embed_save_button.click(embed_save_document_by_unstructured,
+    tab_split_document_embed_save_button.click(split_document_by_unstructured,
                                                inputs=[tab_split_document_doc_id_radio,
                                                        tab_split_document_chunks_by_radio,
-                                                       tab_split_document_chunks_max_text,
+                                                       tab_split_document_chunks_max_slider,
                                                        tab_split_document_chunks_overlap_slider,
                                                        tab_split_document_chunks_split_by_radio,
                                                        tab_split_document_chunks_split_by_custom_text,
@@ -2342,7 +2380,20 @@ Response in Japanese.
                                                outputs=[tab_split_document_output_sql_text,
                                                         tab_split_document_chunks_count,
                                                         tab_split_document_chunks_result_dataframe],
-                                               )
+                                               ).then(embed_save_document_by_unstructured,
+                                                      inputs=[tab_split_document_doc_id_radio,
+                                                              tab_split_document_chunks_by_radio,
+                                                              tab_split_document_chunks_max_slider,
+                                                              tab_split_document_chunks_overlap_slider,
+                                                              tab_split_document_chunks_split_by_radio,
+                                                              tab_split_document_chunks_split_by_custom_text,
+                                                              tab_split_document_chunks_language_radio,
+                                                              tab_split_document_chunks_normalize_radio,
+                                                              tab_split_document_chunks_normalize_options_checkbox_group],
+                                                      outputs=[tab_split_document_output_sql_text,
+                                                               tab_split_document_chunks_count,
+                                                               tab_split_document_chunks_result_dataframe],
+                                                      )
     tab_delete_document.select(refresh_doc_list,
                                outputs=[tab_split_document_doc_id_radio, tab_delete_document_doc_ids_checkbox_group,
                                         tab_chat_document_doc_id_checkbox_group])
@@ -2395,6 +2446,7 @@ Response in Japanese.
                                                  ).then(search_document,
                                                         [tab_chat_document_reranker_model_radio,
                                                          tab_chat_document_reranker_top_k_slider,
+                                                         tab_chat_document_reranker_threshold_slider,
                                                          tab_chat_document_threshold_value_slider,
                                                          tab_chat_document_top_k_slider,
                                                          tab_chat_document_doc_id_all_checkbox,
