@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import platform
 import re
 import shutil
 import time
@@ -45,6 +46,9 @@ body {
 _ = load_dotenv(find_dotenv())
 
 DEFAULT_COLLECTION_NAME = os.environ["DEFAULT_COLLECTION_NAME"]
+
+if platform.system() == 'Linux':
+    oracledb.init_oracle_client(lib_dir="/u01/aipoc/instantclient_23_5")
 
 # 初始化一个数据库连接
 pool = oracledb.create_pool(
@@ -1953,7 +1957,7 @@ with gr.Blocks(css=custom_css) as app:
                     with gr.Column():
                         tab_create_oci_clear_button = gr.ClearButton(value="クリア")
                     with gr.Column():
-                        tab_create_oci_cred_button = gr.Button(value="作成/再作成", variant="primary")
+                        tab_create_oci_cred_button = gr.Button(value="設定/再設定", variant="primary")
                 with gr.Accordion(label="OCI_CREDのテスト", open=False) as tab_create_oci_cred_test_accordion:
                     with gr.Row():
                         with gr.Column():
@@ -1967,11 +1971,29 @@ with gr.Blocks(css=custom_css) as app:
                         with gr.Column():
                             tab_create_oci_cred_test_button = gr.Button(value="テスト", variant="primary")
             with gr.TabItem(label="Step-2.Cohereの設定(オプション)") as tab_create_cohere_cred:
-                pass
+                with gr.Row():
+                    with gr.Column():
+                        tab_create_cohere_cred_api_key_text = gr.Textbox(label="API Key*", lines=1, interactive=True)
+                with gr.Row():
+                    with gr.Column():
+                        tab_create_cohere_cred_button = gr.Button(value="設定/再設定", variant="primary")
             with gr.TabItem(label="Step-3.OpenAIの設定(オプション)") as tab_create_openai_cred:
-                pass
+                with gr.Row():
+                    with gr.Column():
+                        tab_create_openai_cred_base_url_text = gr.Textbox(label="Base URL*", lines=1, interactive=True)
+                with gr.Row():
+                    with gr.Column():
+                        tab_create_openai_cred_api_key_text = gr.Textbox(label="API Key*", lines=1, interactive=True)
+                with gr.Row():
+                    with gr.Column():
+                        tab_create_openai_cred_button = gr.Button(value="設定/再設定", variant="primary")
             with gr.TabItem(label="Step-4.Claudeの設定(オプション)") as tab_create_claude_cred:
-                pass
+                with gr.Row():
+                    with gr.Column():
+                        tab_create_claude_cred_api_key_text = gr.Textbox(label="API Key*", lines=1, interactive=True)
+                with gr.Row():
+                    with gr.Column():
+                        tab_create_claude_cred_button = gr.Button(value="設定/再設定", variant="primary")
         with gr.TabItem(label="LLM評価") as tab_llm_evaluation:
             with gr.TabItem(label="LLMとチャット") as tab_chat_with_llm:
                 with gr.Row():
@@ -2396,14 +2418,16 @@ with gr.Blocks(css=custom_css) as app:
                                                                                    interactive=True,
                                                                                    value=2,
                                                                                    info="Default value: 2。DISTANCE計算対象外。検索されたチャンクを拡張する数を指定。0: 拡張しない。 2: 2個で前後それぞれ1個を拡張。4: 4個で前後それぞれ2個を拡張。... n: n個で前後それぞれn/2個を拡張。")
-                    with gr.Column():
-                        tab_chat_document_text_search_checkbox = gr.Checkbox(label="Text Search", value=False,
-                                                                             info="Text Search is limited to the original query and does not relate to other items.")
-                    with gr.Column():
-                        tab_chat_document_text_search_k_slider = gr.Slider(label="Limit-K for Text Search", minimum=1,
-                                                                           maximum=10, step=1,
-                                                                           value=5,
-                                                                           info="The limitation on the number of words that can be used for Text Search")
+                    with gr.Row():
+                        with gr.Column():
+                            tab_chat_document_text_search_checkbox = gr.Checkbox(label="Text Search", value=False,
+                                                                                 info="Text Search is limited to the original query and does not relate to other items.")
+                        with gr.Column():
+                            tab_chat_document_text_search_k_slider = gr.Slider(label="Limit-K for Text Search",
+                                                                               minimum=1,
+                                                                               maximum=10, step=1,
+                                                                               value=5,
+                                                                               info="The limitation on the number of words that can be used for Text Search")
                 with gr.Row(visible=False):
                     tab_chat_document_accuracy_plan_radio = gr.Radio(
                         ["Somewhat Inaccurate", "Decent Accuracy", "Extremely Precise"],
