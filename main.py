@@ -492,6 +492,11 @@ def create_oci_cred(user_ocid, tenancy_ocid, compartment_ocid, fingerprint, priv
     if not private_key_file:
         raise gr.Error("Private Keyを入力してください")
 
+    user_ocid = user_ocid.strip()
+    tenancy_ocid = tenancy_ocid.strip()
+    compartment_ocid = compartment_ocid.strip()
+    fingerprint = fingerprint.strip()
+
     # set up OCI config
     oci_config_path = find_dotenv("./.oci/config")
     key_file_path = './.oci/oci_api_key.pem'
@@ -520,11 +525,11 @@ def create_oci_cred(user_ocid, tenancy_ocid, compartment_ocid, fingerprint, priv
                 print(f"DatabaseError={de}")
 
             oci_cred = {
-                'user_ocid': user_ocid.strip(),
-                'tenancy_ocid': tenancy_ocid.strip(),
-                'compartment_ocid': compartment_ocid.strip(),
+                'user_ocid': user_ocid,
+                'tenancy_ocid': tenancy_ocid,
+                'compartment_ocid': compartment_ocid,
                 'private_key': private_key.strip(),
-                'fingerprint': fingerprint.strip()
+                'fingerprint': fingerprint
             }
 
             create_oci_cred_sql = """
@@ -550,8 +555,42 @@ BEGIN
     );
 END; 
 """
-    gr.Info("OCI_CREDの作成が完了しました")
+    gr.Info("OCI API Keyの設定が完了しました")
     return gr.Accordion(), gr.Textbox(value=create_oci_cred_sql.strip())
+
+
+def create_cohere_cred(cohere_cred_api_key):
+    if not cohere_cred_api_key:
+        raise gr.Error("Cohere API Keyを入力してください")
+    cohere_cred_api_key = cohere_cred_api_key.strip()
+    env_path = find_dotenv("./.env")
+    set_key(env_path, "COHERE_API_KEY", cohere_cred_api_key, quote_mode="never")
+    load_dotenv(env_path)
+    gr.Info("Cohere API Keyの設定が完了しました")
+    return gr.Textbox(value=cohere_cred_api_key)
+
+
+def create_openai_cred(openai_cred_base_url, openai_cred_api_key):
+    if not openai_cred_base_url:
+        raise gr.Error("OpenAI Base URLを入力してください")
+    if not openai_cred_api_key:
+        raise gr.Error("OpenAI API Keyを入力してください")
+    env_path = find_dotenv("./.env")
+    set_key(env_path, "OPENAI_BASE_URL", openai_cred_base_url, quote_mode="never")
+    set_key(env_path, "OPENAI_API_KEY", openai_cred_api_key, quote_mode="never")
+    load_dotenv(env_path)
+    gr.Info("OpenAI API Keyの設定が完了しました")
+    return gr.Textbox(value=openai_cred_base_url.strip()), gr.Textbox(value=openai_cred_api_key.strip())
+
+
+def create_claude_cred(claude_cred_api_key):
+    if not claude_cred_api_key:
+        raise gr.Error("Claude API Keyを入力してください")
+    env_path = find_dotenv("./.env")
+    set_key(env_path, "ANTHROPIC_API_KEY", claude_cred_api_key, quote_mode="never")
+    load_dotenv(env_path)
+    gr.Info("Claude API Keyの設定が完了しました")
+    return gr.Textbox(value=claude_cred_api_key.strip())
 
 
 def create_table():
@@ -1501,28 +1540,29 @@ def search_document(reranker_model_radio_input,
                     [source.split(':')[0] for source in docs_dataframe['SOURCE'].tolist()]) + "'"
                 print(f"{filtered_doc_ids=}")
                 select_extend_first_chunk_sql = f"""
-            SELECT 
-                    json_value(dt.cmetadata, '$.file_name') name,
-                    MIN(dc.embed_id) embed_id,
-                    RTRIM(XMLCAST(XMLAGG(XMLELEMENT(e, dc.embed_data || ',') ORDER BY dc.embed_id) AS CLOB), ',') AS embed_data,
-                    dc.doc_id doc_id,
-                    '999999.0' vector_distance
-            FROM 
-                    {DEFAULT_COLLECTION_NAME}_embedding dc, {DEFAULT_COLLECTION_NAME}_collection dt
-            WHERE 
-                    dc.doc_id = dt.id AND 
-                    dc.doc_id IN (:filtered_doc_ids) AND 
-                    dc.embed_id <= :extend_first_chunk_size
-            GROUP BY
-                    dc.doc_id, name         
-            ORDER 
-                    BY dc.doc_id
+SELECT 
+        json_value(dt.cmetadata, '$.file_name') name,
+        MIN(dc.embed_id) embed_id,
+        RTRIM(XMLCAST(XMLAGG(XMLELEMENT(e, dc.embed_data || ',') ORDER BY dc.embed_id) AS CLOB), ',') AS embed_data,
+        dc.doc_id doc_id,
+        '999999.0' vector_distance
+FROM 
+        {DEFAULT_COLLECTION_NAME}_embedding dc, {DEFAULT_COLLECTION_NAME}_collection dt
+WHERE 
+        dc.doc_id = dt.id AND 
+        dc.doc_id IN (:filtered_doc_ids) AND 
+        dc.embed_id <= :extend_first_chunk_size
+GROUP BY
+        dc.doc_id, name         
+ORDER 
+        BY dc.doc_id
             """
                 select_extend_first_chunk_sql = (select_extend_first_chunk_sql
                                                  .replace(':filtered_doc_ids', filtered_doc_ids)
                                                  .replace(':extend_first_chunk_size',
                                                           str(extend_first_chunk_size_input)))
                 print(f"{select_extend_first_chunk_sql=}")
+                query_sql_output += "\n" + select_extend_first_chunk_sql.strip()
                 cursor.execute(select_extend_first_chunk_sql)
                 first_chunks_df = pd.DataFrame(columns=docs_dataframe.columns)
                 for row in cursor:
@@ -1677,17 +1717,24 @@ async def chat_document(search_result,
                claude_3_opus_response, claude_3_sonnet_response, claude_3_haiku_response)
 
 
-async def eval_ragas(search_result,
-                     llm_answer_checkbox,
+async def eval_ragas(llm_answer_checkbox,
                      llm_evaluation_checkbox,
-                     query_text, system_text, standard_answer_text,
+                     system_text, standard_answer_text,
                      command_r_response, command_r_plus_response, openai_gpt4o_response,
                      openai_gpt4_response, claude_3_opus_response, claude_3_sonnet_response, claude_3_haiku_response):
+    def remove_last_line(text):
+        if text:
+            lines = text.splitlines()
+            if lines[-1].startswith("推論時間"):
+                lines.pop()
+            return '\n'.join(lines)
+        else:
+            return text
+
     print(f"{llm_evaluation_checkbox=}")
     if not llm_evaluation_checkbox:
         yield ("", "", "", "", "", "", "")
     else:
-        query_text = query_text.strip()
         standard_answer_text = standard_answer_text.strip()
 
         command_r_checkbox = False
@@ -1712,49 +1759,65 @@ async def eval_ragas(search_result,
         if "claude/haiku" in llm_answer_checkbox:
             claude_3_haiku_checkbox = True
 
+        command_r_response = remove_last_line(command_r_response)
+        command_r_plus_response = remove_last_line(command_r_plus_response)
+        openai_gpt4o_response = remove_last_line(openai_gpt4o_response)
+        openai_gpt4_response = remove_last_line(openai_gpt4_response)
+        claude_3_opus_response = remove_last_line(claude_3_opus_response)
+        claude_3_sonnet_response = remove_last_line(claude_3_sonnet_response)
+        claude_3_haiku_response = remove_last_line(claude_3_haiku_response)
+
         command_r_user_text = f"""Standard Answer: {standard_answer_text}
     
                 Given Answer: {command_r_response}
     
-                Please evaluate the given answer based on the criteria described:
+                Please evaluate the given answer based on the criteria described:\n
                 """
 
         command_r_plus_user_text = f"""Standard Answer: {standard_answer_text}
     
                 Given Answer: {command_r_plus_response}
     
-                Please evaluate the given answer based on the criteria described:
+                Please evaluate the given answer based on the criteria described:\n
                 """
         openai_gpt4o_user_text = f"""Standard Answer: {standard_answer_text}
     
                 Given Answer: {openai_gpt4o_response}
     
-                Please evaluate the given answer based on the criteria described:
+                Please evaluate the given answer based on the criteria described:\n
                 """
         openai_gpt4_user_text = f"""Standard Answer: {standard_answer_text}
     
                 Given Answer: {openai_gpt4_response}
     
-                Please evaluate the given answer based on the criteria described:
+                Please evaluate the given answer based on the criteria described:\n
                 """
         claude_3_opus_user_text = f"""Standard Answer: {standard_answer_text}
     
                 Given Answer: {claude_3_opus_response}
     
-                Please evaluate the given answer based on the criteria described:
+                Please evaluate the given answer based on the criteria described:\n
                 """
         claude_3_sonnet_user_text = f"""Standard Answer: {standard_answer_text}
     
                 Given Answer: {claude_3_sonnet_response}
     
-                Please evaluate the given answer based on the criteria described:
+                Please evaluate the given answer based on the criteria described:\n
                 """
         claude_3_haiku_user_text = f"""Standard Answer: {standard_answer_text}
     
                 Given Answer: {claude_3_haiku_response}
     
-                Please evaluate the given answer based on the criteria described:
+                Please evaluate the given answer based on the criteria described:\n
                 """
+
+        eval_command_r_response = ""
+        eval_command_r_plus_response = ""
+        eval_openai_gpt4o_response = ""
+        eval_openai_gpt4_response = ""
+        eval_claude_3_opus_response = ""
+        eval_claude_3_sonnet_response = ""
+        eval_claude_3_haiku_response = ""
 
         async for r, r_plus, gpt4o, gpt4, opus, sonnet, haiku in chat(system_text, command_r_user_text,
                                                                       command_r_plus_user_text,
@@ -1766,15 +1829,16 @@ async def eval_ragas(search_result,
                                                                       openai_gpt4_checkbox, claude_3_opus_checkbox,
                                                                       claude_3_sonnet_checkbox,
                                                                       claude_3_haiku_checkbox):
-            command_r_response += r
-            command_r_plus_response += r_plus
-            openai_gpt4o_response += gpt4o
-            openai_gpt4_response += gpt4
-            claude_3_opus_response += opus
-            claude_3_sonnet_response += sonnet
-            claude_3_haiku_response += haiku
-            yield (command_r_response, command_r_plus_response, openai_gpt4o_response, openai_gpt4_response,
-                   claude_3_opus_response, claude_3_sonnet_response, claude_3_haiku_response)
+            eval_command_r_response += r
+            eval_command_r_plus_response += r_plus
+            eval_openai_gpt4o_response += gpt4o
+            eval_openai_gpt4_response += gpt4
+            eval_claude_3_opus_response += opus
+            eval_claude_3_sonnet_response += sonnet
+            eval_claude_3_haiku_response += haiku
+            yield (eval_command_r_response, eval_command_r_plus_response, eval_openai_gpt4o_response,
+                   eval_openai_gpt4_response,
+                   eval_claude_3_opus_response, eval_claude_3_sonnet_response, eval_claude_3_haiku_response)
 
 
 def generate_download_file(search_result, llm_answer_checkbox, llm_evaluation_checkbox,
@@ -1929,7 +1993,7 @@ with gr.Blocks(css=custom_css) as app:
                 with gr.Row():
                     with gr.Column():
                         tab_create_table_button = gr.Button(value="作成/再作成", variant="primary")
-            with gr.TabItem(label="Step-1.OCIGenAIの設定*") as tab_create_oci_cred:
+            with gr.TabItem(label="Step-1.OCI GenAIの設定*") as tab_create_oci_cred:
                 with gr.Accordion(label="使用されたSQL", open=False) as tab_create_oci_cred_sql_accordion:
                     tab_create_oci_cred_sql_text = gr.Textbox(label="SQL", show_label=False, lines=25, max_lines=50,
                                                               autoscroll=False, interactive=False,
@@ -1958,7 +2022,7 @@ with gr.Blocks(css=custom_css) as app:
                         tab_create_oci_clear_button = gr.ClearButton(value="クリア")
                     with gr.Column():
                         tab_create_oci_cred_button = gr.Button(value="設定/再設定", variant="primary")
-                with gr.Accordion(label="OCI_CREDのテスト", open=False) as tab_create_oci_cred_test_accordion:
+                with gr.Accordion(label="OCI GenAIのテスト", open=False) as tab_create_oci_cred_test_accordion:
                     with gr.Row():
                         with gr.Column():
                             tab_create_oci_cred_test_query_text = gr.Textbox(label="テキスト", lines=1, max_lines=1,
@@ -2055,8 +2119,13 @@ with gr.Blocks(css=custom_css) as app:
                     tab_chat_with_llm_system_text = gr.Textbox(label="システム・メッセージ*", show_label=False, lines=5,
                                                                max_lines=15,
                                                                value="You are a helpful assistant. \n\
-            Please respond to me in the same language I use for my messages. \n\
-            If I switch languages, please switch your responses accordingly.")
+Please respond to me in the same language I use for my messages. \n\
+If I switch languages, please switch your responses accordingly.")
+                #                     tab_chat_with_llm_system_text = gr.Textbox(label="システム・メッセージ*", show_label=False, lines=5,
+                #                                                                max_lines=15,
+                #                                                                value="あなたは役に立つアシスタントです。\n\
+                # 私のメッセージと同じ言語で返答してください。\n\
+                # 私が言語を切り替えた場合は、あなたもそれに合わせて切り替えてください。")
                 with gr.Row():
                     with gr.Column():
                         tab_chat_with_llm_query_text = gr.Textbox(label="ユーザー・メッセージ*", lines=2, max_lines=5)
@@ -2476,21 +2545,23 @@ with gr.Blocks(css=custom_css) as app:
                     tab_chat_document_llm_evaluation_checkbox = gr.Checkbox(label="評価", show_label=True,
                                                                             interactive=True, value=False)
                 with gr.Row():
-                    tab_chat_document_system_message_text = gr.Textbox(label="システム・メッセージ*", lines=5,
-                                                                       max_lines=15,
+                    tab_chat_document_system_message_text = gr.Textbox(label="システム・メッセージ*", lines=15,
+                                                                       max_lines=20,
                                                                        interactive=True,
                                                                        visible=False,
-                                                                       value=f"""You are an ANSWER EVALUATOR. Your task is to compare a given answer to a standard answer and evaluate its quality.
-    Respond with a score from 0 to 10 for each of the following criteria:
-    1. Correctness (0 being completely incorrect, 10 being perfectly correct)
-    2. Completeness (0 being entirely incomplete, 10 being fully complete)
-    3. Clarity (0 being very unclear, 10 being extremely clear)
-    4. Conciseness (0 being extremely verbose, 10 being optimally concise)
-    
-    After providing scores, give a brief explanation for each score.
-    Finally, provide an overall score from 0 to 10 and a summary of the evaluation.
-    Please respond to me in the same language I use for my messages. 
-    If I switch languages, please switch your responses accordingly.
+                                                                       value=f"""You are an ANSWER EVALUATOR. 
+Your task is to compare a given answer to a standard answer and evaluate its quality.
+Please respond to me in the same language I use for my messages. 
+If I switch languages, please switch your responses accordingly.
+
+Respond with a score from 0 to 10 for each of the following criteria:
+1. Correctness (0 being completely incorrect, 10 being perfectly correct)
+2. Completeness (0 being entirely incomplete, 10 being fully complete)
+3. Clarity (0 being very unclear, 10 being extremely clear)
+4. Conciseness (0 being extremely verbose, 10 being optimally concise)
+
+After providing scores, give a brief explanation for each score.
+Finally, provide an overall score from 0 to 10 and a summary of the evaluation.
                 """)
                 with gr.Row():
                     tab_chat_document_standard_answer_text = gr.Textbox(label="標準回答*", lines=2, interactive=True,
@@ -2510,6 +2581,15 @@ with gr.Blocks(css=custom_css) as app:
                                      [tab_create_oci_cred_sql_accordion, tab_create_oci_cred_sql_text])
     tab_create_oci_cred_test_button.click(test_oci_cred, [tab_create_oci_cred_test_query_text],
                                           [tab_create_oci_cred_test_vector_text])
+    tab_create_cohere_cred_button.click(create_cohere_cred,
+                                        [tab_create_cohere_cred_api_key_text],
+                                        [tab_create_cohere_cred_api_key_text])
+    tab_create_openai_cred_button.click(create_openai_cred,
+                                        [tab_create_openai_cred_base_url_text, tab_create_openai_cred_api_key_text],
+                                        [tab_create_openai_cred_base_url_text, tab_create_openai_cred_api_key_text])
+    tab_create_claude_cred_button.click(create_claude_cred,
+                                        [tab_create_claude_cred_api_key_text],
+                                        [tab_create_claude_cred_api_key_text])
     tab_chat_with_llm_answer_checkbox_group.change(set_chat_llm_answer, [tab_chat_with_llm_answer_checkbox_group],
                                                    [tab_chat_with_llm_command_r_accordion,
                                                     tab_chat_with_llm_command_r_plus_accordion,
@@ -2670,10 +2750,8 @@ with gr.Blocks(css=custom_css) as app:
                                                                         tab_chat_document_claude_3_haiku_answer_text]
                                                                ).then(eval_ragas,
                                                                       inputs=[
-                                                                          tab_chat_document_searched_result_dataframe,
                                                                           tab_chat_document_llm_answer_checkbox_group,
                                                                           tab_chat_document_llm_evaluation_checkbox,
-                                                                          tab_chat_document_query_text,
                                                                           tab_chat_document_system_message_text,
                                                                           tab_chat_document_standard_answer_text,
                                                                           tab_chat_document_command_r_answer_text,
