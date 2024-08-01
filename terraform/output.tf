@@ -12,7 +12,7 @@ output "autonomous_data_warehouse_high_connection_string" {
 
 output "ssh_to_instance" {
   description = "convenient command to ssh to the instance"
-  value       = "ssh -o ServerAliveInterval=10 opc@${oci_core_instance.generated_oci_core_instance.public_ip}"
+  value       = "ssh -o ServerAliveInterval=10 ubuntu@${oci_core_instance.generated_oci_core_instance.public_ip}"
 }
 
 #output "sqlplus_to_oracle" {

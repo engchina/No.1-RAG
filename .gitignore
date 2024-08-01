@@ -162,3 +162,13 @@ cython_debug/
 .idea/
 .env
 TERRAFORM.md
+files/
+
+# Terraform
+terraform/.terraform
+terraform/.terraform.lock.hcl
+terraform/.terraform.state
+terraform/.terraform.tfstate
+terraform/.terraform.tfstate.backup
+terraform/.terraform.tfvars
+terraform/wallet.zip

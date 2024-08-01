@@ -15,7 +15,7 @@ resource "oci_database_autonomous_database" "generated_database_autonomous_datab
   compute_count                        = "2"
   compute_model                        = "ECPU"
   data_storage_size_in_tbs             = "1"
-  db_name                              = "ADB"
+  db_name                              = var.adb_name
   db_version                                     = "23ai"
   db_workload                                    = "DW"
   display_name                                   = "AIPOC"

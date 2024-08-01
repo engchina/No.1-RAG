@@ -3,6 +3,11 @@ variable "availability_domain" {
 }
 
 variable "compartment_ocid" {
+  default = ""
+}
+
+variable "adb_name" {
+  default = "ADB"
 }
 
 variable "instance_display_name" {
@@ -30,7 +35,7 @@ variable "instance_boot_volume_vpus" {
 }
 
 variable "instance_image_source_id" {
-  default = "ocid1.image.oc1.ap-tokyo-1.aaaaaaaa2vfxs5eqzyk4o7lyd6j4bo42pfy6oqrwfzkkho54uwiafy7nxu3a"
+  default = "ocid1.image.oc1.ap-tokyo-1.aaaaaaaaoiusqhftxmiyjlulnxx5mdnqfv6pjx4hdcoks3exn7gsrcwpkpdq"
 }
 
 variable "instance_user_data" {
@@ -38,12 +43,13 @@ variable "instance_user_data" {
 }
 
 variable "subnet_ai_subnet_id" {
-  default = "ocid1.subnet.oc1.ap-tokyo-1.aaaaaaaa5imetr2dm3u5pxdyzk63hku5struudgqxrm5glvgpjfgspa64gba"
+  default = ""
 }
 
 variable "security_list_id" {
-  default = "ocid1.securitylist.oc1.ap-tokyo-1.aaaaaaaa3ffult7vy2nfc2bf5pqkio3vowc2psriqdj3w5byc7xbyumfilqq"
+  default = ""
 }
 
 variable "ssh_authorized_keys" {
+  default = ""
 }

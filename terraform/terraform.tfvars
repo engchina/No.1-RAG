@@ -1,0 +1,4 @@
+compartment_ocid    = "ocid1.compartment.oc1..aaaaaaaadsagovrmugvhqvrug74ikajc3xzgyqqbundue4js2qn4g6wlnzmq"
+subnet_ai_subnet_id = "ocid1.subnet.oc1.ap-tokyo-1.aaaaaaaa5imetr2dm3u5pxdyzk63hku5struudgqxrm5glvgpjfgspa64gba"
+security_list_id    = "ocid1.securitylist.oc1.ap-tokyo-1.aaaaaaaa3ffult7vy2nfc2bf5pqkio3vowc2psriqdj3w5byc7xbyumfilqq"
+ssh_authorized_keys = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKtwbNDlpP5dLO6rf/KCL8RpiZdX+uKISlnKcuytkE8BhSmeZkRJjUpCM7QatZ6Gbsti7m+SayokY7uK/hx5AruurqYyYtThcZOT9LG9rVG18NGoTfsM7GtJtejQMiQcS+q/Rc3OExHfGn+zlQlJaNYu6H8nU1xxGSfUvew15Vsh6pq1m27XqKcr5YfgMqaVunvsI9V0CSrSDCstFHFVgf7av/5F62GBY6MZPrsk8w8ZEyFalZm+2Yw/DJutPePJOiJeXYJqn/k52FfeBmEIIexHckjTFPdXhEc2OVD95dcK2eGbGy9//yaUE58cVLkMdQboH6svjMG6xbY89N+TTv oracle@k8s-master"
