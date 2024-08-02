@@ -1,0 +1,64 @@
+#cloud-config
+output: {all: '| tee -a /var/log/cloud-init-custom.log'}
+bootcmd:
+  - echo "Starting boot command..."
+  - mkdir -p /u01/aipoc/props
+packages:
+  - git
+write_files:
+  - path: "/u01/aipoc/props/db.env"
+    permissions: "0644"
+    encoding: "gzip+base64"
+    content: |
+      ${oci_database_autonomous_database_connection_string}
+  - path: "/u01/aipoc/props/compartment_id.txt"
+    permissions: "0644"
+    content: ${output_compartment_ocid}
+  - path: "/u01/aipoc/wallet.zip"
+    permissions: "0644"
+    encoding: base64
+    content: |
+      ${oci_database_autonomous_database_wallet_content}
+runcmd:
+  - echo "Running aipoc init..."
+  # install unzip and gcc
+  - apt update
+  - apt install unzip gcc build-essential libmagic-dev libgl1-mesa-dev poppler-utils tesseract-ocr libreoffice pandoc -y
+  # open port 8080
+  - iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8080 -j ACCEPT
+  - netfilter-persistent save
+  # dowanload and configure instantclient
+  - cd /u01/aipoc
+  - wget https://download.oracle.com/otn_software/linux/instantclient/2350000/instantclient-basic-linux.x64-23.5.0.24.07.zip -O /u01/aipoc/instantclient-basic-linux.x64-23.5.0.24.07.zip
+  - unzip /u01/aipoc/instantclient-basic-linux.x64-23.5.0.24.07.zip -d ./
+  - wget http://ftp.de.debian.org/debian/pool/main/liba/libaio/libaio1_0.3.113-4_amd64.deb
+  - dpkg -i libaio1_0.3.113-4_amd64.deb
+  - sh -c "echo /u01/aipoc/instantclient_23_5 > /etc/ld.so.conf.d/oracle-instantclient.conf"
+  - ldconfig
+  - echo 'export LD_LIBRARY_PATH=/u01/aipoc/instantclient_23_5:$LD_LIBRARY_PATH' >> /etc/profile
+  - source /etc/profile
+  # unzip wallet and copy essential file to instantclient
+  - unzip /u01/aipoc/wallet.zip -d ./wallet
+  - cp /u01/aipoc/wallet/*  /u01/aipoc/instantclient_23_5/network/admin/
+  # install and configure miniconda
+  - wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /u01/aipoc/miniconda.sh
+  - bash miniconda.sh -b -p /u01/aipoc/miniconda
+  - eval "$(/u01/aipoc/miniconda/bin/conda shell.bash hook)"
+  - /u01/aipoc/miniconda/bin/conda init bash
+  # - source /root/.bashrc
+  # download source code
+  - git clone https://github.com/engchina/No.1-RAG.git; cd No.1-RAG
+  # replace env properties
+  - cp .env.example .env
+  - DB_CONNECTION_STRING=$(cat /u01/aipoc/props/db.env)
+  - sed -i "s|ORACLE_23AI_CONNECTION_STRING=TODO|ORACLE_23AI_CONNECTION_STRING=$DB_CONNECTION_STRING|g" .env
+  - COMPARTMENT_ID=$(cat /u01/aipoc/props/compartment_id.txt)
+  - sed -i "s|OCI_COMPARTMENT_OCID=TODO|OCI_COMPARTMENT_OCID=$COMPARTMENT_ID|g" .env
+  # run application
+  - chmod +x main.sh
+  - crontab main.cron
+  - conda create -n no.1-rag python=3.11 -y
+  - conda activate no.1-rag
+  - pip install -r requirements.txt
+  - /bin/bash /u01/aipoc/No.1-RAG/main.sh &
+  - echo "Finished aipoc init."

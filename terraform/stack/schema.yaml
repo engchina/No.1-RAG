@@ -1,0 +1,136 @@
+## Copyright © 2020, Oracle and/or its affiliates.
+## All rights reserved. The Universal Permissive License (UPL), Version 1.0 as shown at http://oss.oracle.com/licenses/upl
+
+title: "Deploy RAG Evaluation Tool on Oracle Cloud Infrastructure Compute instance"
+stackDescription: "Deploy RAG Evaluation Tool on Oracle Cloud Infrastructure Compute instance"
+schemaVersion: 1.1.0
+version: "20220422"
+locale: "en"
+
+variableGroups:
+  - title: Hidden
+    visible: false
+    variables:
+      - instance_boot_volume_size
+      - instance_boot_volume_vpus
+      - instance_flex_shape_memory
+      - instance_flex_shape_ocpus
+      - instance_image_source_id
+      - instance_shape
+
+  - title: Required Configuration
+    visible: true
+    variables:
+      - region
+      - compartment_ocid
+      - availability_domain
+      - adb_name
+      - adb_password
+      - instance_display_name
+      - vcn_ai_vcn_id
+      - subnet_ai_subnet_id
+      - ssh_authorized_keys
+
+variables:
+  region:
+    title: Region
+    type: oci:identity:region:name
+    required: true
+    visible: false
+
+  compartment_ocid:
+    type: oci:identity:compartment:id
+    required: true
+    visible: true
+    title: "Create in compartment"
+
+  availability_domain:
+    type: oci:identity:availabilitydomain:name
+    required: true
+    visible: true
+    title: "Availability domain"
+    dependsOn:
+      region: ${region}
+      compartmentId: ${compartment_ocid}
+
+  adb_name:
+    type: string
+    required: true
+    visible: true
+    title: "Database name"
+
+  adb_password:
+    type: password
+    required: true
+    visible: true
+    title: "Database password"
+    description: "Set the password for your Autonomous Database ADMIN user here."
+    # renders a second field to re-enter the password for confirmation
+    confirmation: true
+    pattern: "^(?=.*[!@#%^*_+\\-:?.,\\[\\]\\{\\}])(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?!.*[$\\(\\)]).{8,32}$"
+
+  instance_display_name:
+    type: string
+    required: true
+    visible: true
+    title: "Compute instance name"
+
+  vcn_ai_vcn_id:
+    type: oci:core:vcn:id
+    required: true
+    visible: true
+    title: "VCN"
+    description: "Select existing virtual cloud network"
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+
+  subnet_ai_subnet_id:
+    type: oci:core:subnet:id
+    required: true
+    visible: true
+    title: "Subnet"
+    description: "Select existing subnet"
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vcnId: ${vcn_ai_vcn_id}
+
+  ssh_authorized_keys:
+    type: oci:core:ssh:publickey
+    title: "Add SSH keys"
+    description: "Upload a public key that you already have."
+    required: true
+    visible: true
+
+  instance_boot_volume_size:
+    visible: false
+  instance_boot_volume_vpus:
+    visible: false
+  instance_flex_shape_memory:
+    visible: false
+  instance_flex_shape_ocpus:
+    visible: false
+  instance_image_source_id:
+    visible: false
+  instance_shape:
+    visible: false
+
+outputs:
+
+  autonomous_data_warehouse_high_connection_string:
+    title: "Autonomous Data Warehouse High Connection String"
+    displayText: "Autonomous Data Warehouse High Connection String"
+    type: copyableString
+    visible: true
+
+  ssh_to_instance:
+    title: "Convenient command to ssh to the instance"
+    displayText: "Convenient command to ssh to the instance"
+    type: copyableString
+    visible: true
+
+  application_url:
+    title: "Application URL"
+    displayText: "Application URL"
+    type: copyableString
+    visible: true
+
