@@ -10,7 +10,6 @@ from typing import List, Tuple
 
 import cohere
 import gradio as gr
-import oci
 import oracledb
 import pandas as pd
 import requests
@@ -43,7 +42,7 @@ body {
 """
 
 # read local .env file
-_ = load_dotenv(find_dotenv())
+load_dotenv(find_dotenv())
 
 DEFAULT_COLLECTION_NAME = os.environ["DEFAULT_COLLECTION_NAME"]
 
@@ -95,21 +94,14 @@ WHERE id = :doc_id """, doc_id=doc_id)
 
 
 def process_text_chunks(unstructured_chunks):
-    """
-    处理文本块并创建带有元数据的字典列表。
-
-    Args:
-    unstructured_chunks (list): 包含文本块的列表。每个文本块应该有一个'text'属性。
-
-    Returns:
-    list: 包含处理后的文本块信息的字典列表。
-    """
     chunks = []
     chunk_id = 1
     start_offset = 1
 
     for chunk in unstructured_chunks:
         chunk_length = len(chunk.text)
+        if chunk_length == 0:
+            continue
         chunks.append({
             'CHUNK_ID': chunk_id,
             'CHUNK_OFFSET': start_offset,
@@ -126,9 +118,6 @@ def process_text_chunks(unstructured_chunks):
 
 async def command_r_task(system_text, query_text, command_r_checkbox):
     if command_r_checkbox:
-        # Default config file and profile
-        default_config = oci.config.from_file(file_location="./.oci/config")
-        oci.config.validate_config(default_config)
         command_r_16k = ChatOCIGenAI(
             model_id="cohere.command-r-16k",
             service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
@@ -155,9 +144,6 @@ async def command_r_task(system_text, query_text, command_r_checkbox):
 
 async def command_r_plus_task(system_text, query_text, command_r_plus_checkbox):
     if command_r_plus_checkbox:
-        # Default config file and profile
-        default_config = oci.config.from_file(file_location="./.oci/config")
-        oci.config.validate_config(default_config)
         command_r_plus = ChatOCIGenAI(
             model_id="cohere.command-r-plus",
             service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
@@ -184,6 +170,7 @@ async def command_r_plus_task(system_text, query_text, command_r_plus_checkbox):
 
 async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
     if openai_gpt4o_checkbox:
+        load_dotenv(find_dotenv())
         openai_gpt4o = ChatOpenAI(
             model="gpt-4o",
             temperature=0,
@@ -213,6 +200,7 @@ async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
 
 async def openai_gpt4_task(system_text, query_text, openai_gpt4_checkbox):
     if openai_gpt4_checkbox:
+        load_dotenv(find_dotenv())
         openai_gpt4 = ChatOpenAI(
             model="gpt-4",
             temperature=0,
@@ -242,6 +230,7 @@ async def openai_gpt4_task(system_text, query_text, openai_gpt4_checkbox):
 
 async def claude_3_opus_task(system_text, query_text, claude_3_opus_checkbox):
     if claude_3_opus_checkbox:
+        load_dotenv(find_dotenv())
         claude_3_opus = ChatAnthropic(
             model="claude-3-opus-20240229",
             temperature=0,
@@ -269,6 +258,7 @@ async def claude_3_opus_task(system_text, query_text, claude_3_opus_checkbox):
 
 async def claude_3_sonnet_task(system_text, query_text, claude_3_sonnet_checkbox):
     if claude_3_sonnet_checkbox:
+        load_dotenv(find_dotenv())
         claude_3_sonnet = ChatAnthropic(
             model="claude-3-5-sonnet-20240620",
             temperature=0,
@@ -296,6 +286,7 @@ async def claude_3_sonnet_task(system_text, query_text, claude_3_sonnet_checkbox
 
 async def claude_3_haiku_task(system_text, query_text, claude_3_haiku_checkbox):
     if claude_3_haiku_checkbox:
+        load_dotenv(find_dotenv())
         claude_3_haiku = ChatAnthropic(
             model="claude-3-haiku-20240307",
             temperature=0,
@@ -498,8 +489,12 @@ def create_oci_cred(user_ocid, tenancy_ocid, compartment_ocid, fingerprint, priv
     fingerprint = fingerprint.strip()
 
     # set up OCI config
-    oci_config_path = find_dotenv("./.oci/config")
-    key_file_path = './.oci/oci_api_key.pem'
+    if not os.path.exists("/root/.oci"):
+        os.makedirs("/root/.oci")
+    if not os.path.exists("/root/.oci/config"):
+        shutil.copy("./.oci/config", "/root/.oci/config")
+    oci_config_path = find_dotenv("/root/.oci/config")
+    key_file_path = '/root/.oci/oci_api_key.pem'
     set_key(oci_config_path, "user", user_ocid, quote_mode="never")
     set_key(oci_config_path, "tenancy", tenancy_ocid, quote_mode="never")
     set_key(oci_config_path, "region", 'us-chicago-1', quote_mode="never")
@@ -509,7 +504,8 @@ def create_oci_cred(user_ocid, tenancy_ocid, compartment_ocid, fingerprint, priv
     load_dotenv(oci_config_path)
 
     # set up .env
-    env_path = find_dotenv("./.env")
+    env_path = find_dotenv()
+    os.environ["OCI_COMPARTMENT_OCID"] = compartment_ocid
     set_key(env_path, "OCI_COMPARTMENT_OCID", compartment_ocid, quote_mode="never")
     load_dotenv(env_path)
 
@@ -519,6 +515,20 @@ def create_oci_cred(user_ocid, tenancy_ocid, compartment_ocid, fingerprint, priv
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
             try:
+                # Define the PL/SQL statement
+                append_acl_sql = """
+BEGIN
+  DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE(
+    host => '*',
+    ace => xs$ace_type(privilege_list => xs$name_list('connect'),
+                       principal_name => 'admin',
+                       principal_type => xs_acl.ptype_db));
+END;
+                """
+
+                # Execute the PL/SQL statement
+                cursor.execute(append_acl_sql)
+
                 drop_oci_cred_sql = "BEGIN dbms_vector.drop_credential('OCI_CRED'); END;"
                 cursor.execute(drop_oci_cred_sql)
             except DatabaseError as de:
@@ -544,6 +554,15 @@ END; """
             conn.commit()
 
     create_oci_cred_sql = f"""
+-- Append Host ACE    
+BEGIN
+  DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE(
+    host => '*',
+    ace => xs$ace_type(privilege_list => xs$name_list('connect'),
+                       principal_name => 'admin',
+                       principal_type => xs_acl.ptype_db));
+END;
+    
 -- Drop Existing OCI Credential
 BEGIN dbms_vector.drop_credential('OCI_CRED'); END;
 
@@ -563,7 +582,8 @@ def create_cohere_cred(cohere_cred_api_key):
     if not cohere_cred_api_key:
         raise gr.Error("Cohere API Keyを入力してください")
     cohere_cred_api_key = cohere_cred_api_key.strip()
-    env_path = find_dotenv("./.env")
+    env_path = find_dotenv()
+    os.environ["COHERE_API_KEY"] = cohere_cred_api_key
     set_key(env_path, "COHERE_API_KEY", cohere_cred_api_key, quote_mode="never")
     load_dotenv(env_path)
     gr.Info("Cohere API Keyの設定が完了しました")
@@ -575,10 +595,12 @@ def create_openai_cred(openai_cred_base_url, openai_cred_api_key):
         raise gr.Error("OpenAI Base URLを入力してください")
     if not openai_cred_api_key:
         raise gr.Error("OpenAI API Keyを入力してください")
-    env_path = find_dotenv("./.env")
+    env_path = find_dotenv()
+    os.environ["OPENAI_BASE_URL"] = openai_cred_base_url
+    os.environ["OPENAI_API_KEY"] = openai_cred_api_key
     set_key(env_path, "OPENAI_BASE_URL", openai_cred_base_url, quote_mode="never")
     set_key(env_path, "OPENAI_API_KEY", openai_cred_api_key, quote_mode="never")
-    load_dotenv(env_path)
+    load_dotenv(find_dotenv())
     gr.Info("OpenAI API Keyの設定が完了しました")
     return gr.Textbox(value=openai_cred_base_url.strip()), gr.Textbox(value=openai_cred_api_key.strip())
 
@@ -586,7 +608,8 @@ def create_openai_cred(openai_cred_base_url, openai_cred_api_key):
 def create_claude_cred(claude_cred_api_key):
     if not claude_cred_api_key:
         raise gr.Error("Claude API Keyを入力してください")
-    env_path = find_dotenv("./.env")
+    env_path = find_dotenv()
+    os.environ["ANTHROPIC_API_KEY"] = claude_cred_api_key
     set_key(env_path, "ANTHROPIC_API_KEY", claude_cred_api_key, quote_mode="never")
     load_dotenv(env_path)
     gr.Info("Claude API Keyの設定が完了しました")
@@ -653,8 +676,6 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_embedding (
     output_sql_text += "\n" + create_index_sql.strip() + ";"
 
     # Default config file and profile
-    default_config = oci.config.from_file(file_location="./.oci/config")
-    oci.config.validate_config(default_config)
     embed = OCIGenAIEmbeddings(
         model_id=os.environ["OCI_COHERE_EMBED_MODEL"],
         service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
@@ -734,8 +755,10 @@ END; """
 
 
 def load_document(file_path, server_directory):
-    if not file_path or not server_directory:
-        raise gr.Error("ファイルとディレクトリを入力してください")
+    if not file_path:
+        raise gr.Error("ファイルを選択してください")
+    if not os.path.exists(server_directory):
+        os.makedirs(server_directory)
     doc_id = generate_unique_id("doc_")
     file_name = os.path.basename(file_path.name)
     file_extension = os.path.splitext(file_name)
@@ -900,12 +923,12 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
     for el in elements:
         # print(f"{el.category=}")
         # print(f"{el.text=}")
-        print(f"{el.metadata.page_number=}")
+        # print(f"{el.metadata.page_number=}")
         page_number = el.metadata.page_number
         if prev_page_number != page_number:
             prev_page_number = page_number
             table_idx = 1
-        print(f"{type(el.category)=}")
+        # print(f"{type(el.category)=}")
         if el.category == "Table":
             table_id = f"page_{page_number}_table_{table_idx}"
             print(f"{table_id=}")
@@ -993,8 +1016,6 @@ def generate_query(query_text, generate_query_radio):
 
     # chat_llm = ChatOpenAI(api_key=os.environ["OPENAI_API_KEY"], base_url=os.environ["OPENAI_BASE_URL"],
     #                       model=os.environ["OPENAI_MODEL_NAME"], temperature=0)
-    default_config = oci.config.from_file(file_location="./.oci/config")
-    oci.config.validate_config(default_config)
     chat_llm = ChatOCIGenAI(
         model_id="cohere.command-r-plus",
         service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
@@ -1510,6 +1531,7 @@ def search_document(reranker_model_radio_input,
                 for doc in unranked_docs:
                     unranked.append(doc[2])
                 cohere_reranker = reranker_model_radio_input.split('/')[1]
+                print(f"{os.environ['COHERE_API_KEY']=}")
                 cohere_client = cohere.Client(api_key=os.environ["COHERE_API_KEY"])
                 ranked_results = cohere_client.rerank(query=query_text_input,
                                                       documents=unranked,
@@ -1985,15 +2007,7 @@ with gr.Blocks(css=custom_css) as app:
     gr.Markdown(value="# RAG Evaluation Tool")
     with gr.Tabs() as tabs:
         with gr.TabItem(label="環境設定") as tab_setting:
-            with gr.TabItem(label="Step-0.テーブルの作成*") as tab_create_table:
-                with gr.Accordion(label="使用されたSQL", open=False) as tab_create_table_sql_accordion:
-                    tab_create_table_sql_text = gr.Textbox(label="SQL", show_label=False, lines=25, max_lines=50,
-                                                           autoscroll=False, interactive=False,
-                                                           show_copy_button=True)
-                with gr.Row():
-                    with gr.Column():
-                        tab_create_table_button = gr.Button(value="作成/再作成", variant="primary")
-            with gr.TabItem(label="Step-1.OCI GenAIの設定*") as tab_create_oci_cred:
+            with gr.TabItem(label="Step-0.OCI GenAIの設定*") as tab_create_oci_cred:
                 with gr.Accordion(label="使用されたSQL", open=False) as tab_create_oci_cred_sql_accordion:
                     tab_create_oci_cred_sql_text = gr.Textbox(label="SQL", show_label=False, lines=25, max_lines=50,
                                                               autoscroll=False, interactive=False,
@@ -2034,6 +2048,14 @@ with gr.Blocks(css=custom_css) as app:
                     with gr.Row():
                         with gr.Column():
                             tab_create_oci_cred_test_button = gr.Button(value="テスト", variant="primary")
+            with gr.TabItem(label="Step-1.テーブルの作成*") as tab_create_table:
+                with gr.Accordion(label="使用されたSQL", open=False) as tab_create_table_sql_accordion:
+                    tab_create_table_sql_text = gr.Textbox(label="SQL", show_label=False, lines=25, max_lines=50,
+                                                           autoscroll=False, interactive=False,
+                                                           show_copy_button=True)
+                with gr.Row():
+                    with gr.Column():
+                        tab_create_table_button = gr.Button(value="作成/再作成", variant="primary")
             with gr.TabItem(label="Step-2.Cohereの設定(オプション)") as tab_create_cohere_cred:
                 with gr.Row():
                     with gr.Column():
@@ -2225,8 +2247,8 @@ If I switch languages, please switch your responses accordingly.")
                             #                                              )
                             tab_split_document_chunks_max_slider = gr.Slider(label="Max",
                                                                              value=256,
-                                                                             minimum=100,
-                                                                             maximum=400,
+                                                                             minimum=64,
+                                                                             maximum=384,
                                                                              step=1,
                                                                              )
                         with gr.Column():
@@ -2551,9 +2573,6 @@ If I switch languages, please switch your responses accordingly.")
                                                                        visible=False,
                                                                        value=f"""You are an ANSWER EVALUATOR. 
 Your task is to compare a given answer to a standard answer and evaluate its quality.
-Please respond to me in the same language I use for my messages. 
-If I switch languages, please switch your responses accordingly.
-
 Respond with a score from 0 to 10 for each of the following criteria:
 1. Correctness (0 being completely incorrect, 10 being perfectly correct)
 2. Completeness (0 being entirely incomplete, 10 being fully complete)
@@ -2562,6 +2581,8 @@ Respond with a score from 0 to 10 for each of the following criteria:
 
 After providing scores, give a brief explanation for each score.
 Finally, provide an overall score from 0 to 10 and a summary of the evaluation.
+Please respond to me in the same language I use for my messages. 
+If I switch languages, please switch your responses accordingly.
                 """)
                 with gr.Row():
                     tab_chat_document_standard_answer_text = gr.Textbox(label="標準回答*", lines=2, interactive=True,
