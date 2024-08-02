@@ -1197,9 +1197,6 @@ def search_document(reranker_model_radio_input,
         sampled_list += list(combinations(words_list, min_required))
         return sampled_list
 
-    def unique_list_of_lists(nested_list):
-        return list(set([tuple(lst) for lst in nested_list]))
-
     def process_lists(lists, limit=10):
         contains_sql_list = []
         if len(lists) > limit:
@@ -1508,6 +1505,7 @@ def search_document(reranker_model_radio_input,
                     len(search_text)) + ")[" + ', '.join(
                     search_text) + "]", visible=True),
                         gr.Dataframe(value=docs_dataframe, wrap=True,
+                                     headers=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "KEY_WORDS"],
                                      column_widths=["4%", "68%", "6%", "8%", "6%", "8%"]),
                         gr.Textbox(command_r_result), gr.Textbox(command_r_plus_result), gr.Textbox(gpt4o_result),
                         gr.Textbox(gpt4_result), gr.Textbox(opus_result), gr.Textbox(sonnet_result),
@@ -1644,6 +1642,7 @@ ORDER
                 docs_dataframe.shape[0]) + "   |   **検索キーワード**: (" + str(len(search_text)) + ")[" + ', '.join(
                 search_text) + "]", visible=True),
                     gr.Dataframe(value=docs_dataframe, wrap=True,
+                                 headers=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "KEY_WORDS"],
                                  column_widths=["4%", "62%", "6%", "8%", "6%", "6%", "8%"]))
 
 
