@@ -464,7 +464,7 @@ async def chat_stream(system_text, query_text, llm_answer_checkbox):
                claude_3_opus_response, claude_3_sonnet_response, claude_3_haiku_response)
 
 
-def create_oci_cred(user_ocid, tenancy_ocid, compartment_ocid, fingerprint, private_key_file):
+def create_oci_cred(user_ocid, tenancy_ocid, fingerprint, private_key_file):
     def process_private_key(private_key_file_path):
         with open(private_key_file_path, 'r') as file:
             lines = file.readlines()
@@ -476,8 +476,6 @@ def create_oci_cred(user_ocid, tenancy_ocid, compartment_ocid, fingerprint, priv
         raise gr.Error("User OCIDを入力してください")
     if not tenancy_ocid:
         raise gr.Error("Tenancy OCIDを入力してください")
-    if not compartment_ocid:
-        raise gr.Error("Compartment OCIDを入力してください")
     if not fingerprint:
         raise gr.Error("Fingerprintを入力してください")
     if not private_key_file:
@@ -485,7 +483,6 @@ def create_oci_cred(user_ocid, tenancy_ocid, compartment_ocid, fingerprint, priv
 
     user_ocid = user_ocid.strip()
     tenancy_ocid = tenancy_ocid.strip()
-    compartment_ocid = compartment_ocid.strip()
     fingerprint = fingerprint.strip()
 
     # set up OCI config
@@ -502,12 +499,6 @@ def create_oci_cred(user_ocid, tenancy_ocid, compartment_ocid, fingerprint, priv
     set_key(oci_config_path, "key_file", key_file_path, quote_mode="never")
     shutil.copy(private_key_file.name, key_file_path)
     load_dotenv(oci_config_path)
-
-    # set up .env
-    env_path = find_dotenv()
-    os.environ["OCI_COMPARTMENT_OCID"] = compartment_ocid
-    set_key(env_path, "OCI_COMPARTMENT_OCID", compartment_ocid, quote_mode="never")
-    load_dotenv(env_path)
 
     # set up OCI Credential on database
     private_key = process_private_key(private_key_file.name)
@@ -537,7 +528,7 @@ END;
             oci_cred = {
                 'user_ocid': user_ocid,
                 'tenancy_ocid': tenancy_ocid,
-                'compartment_ocid': compartment_ocid,
+                'compartment_ocid': os.environ["OCI_COMPARTMENT_OCID"],
                 'private_key': private_key.strip(),
                 'fingerprint': fingerprint
             }
@@ -2021,10 +2012,6 @@ with gr.Blocks(css=custom_css) as app:
                                                                            interactive=True)
                 with gr.Row():
                     with gr.Column():
-                        tab_create_oci_cred_compartment_ocid_text = gr.Textbox(label="Compartment OCID*", lines=1,
-                                                                               interactive=True)
-                with gr.Row():
-                    with gr.Column():
                         tab_create_oci_cred_fingerprint_text = gr.Textbox(label="Fingerprint*", lines=1,
                                                                           interactive=True)
                 with gr.Row():
@@ -2593,11 +2580,11 @@ If I switch languages, please switch your responses accordingly.
                         tab_chat_document_chat_document_button = gr.Button(value="送信", variant="primary")
 
     tab_create_oci_clear_button.add([tab_create_oci_cred_user_ocid_text, tab_create_oci_cred_tenancy_ocid_text,
-                                     tab_create_oci_cred_compartment_ocid_text, tab_create_oci_cred_fingerprint_text,
+                                     tab_create_oci_cred_fingerprint_text,
                                      tab_create_oci_cred_private_key_file])
     tab_create_oci_cred_button.click(create_oci_cred,
                                      [tab_create_oci_cred_user_ocid_text, tab_create_oci_cred_tenancy_ocid_text,
-                                      tab_create_oci_cred_compartment_ocid_text, tab_create_oci_cred_fingerprint_text,
+                                      tab_create_oci_cred_fingerprint_text,
                                       tab_create_oci_cred_private_key_file],
                                      [tab_create_oci_cred_sql_accordion, tab_create_oci_cred_sql_text])
     tab_create_oci_cred_test_button.click(test_oci_cred, [tab_create_oci_cred_test_query_text],

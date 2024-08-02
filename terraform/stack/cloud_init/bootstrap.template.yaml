@@ -23,7 +23,8 @@ runcmd:
   - echo "Running aipoc init..."
   # install unzip and gcc
   - apt update
-  - apt install unzip gcc build-essential libmagic-dev libgl1-mesa-dev poppler-utils tesseract-ocr libreoffice pandoc -y
+  # apt-cache search tesseract-ocr
+  - apt install unzip gcc build-essential libmagic-dev libgl1-mesa-dev poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-enm tesseract-ocr-jpn tesseract-ocr-jpn-vert tesseract-ocr-script-jpan tesseract-ocr-script-jpan-vert tesseract-ocr-chi-sim tesseract-ocr-chi-sim-vert tesseract-ocr-chi-tra tesseract-ocr-chi-tra-vert libreoffice pandoc -y
   # open port 8080
   - iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8080 -j ACCEPT
   - netfilter-persistent save
