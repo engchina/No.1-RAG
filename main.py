@@ -20,7 +20,8 @@ from langchain_community.embeddings import OCIGenAIEmbeddings
 from langchain_community.vectorstores.utils import DistanceStrategy
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
+from langfuse.callback import CallbackHandler
 from langchain_openai import ChatOpenAI
 from oracledb import DatabaseError
 from unstructured.chunking.title import chunk_by_title
@@ -55,6 +56,12 @@ pool = oracledb.create_pool(
     min=10,
     max=50,
     increment=1
+)
+
+langfuse_handler = CallbackHandler(
+    secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+    public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+    host=os.environ["LANGFUSE_HOST"],
 )
 
 
@@ -130,7 +137,9 @@ async def command_r_task(system_text, query_text, command_r_checkbox):
         ]
         start_time = time.time()
         print(f"{start_time=}")
-        async for chunk in command_r_16k.astream(messages):
+        async for chunk in command_r_16k.astream(messages, config={"callbacks": [langfuse_handler],
+                                                                   "metadata": {
+                                                                       "ls_model_name": "cohere.command-r-16k"}}):
             yield chunk.content
         end_time = time.time()
         print(f"{end_time=}")
@@ -156,7 +165,9 @@ async def command_r_plus_task(system_text, query_text, command_r_plus_checkbox):
         ]
         start_time = time.time()
         print(f"{start_time=}")
-        async for chunk in command_r_plus.astream(messages):
+        async for chunk in command_r_plus.astream(messages, config={"callbacks": [langfuse_handler],
+                                                                    "metadata": {
+                                                                        "ls_model_name": "cohere.command-r-plus"}}):
             yield chunk.content
         end_time = time.time()
         print(f"{end_time=}")
@@ -186,7 +197,7 @@ async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
         ]
         start_time = time.time()
         print(f"{start_time=}")
-        async for chunk in openai_gpt4o.astream(messages):
+        async for chunk in openai_gpt4o.astream(messages, config={"callbacks": [langfuse_handler]}):
             yield chunk.content
         end_time = time.time()
         print(f"{end_time=}")
@@ -216,7 +227,7 @@ async def openai_gpt4_task(system_text, query_text, openai_gpt4_checkbox):
         ]
         start_time = time.time()
         print(f"{start_time=}")
-        async for chunk in openai_gpt4.astream(messages):
+        async for chunk in openai_gpt4.astream(messages, config={"callbacks": [langfuse_handler]}):
             yield chunk.content
         end_time = time.time()
         print(f"{end_time=}")
@@ -244,7 +255,7 @@ async def claude_3_opus_task(system_text, query_text, claude_3_opus_checkbox):
         ]
         start_time = time.time()
         print(f"{start_time=}")
-        async for chunk in claude_3_opus.astream(messages):
+        async for chunk in claude_3_opus.astream(messages, config={"callbacks": [langfuse_handler]}):
             yield chunk.content
         end_time = time.time()
         print(f"{end_time=}")
@@ -272,7 +283,7 @@ async def claude_3_sonnet_task(system_text, query_text, claude_3_sonnet_checkbox
         ]
         start_time = time.time()
         print(f"{start_time=}")
-        async for chunk in claude_3_sonnet.astream(messages):
+        async for chunk in claude_3_sonnet.astream(messages, config={"callbacks": [langfuse_handler]}):
             yield chunk.content
         end_time = time.time()
         print(f"{end_time=}")
@@ -300,7 +311,7 @@ async def claude_3_haiku_task(system_text, query_text, claude_3_haiku_checkbox):
         ]
         start_time = time.time()
         print(f"{start_time=}")
-        async for chunk in claude_3_haiku.astream(messages):
+        async for chunk in claude_3_haiku.astream(messages, config={"callbacks": [langfuse_handler]}):
             yield chunk.content
         end_time = time.time()
         print(f"{end_time=}")

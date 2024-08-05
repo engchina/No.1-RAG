@@ -35,3 +35,10 @@ CREATE INDEX embed_data_idx ON langchain_oracle_embedding(embed_data) INDEXTYPE 
 ```
 sudo apt install build-essential libmagic-dev poppler-utils tesseract-ocr libreoffice pandoc -y
 ```
+
+## Generate LangFuse Secret and Salt
+
+```
+echo <your_secret> | openssl rand -base64 32
+echo <your_salt> | openssl rand -base64 32
+```
