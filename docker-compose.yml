@@ -8,9 +8,11 @@ services:
       - "3000:3000"
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/postgres
-      - NEXTAUTH_SECRET=mysecret
-      - SALT=mysalt
+      - NEXTAUTH_SECRET=2safHEIlqVWkn+oCtZcRZaF2a/q2rHRoxq44wkETuKQ=
+      - SALT=JJB9fpsLn3gNTeDrcBXIr9whM9eD3qmQQwr8VkJ0hfs=
       - NEXTAUTH_URL=http://localhost:3000
+      - AUTH_DISABLE_USERNAME_PASSWORD=false
+      - AUTH_DISABLE_SIGNUP=false
       - TELEMETRY_ENABLED=${TELEMETRY_ENABLED:-true}
       - LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=${LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES:-false}
 
