@@ -52,10 +52,10 @@ runcmd:
   - git clone https://github.com/engchina/No.1-RAG.git; cd No.1-RAG
   # install docker
   - chmod +x install_docker.sh
-  - install_docker.sh
+  - ./install_docker.sh
   - systemctl start docker
   - chmod +x langfuse.sh
-  - /bin/bash /u01/aipoc/No.1-RAG/langfuse.sh &
+  - ./langfuse.sh &
   # replace env properties
   - cp .env.example .env
   - DB_CONNECTION_STRING=$(cat /u01/aipoc/props/db.env)
@@ -69,5 +69,5 @@ runcmd:
   - conda create -n no.1-rag python=3.11 -y
   - conda activate no.1-rag
   - pip install -r requirements.txt
-  - /bin/bash /u01/aipoc/No.1-RAG/main.sh &
+  - ./main.sh &
   - echo "Finished aipoc init."
