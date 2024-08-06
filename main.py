@@ -58,12 +58,6 @@ pool = oracledb.create_pool(
     increment=1
 )
 
-langfuse_handler = CallbackHandler(
-    secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-    public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-    host=os.environ["LANGFUSE_HOST"],
-)
-
 
 def get_doc_list() -> List[Tuple[str, str]]:
     with pool.acquire() as conn:
@@ -137,6 +131,11 @@ async def command_r_task(system_text, query_text, command_r_checkbox):
         ]
         start_time = time.time()
         print(f"{start_time=}")
+        langfuse_handler = CallbackHandler(
+            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+            host=os.environ["LANGFUSE_HOST"],
+        )
         async for chunk in command_r_16k.astream(messages, config={"callbacks": [langfuse_handler],
                                                                    "metadata": {
                                                                        "ls_model_name": "cohere.command-r-16k"}}):
@@ -165,6 +164,11 @@ async def command_r_plus_task(system_text, query_text, command_r_plus_checkbox):
         ]
         start_time = time.time()
         print(f"{start_time=}")
+        langfuse_handler = CallbackHandler(
+            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+            host=os.environ["LANGFUSE_HOST"],
+        )
         async for chunk in command_r_plus.astream(messages, config={"callbacks": [langfuse_handler],
                                                                     "metadata": {
                                                                         "ls_model_name": "cohere.command-r-plus"}}):
@@ -197,6 +201,11 @@ async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
         ]
         start_time = time.time()
         print(f"{start_time=}")
+        langfuse_handler = CallbackHandler(
+            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+            host=os.environ["LANGFUSE_HOST"],
+        )
         async for chunk in openai_gpt4o.astream(messages, config={"callbacks": [langfuse_handler]}):
             yield chunk.content
         end_time = time.time()
@@ -227,6 +236,11 @@ async def openai_gpt4_task(system_text, query_text, openai_gpt4_checkbox):
         ]
         start_time = time.time()
         print(f"{start_time=}")
+        langfuse_handler = CallbackHandler(
+            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+            host=os.environ["LANGFUSE_HOST"],
+        )
         async for chunk in openai_gpt4.astream(messages, config={"callbacks": [langfuse_handler]}):
             yield chunk.content
         end_time = time.time()
@@ -255,6 +269,11 @@ async def claude_3_opus_task(system_text, query_text, claude_3_opus_checkbox):
         ]
         start_time = time.time()
         print(f"{start_time=}")
+        langfuse_handler = CallbackHandler(
+            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+            host=os.environ["LANGFUSE_HOST"],
+        )
         async for chunk in claude_3_opus.astream(messages, config={"callbacks": [langfuse_handler]}):
             yield chunk.content
         end_time = time.time()
@@ -283,6 +302,11 @@ async def claude_3_sonnet_task(system_text, query_text, claude_3_sonnet_checkbox
         ]
         start_time = time.time()
         print(f"{start_time=}")
+        langfuse_handler = CallbackHandler(
+            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+            host=os.environ["LANGFUSE_HOST"],
+        )
         async for chunk in claude_3_sonnet.astream(messages, config={"callbacks": [langfuse_handler]}):
             yield chunk.content
         end_time = time.time()
@@ -311,6 +335,11 @@ async def claude_3_haiku_task(system_text, query_text, claude_3_haiku_checkbox):
         ]
         start_time = time.time()
         print(f"{start_time=}")
+        langfuse_handler = CallbackHandler(
+            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+            host=os.environ["LANGFUSE_HOST"],
+        )
         async for chunk in claude_3_haiku.astream(messages, config={"callbacks": [langfuse_handler]}):
             yield chunk.content
         end_time = time.time()
