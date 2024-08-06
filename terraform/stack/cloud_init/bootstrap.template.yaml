@@ -55,6 +55,8 @@ runcmd:
   - ./install_docker.sh
   - systemctl start docker
   - chmod +x langfuse.sh
+  - EXTERNAL_IP=$(curl -s -m 10 http://whatismyip.akamai.com/)
+  - sed -i "s|localhost|$EXTERNAL_IP|g" docker-compose.yml
   - ./langfuse.sh &
   # replace env properties
   - cp .env.example .env

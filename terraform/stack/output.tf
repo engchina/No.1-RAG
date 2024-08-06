@@ -22,6 +22,11 @@ output "ssh_to_instance" {
 #}
 
 output "application_url" {
-  description = "convenient command to access the application"
+  description = "convenient url to access the application"
   value       = "http://${oci_core_instance.generated_oci_core_instance.public_ip}:8080"
+}
+
+output "langfuse_url" {
+  description = "convenient url to access the langfuse"
+  value       = "http://${oci_core_instance.generated_oci_core_instance.public_ip}:3000"
 }

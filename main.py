@@ -597,6 +597,8 @@ def create_openai_cred(openai_cred_base_url, openai_cred_api_key):
         raise gr.Error("OpenAI Base URLを入力してください")
     if not openai_cred_api_key:
         raise gr.Error("OpenAI API Keyを入力してください")
+    openai_cred_base_url = openai_cred_base_url.strip()
+    openai_cred_api_key = openai_cred_api_key.strip()
     env_path = find_dotenv()
     os.environ["OPENAI_BASE_URL"] = openai_cred_base_url
     os.environ["OPENAI_API_KEY"] = openai_cred_api_key
@@ -604,18 +606,42 @@ def create_openai_cred(openai_cred_base_url, openai_cred_api_key):
     set_key(env_path, "OPENAI_API_KEY", openai_cred_api_key, quote_mode="never")
     load_dotenv(find_dotenv())
     gr.Info("OpenAI API Keyの設定が完了しました")
-    return gr.Textbox(value=openai_cred_base_url.strip()), gr.Textbox(value=openai_cred_api_key.strip())
+    return gr.Textbox(value=openai_cred_base_url), gr.Textbox(value=openai_cred_api_key)
 
 
 def create_claude_cred(claude_cred_api_key):
     if not claude_cred_api_key:
         raise gr.Error("Claude API Keyを入力してください")
+    claude_cred_api_key = claude_cred_api_key.strip()
     env_path = find_dotenv()
     os.environ["ANTHROPIC_API_KEY"] = claude_cred_api_key
     set_key(env_path, "ANTHROPIC_API_KEY", claude_cred_api_key, quote_mode="never")
     load_dotenv(env_path)
     gr.Info("Claude API Keyの設定が完了しました")
-    return gr.Textbox(value=claude_cred_api_key.strip())
+    return gr.Textbox(value=claude_cred_api_key)
+
+
+def create_langfuse_cred(langfuse_cred_secret_key, langfuse_cred_public_key, langfuse_cred_host):
+    if not langfuse_cred_secret_key:
+        raise gr.Error("Langfuse Secret Keyを入力してください")
+    if not langfuse_cred_public_key:
+        raise gr.Error("Langfuse Public Keyを入力してください")
+    if not langfuse_cred_host:
+        raise gr.Error("Langfuse Hostを入力してください")
+    langfuse_cred_secret_key = langfuse_cred_secret_key.strip()
+    langfuse_cred_public_key = langfuse_cred_public_key.strip()
+    langfuse_cred_host = langfuse_cred_host.strip()
+    env_path = find_dotenv()
+    os.environ["LANGFUSE_SECRET_KEY"] = langfuse_cred_secret_key
+    os.environ["LANGFUSE_PUBLIC_KEY"] = langfuse_cred_public_key
+    os.environ["LANGFUSE_HOST"] = langfuse_cred_host
+    set_key(env_path, "LANGFUSE_SECRET_KEY", langfuse_cred_secret_key, quote_mode="never")
+    set_key(env_path, "LANGFUSE_PUBLIC_KEY", langfuse_cred_public_key, quote_mode="never")
+    set_key(env_path, "LANGFUSE_HOST", langfuse_cred_host, quote_mode="never")
+    load_dotenv(env_path)
+    gr.Info("Claude API Keyの設定が完了しました")
+    return gr.Textbox(value=langfuse_cred_secret_key), gr.Textbox(value=langfuse_cred_public_key), gr.Textbox(
+        value=langfuse_cred_host)
 
 
 def create_table():
@@ -2077,6 +2103,23 @@ with gr.Blocks(css=custom_css) as app:
                 with gr.Row():
                     with gr.Column():
                         tab_create_claude_cred_button = gr.Button(value="設定/再設定", variant="primary")
+            with gr.TabItem(label="Step-5.Langfuseの設定(オプション)") as tab_create_langfuse_cred:
+                with gr.Row():
+                    with gr.Column():
+                        tab_create_langfuse_cred_secret_key_text = gr.Textbox(label="LANGFUSE_SECRET_KEY*", lines=1,
+                                                                              interactive=True, placeholder="sk-lf-...")
+                with gr.Row():
+                    with gr.Column():
+                        tab_create_langfuse_cred_public_key_text = gr.Textbox(label="LANGFUSE_PUBLIC_KEY*", lines=1,
+                                                                              interactive=True, placeholder="pk-lf-...")
+                with gr.Row():
+                    with gr.Column():
+                        tab_create_langfuse_cred_host_text = gr.Textbox(label="LANGFUSE_HOST*", lines=1,
+                                                                        interactive=True,
+                                                                        placeholder="http://xxx.xxx.xxx.xxx:3000")
+                with gr.Row():
+                    with gr.Column():
+                        tab_create_langfuse_cred_button = gr.Button(value="設定/再設定", variant="primary")
         with gr.TabItem(label="LLM評価") as tab_llm_evaluation:
             with gr.TabItem(label="LLMとチャット") as tab_chat_with_llm:
                 with gr.Row():
@@ -2608,6 +2651,12 @@ If I switch languages, please switch your responses accordingly.
     tab_create_claude_cred_button.click(create_claude_cred,
                                         [tab_create_claude_cred_api_key_text],
                                         [tab_create_claude_cred_api_key_text])
+    tab_create_langfuse_cred_button.click(create_langfuse_cred,
+                                          [tab_create_langfuse_cred_secret_key_text,
+                                           tab_create_langfuse_cred_public_key_text,
+                                           tab_create_langfuse_cred_host_text],
+                                          [tab_create_langfuse_cred_secret_key_text],
+                                          tab_create_langfuse_cred_public_key_text, tab_create_langfuse_cred_host_text)
     tab_chat_with_llm_answer_checkbox_group.change(set_chat_llm_answer, [tab_chat_with_llm_answer_checkbox_group],
                                                    [tab_chat_with_llm_command_r_accordion,
                                                     tab_chat_with_llm_command_r_plus_accordion,
