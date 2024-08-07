@@ -1,2 +1,3 @@
+@reboot /bin/bash /u01/aipoc/No.1-RAG/langfuse/main.sh
 @reboot /bin/bash /u01/aipoc/No.1-RAG/main.sh
-@reboot /bin/bash /u01/aipoc/No.1-RAG/langfuse.sh
+@reboot /bin/bash /u01/aipoc/No.1-RAG/ginza-api/main.sh

@@ -50,14 +50,16 @@ runcmd:
   - /u01/aipoc/miniconda/bin/conda init bash
   # download source code
   - git clone https://github.com/engchina/No.1-RAG.git; cd No.1-RAG
+  - dos2unix main.cron
+  - crontab main.cron
   # install docker
-  - chmod +x install_docker.sh
-  - ./install_docker.sh
+  - chmod +x ./langfuse/install_docker.sh
+  - ./langfuse/install_docker.sh
   - systemctl start docker
-  - chmod +x langfuse.sh
   - EXTERNAL_IP=$(curl -s -m 10 http://whatismyip.akamai.com/)
-  - sed -i "s|localhost|$EXTERNAL_IP|g" docker-compose.yml
-  - ./langfuse.sh &
+  - sed -i "s|localhost|$EXTERNAL_IP|g" ./langfuse/docker-compose.yml
+  - chmod +x ./langfuse/main.sh
+  - ./langfuse/main.sh &
   # replace env properties
   - cp .env.example .env
   - DB_CONNECTION_STRING=$(cat /u01/aipoc/props/db.env)
@@ -65,11 +67,15 @@ runcmd:
   - COMPARTMENT_ID=$(cat /u01/aipoc/props/compartment_id.txt)
   - sed -i "s|OCI_COMPARTMENT_OCID=TODO|OCI_COMPARTMENT_OCID=$COMPARTMENT_ID|g" .env
   # run application
-  - chmod +x main.sh
-  - dos2unix main.cron
-  - crontab main.cron
   - conda create -n no.1-rag python=3.11 -y
   - conda activate no.1-rag
   - pip install -r requirements.txt
+  - chmod +x main.sh
   - ./main.sh &
+  # run ginza-api
+  - conda create -n ginza-api python=3.11 -y
+  - conda activate ginza-api
+  - pip install -r ./ginza-api/requirements.txt
+  - chmod +x ./ginza-api/main.sh
+  - ./ginza-api/main.sh &
   - echo "Finished aipoc init."
