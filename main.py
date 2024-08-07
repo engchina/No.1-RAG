@@ -1827,8 +1827,8 @@ def search_document(reranker_model_radio_input,
 
                 return (gr.Textbox(value=query_sql_output.strip()), gr.Markdown("**検索結果数**: " + str(
                     docs_dataframe.shape[0]) + "   |   **検索キーワード**: (" + str(
-                    len(search_text)) + ")[" + ', '.join(
-                    search_text) + "]", visible=True),
+                    len(search_texts)) + ")[" + ', '.join(
+                    search_texts) + "]", visible=True),
                         gr.Dataframe(value=docs_dataframe, wrap=True,
                                      headers=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "SCORE", "KEY_WORDS"],
                                      column_widths=["4%", "68%", "6%", "8%", "6%", "8%"]),
@@ -1948,7 +1948,7 @@ ORDER
             conn.commit()
 
             docs_dataframe['KEY_WORDS'] = docs_dataframe['CONTENT'].apply(
-                lambda x: [word for word in search_text if word.lower() in x.lower()])
+                lambda x: [word for word in search_texts if word.lower() in x.lower()])
             docs_dataframe['KEY_WORDS'] = docs_dataframe['KEY_WORDS'].apply(format_keywords)
             docs_dataframe['CONTENT'] = docs_dataframe['CONTENT'].apply(replace_newlines)
 
@@ -1964,8 +1964,8 @@ ORDER
                     columns=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "SCORE", "KEY_WORDS"])
 
             return (gr.Textbox(value=query_sql_output.strip()), gr.Markdown("**検索結果数**: " + str(
-                docs_dataframe.shape[0]) + "   |   **検索キーワード**: (" + str(len(search_text)) + ")[" + ', '.join(
-                search_text) + "]", visible=True),
+                docs_dataframe.shape[0]) + "   |   **検索キーワード**: (" + str(len(search_texts)) + ")[" + ', '.join(
+                search_texts) + "]", visible=True),
                     gr.Dataframe(value=docs_dataframe, wrap=True,
                                  headers=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "SCORE", "KEY_WORDS"],
                                  column_widths=["4%", "62%", "6%", "8%", "6%", "6%", "8%"]))
