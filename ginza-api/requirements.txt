@@ -3,6 +3,7 @@ ginza==5.2.0
 ginza-transformers==0.4.2
 ja-ginza==5.2.0
 jieba==0.42.1
+numpy==1.26.4
 pydantic==2.7.1
 requests==2.31.0
 spacy==3.7.4
