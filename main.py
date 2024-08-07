@@ -65,7 +65,7 @@ def do_auth(username, password):
     match = re.match(pattern, dsn)
 
     if match:
-        if username == match.group(1) and password == match.group(2):
+        if username.lower() == match.group(1).lower() and password == match.group(2):
             return True
     return False
 
