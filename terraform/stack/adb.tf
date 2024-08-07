@@ -25,7 +25,7 @@ resource "oci_database_autonomous_database" "generated_database_autonomous_datab
   is_dedicated                                   = "false"
   is_mtls_connection_required                    = "true"
   is_preview_version_with_service_terms_accepted = "false"
-  license_model                                  = "LICENSE_INCLUDED"
+  license_model                                  = var.license_model
   ncharacter_set                                 = "AL16UTF16"
 }
 

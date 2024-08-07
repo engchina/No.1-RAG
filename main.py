@@ -2060,7 +2060,8 @@ WHERE id = :doc_id """
 
 
 with gr.Blocks(css=custom_css) as app:
-    gr.Markdown(value="# RAG Evaluation Tool")
+    gr.Markdown(value="# RAG精度あげたろう")
+    gr.Markdown(value="### LLM&RAG精度検証ツール")
     with gr.Tabs() as tabs:
         with gr.TabItem(label="環境設定") as tab_setting:
             with gr.TabItem(label="Step-0.OCI GenAIの設定*") as tab_create_oci_cred:

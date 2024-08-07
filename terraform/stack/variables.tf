@@ -14,6 +14,10 @@ variable "adb_password" {
   default = ""
 }
 
+variable "license_model" {
+  default = ""
+}
+
 variable "instance_display_name" {
   default = "AIPOC_INSTANCE"
 }

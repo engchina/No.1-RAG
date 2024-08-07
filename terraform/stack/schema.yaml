@@ -26,6 +26,7 @@ variableGroups:
       - availability_domain
       - adb_name
       - adb_password
+      - license_model
       - instance_display_name
       - vcn_ai_vcn_id
       - subnet_ai_subnet_id
@@ -68,6 +69,16 @@ variables:
     # renders a second field to re-enter the password for confirmation
     confirmation: true
     pattern: "^(?=.*[!@#%^*_+\\-:?.,\\[\\]\\{\\}])(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?!.*[$\\(\\)]).{8,32}$"
+
+  license_model:
+    type: enum
+    required: true
+    visible: true
+    title: "Choose license"
+    enum:
+      - "BRING_YOUR_OWN_LICENSE"
+      - "LICENSE_INCLUDED"
+    default: "LICENSE_INCLUDED"
 
   instance_display_name:
     type: string
