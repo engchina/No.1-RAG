@@ -59,6 +59,17 @@ pool = oracledb.create_pool(
 )
 
 
+def do_auth(username, password):
+    dsn = os.environ["ORACLE_23AI_CONNECTION_STRING"]
+    pattern = r"^([^/]+)/([^@]+)@"
+    match = re.match(pattern, dsn)
+
+    if match:
+        if username == match.group(1) and password == match.group(2):
+            return True
+    return False
+
+
 def get_doc_list() -> List[Tuple[str, str]]:
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
@@ -2900,4 +2911,5 @@ if __name__ == "__main__":
         server_name=args.host,
         server_port=args.port,
         max_threads=200,
+        auth=do_auth,
     )
