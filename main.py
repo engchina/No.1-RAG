@@ -40,6 +40,253 @@ body {
 .sort-button {
     display: none !important;
 } 
+
+body gradio-app .tabitem .block{
+    background: #fff !important;
+}
+
+.gradio-container{
+    background: #c4c4c440;
+}
+
+.tabitem .form{
+border-radius: 3px;
+}
+
+.main_Header>span>h1{
+    color: #fff;
+    text-align: center;
+    margin: 0 auto;
+    display: block;
+}
+
+.tab-nav{
+    # border-bottom: none !important;
+}
+
+.tab-nav button[role="tab"]{
+    color: rgb(96, 96, 96);
+    font-weight: 500;
+    background: rgb(255, 255, 255);
+    padding: 10px 20px;
+    border-radius: 4px 4px 0px 0px;
+    border: none;
+    border-right: 4px solid gray;
+    border-radius: 0px;
+    min-width: 150px;
+}
+
+.tabs .tabitem .tabs .tab-nav button[role="tab"]{
+    min-width: 90px;
+    padding: 5px;
+    border-right: 1px solid #186fb4;
+    border-top: 1px solid #186fb4;
+    border-bottom: 0.2px solid #fff;
+    margin-bottom: -2px;
+    z-index: 3;
+}
+
+
+.tabs .tabitem .tabs .tab-nav button[role="tab"]:first-child{
+    border-left: 1px solid #186fb4;
+        border-top-left-radius: 3px;
+}
+
+.tabs .tabitem .tabs .tab-nav button[role="tab"]:last-child{
+    border-right: 1px solid #186fb4;
+}
+
+.tab-nav button[role="tab"]:first-child{
+       border-top-left-radius: 3px;
+}
+
+.tab-nav button[role="tab"]:last-child{
+        border-top-right-radius: 3px;
+    border-right: none;
+}
+.tabitem{
+    background: #fff;
+    border-radius: 0px 3px 3px 3px !important;
+    box-shadow: rgba(50, 50, 93, 0.25) 0px 2px 5px -1px, rgba(0, 0, 0, 0.3) 0px 1px 3px -1px;
+}
+
+.tabitem .tabitem{
+    border: 1px solid #196fb4;
+    background: #fff;
+    border-radius: 0px 3px 3px 3px !important;
+}
+
+.tabitem textarea, div.tabitem div.container>.wrap{
+    background: #f4f8ffc4;
+}
+
+.tabitem .container .wrap {
+    border-radius: 3px;
+}
+
+.tab-nav button[role="tab"].selected{
+    color: #fff;
+    background: #196fb4;
+    border-bottom: none;
+}
+
+.tabitem .inner_tab button[role="tab"]{
+   border: 1px solid rgb(25, 111, 180);
+   border-bottom: none;
+}
+
+.app.gradio-container {
+  max-width: 1440px;
+}
+
+gradio-app{
+    background-image: url("https://objectstorage.ap-tokyo-1.oraclecloud.com/n/sehubjapacprod/b/km_newsletter/o/tmp%2Fmain_bg.png") !important;
+    background-size: 100vw 100vh !important;
+}
+
+input, textarea{
+    border-radius: 3px;
+}
+
+
+.container>input:focus, .container>textarea:focus, .block .wrap .wrap-inner:focus{
+    border-radius: 3px;
+    box-shadow: rgb(255 246 228 / 63%) 0px 0px 0px 3px, rgb(255 248 236 / 12%) 0px 2px 4px 0px inset !important;
+    border-color: rgb(249 169 125 / 87%) !important;
+}
+
+.tabitem div>button.primary{
+    border: none;
+    background: linear-gradient(to bottom right, #ffc679, #f38141);
+    color: #fff;
+    box-shadow: 2px 2px 2px #0000001f;
+    border-radius: 3px;
+}
+
+.tabitem div>button.primary:hover{
+    border: none;
+    background: #f38141;
+    color: #fff;
+    border-radius: 3px;
+    box-shadow: 2px 2px 2px #0000001f;
+}
+
+
+.tabitem div>button.secondary{
+    border: none;
+    background: linear-gradient(to right bottom, rgb(215 215 217), rgb(194 197 201));
+    color: rgb(107 106 106);
+    box-shadow: rgba(0, 0, 0, 0.12) 2px 2px 2px;
+    border-radius: 3px;
+}
+
+.tabitem div>button.secondary:hover{
+    border: none;
+    background: rgb(175 175 175);
+    color: rgb(255 255 255);
+    border-radius: 3px;
+    box-shadow: rgba(0, 0, 0, 0.12) 2px 2px 2px;
+}
+
+.cus_ele1_select .container .wrap:focus-within{
+    border-radius: 3px;
+    box-shadow: rgb(255 246 228 / 63%) 0px 0px 0px 3px, rgb(255 248 236 / 12%) 0px 2px 4px 0px inset !important;
+    border-color: rgb(249 169 125 / 87%) !important;
+}
+
+input[type="checkbox"]:checked, input[type="checkbox"]:checked:hover, input[type="checkbox"]:checked:focus {
+    border-color: #186fb4;
+    background-color: #186fb4;
+}
+
+#event_tbl{
+    border-radius:3px;
+}
+
+#event_tbl .table-wrap{
+    border-radius:3px;
+}
+
+#event_tbl table thead>tr>th{
+    background: #bfd1e0;
+        min-width: 90px;
+}
+
+#event_tbl table thead>tr>th:first-child{
+    border-radius:3px 0px 0px 0px;
+}
+#event_tbl table thead>tr>th:last-child{
+    border-radius:0px 3px 0px 0px;
+}
+
+
+#event_tbl table .cell-wrap span{
+    font-size: 0.8rem;
+}
+
+#event_tbl table{
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+#event_exp_tbl .table-wrap{
+     border-radius:3px;   
+}
+#event_exp_tbl table thead>tr>th{
+    background: #bfd1e0;
+}
+
+.count_t1_text .prose{
+    padding: 5px 0px 0px 6px;
+}
+
+.count_t1_text .prose>span{
+    padding: 0px;
+}
+
+.cus_ele1_select .container .wrap:focus-within{
+    border-radius: 3px;
+    box-shadow: rgb(255 246 228 / 63%) 0px 0px 0px 3px, rgb(255 248 236 / 12%) 0px 2px 4px 0px inset !important;
+    border-color: rgb(249 169 125 / 87%) !important;
+}
+
+.count_t1_text .prose>span{
+    font-size: 0.9rem;
+}
+
+
+footer{
+  display: none !important;
+}
+
+.sub_Header>span>h3,.sub_Header>span>h2,.sub_Header>span>h4{
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: normal;
+    text-align: center;
+    margin: 0 auto;
+    padding: 5px;
+}
+
+@media (min-width: 1280px) {
+    .app.svelte-wpkpf6.svelte-wpkpf6:not(.fill_width) {
+        max-width: 1400px;
+    }
+}
+.gap.svelte-vt1mxs{
+    gap: unset;
+}
+
+.tabitem .gap.svelte-vt1mxs{
+        gap: var(--layout-gap);
+}
+
+@media (min-width: 1280px) {
+    .app.svelte-wpkpf6.svelte-wpkpf6:not(.fill_width) {
+        max-width: 1400px;
+    }
+}
+
 """
 
 # read local .env file
@@ -604,7 +851,7 @@ BEGIN
                        principal_name => 'admin',
                        principal_type => xs_acl.ptype_db));
 END;
-    
+
 -- Drop Existing OCI Credential
 BEGIN dbms_vector.drop_credential('OCI_CRED'); END;
 
@@ -1116,7 +1363,7 @@ def generate_query(query_text, generate_query_radio):
         ])
 
         generate_sub_queries_chain = (
-                sub_query_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+            sub_query_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         sub_queries = generate_sub_queries_chain.invoke({"original_query": query_text})
         print(f"{sub_queries=}")
@@ -1143,7 +1390,7 @@ def generate_query(query_text, generate_query_radio):
         ])
 
         generate_rag_fusion_queries_chain = (
-                rag_fusion_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+            rag_fusion_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         rag_fusion_queries = generate_rag_fusion_queries_chain.invoke({"original_query": query_text})
         print(f"{rag_fusion_queries=}")
@@ -1163,7 +1410,7 @@ def generate_query(query_text, generate_query_radio):
         ])
 
         generate_hyde_answers_chain = (
-                hyde_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+            hyde_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         hyde_answers = generate_hyde_answers_chain.invoke({"original_query": query_text})
         print(f"{hyde_answers=}")
@@ -1183,7 +1430,7 @@ def generate_query(query_text, generate_query_radio):
         ])
 
         generate_step_back_queries_chain = (
-                step_back_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+            step_back_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         step_back_queries = generate_step_back_queries_chain.invoke({"original_query": query_text})
         print(f"{step_back_queries=}")
@@ -1857,46 +2104,46 @@ async def eval_ragas(llm_answer_checkbox,
         claude_3_haiku_response = remove_last_line(claude_3_haiku_response)
 
         command_r_user_text = f"""Standard Answer: {standard_answer_text}
-    
+
                 Given Answer: {command_r_response}
-    
+
                 Please evaluate the given answer based on the criteria described:\n
                 """
 
         command_r_plus_user_text = f"""Standard Answer: {standard_answer_text}
-    
+
                 Given Answer: {command_r_plus_response}
-    
+
                 Please evaluate the given answer based on the criteria described:\n
                 """
         openai_gpt4o_user_text = f"""Standard Answer: {standard_answer_text}
-    
+
                 Given Answer: {openai_gpt4o_response}
-    
+
                 Please evaluate the given answer based on the criteria described:\n
                 """
         openai_gpt4_user_text = f"""Standard Answer: {standard_answer_text}
-    
+
                 Given Answer: {openai_gpt4_response}
-    
+
                 Please evaluate the given answer based on the criteria described:\n
                 """
         claude_3_opus_user_text = f"""Standard Answer: {standard_answer_text}
-    
+
                 Given Answer: {claude_3_opus_response}
-    
+
                 Please evaluate the given answer based on the criteria described:\n
                 """
         claude_3_sonnet_user_text = f"""Standard Answer: {standard_answer_text}
-    
+
                 Given Answer: {claude_3_sonnet_response}
-    
+
                 Please evaluate the given answer based on the criteria described:\n
                 """
         claude_3_haiku_user_text = f"""Standard Answer: {standard_answer_text}
-    
+
                 Given Answer: {claude_3_haiku_response}
-    
+
                 Please evaluate the given answer based on the criteria described:\n
                 """
 
@@ -2071,11 +2318,11 @@ WHERE id = :doc_id """
 
 
 with gr.Blocks(css=custom_css) as app:
-    gr.Markdown(value="# RAG精度あげたろう")
-    gr.Markdown(value="### LLM&RAG精度検証ツール")
+    gr.Markdown(value="# RAG精度あげたろう", elem_classes="main_Header")
+    gr.Markdown(value="### LLM&RAG精度検証ツール", elem_classes="sub_Header")
     with gr.Tabs() as tabs:
         with gr.TabItem(label="環境設定") as tab_setting:
-            with gr.TabItem(label="Step-0.OCI GenAIの設定*") as tab_create_oci_cred:
+            with gr.TabItem(label="OCI GenAIの設定*") as tab_create_oci_cred:
                 with gr.Accordion(label="使用されたSQL", open=False) as tab_create_oci_cred_sql_accordion:
                     tab_create_oci_cred_sql_text = gr.Textbox(label="SQL", show_label=False, lines=25, max_lines=50,
                                                               autoscroll=False, interactive=False,
@@ -2112,7 +2359,7 @@ with gr.Blocks(css=custom_css) as app:
                     with gr.Row():
                         with gr.Column():
                             tab_create_oci_cred_test_button = gr.Button(value="テスト", variant="primary")
-            with gr.TabItem(label="Step-1.テーブルの作成*") as tab_create_table:
+            with gr.TabItem(label="テーブルの作成*") as tab_create_table:
                 with gr.Accordion(label="使用されたSQL", open=False) as tab_create_table_sql_accordion:
                     tab_create_table_sql_text = gr.Textbox(label="SQL", show_label=False, lines=25, max_lines=50,
                                                            autoscroll=False, interactive=False,
@@ -2120,14 +2367,14 @@ with gr.Blocks(css=custom_css) as app:
                 with gr.Row():
                     with gr.Column():
                         tab_create_table_button = gr.Button(value="作成/再作成", variant="primary")
-            with gr.TabItem(label="Step-2.Cohereの設定(オプション)") as tab_create_cohere_cred:
+            with gr.TabItem(label="Cohereの設定(オプション)") as tab_create_cohere_cred:
                 with gr.Row():
                     with gr.Column():
                         tab_create_cohere_cred_api_key_text = gr.Textbox(label="API Key*", lines=1, interactive=True)
                 with gr.Row():
                     with gr.Column():
                         tab_create_cohere_cred_button = gr.Button(value="設定/再設定", variant="primary")
-            with gr.TabItem(label="Step-3.OpenAIの設定(オプション)") as tab_create_openai_cred:
+            with gr.TabItem(label="OpenAIの設定(オプション)") as tab_create_openai_cred:
                 with gr.Row():
                     with gr.Column():
                         tab_create_openai_cred_base_url_text = gr.Textbox(label="Base URL*", lines=1, interactive=True)
@@ -2137,14 +2384,14 @@ with gr.Blocks(css=custom_css) as app:
                 with gr.Row():
                     with gr.Column():
                         tab_create_openai_cred_button = gr.Button(value="設定/再設定", variant="primary")
-            with gr.TabItem(label="Step-4.Claudeの設定(オプション)") as tab_create_claude_cred:
+            with gr.TabItem(label="Claudeの設定(オプション)") as tab_create_claude_cred:
                 with gr.Row():
                     with gr.Column():
                         tab_create_claude_cred_api_key_text = gr.Textbox(label="API Key*", lines=1, interactive=True)
                 with gr.Row():
                     with gr.Column():
                         tab_create_claude_cred_button = gr.Button(value="設定/再設定", variant="primary")
-            with gr.TabItem(label="Step-5.Langfuseの設定(オプション)") as tab_create_langfuse_cred:
+            with gr.TabItem(label="Langfuseの設定(オプション)") as tab_create_langfuse_cred:
                 with gr.Row():
                     with gr.Column():
                         tab_create_langfuse_cred_secret_key_text = gr.Textbox(label="LANGFUSE_SECRET_KEY*", lines=1,
@@ -2240,7 +2487,7 @@ If I switch languages, please switch your responses accordingly.")
                 with gr.Row(visible=False):
                     with gr.Column():
                         gr.Examples(examples=[], inputs=tab_chat_with_llm_query_text)
-        with gr.TabItem(label="RAG評価") as tab_rag_evaluation:
+        with gr.TabItem(label="RAG評価", elem_classes="inner_tab") as tab_rag_evaluation:
             with gr.TabItem(label="Step-1.読込み") as tab_load_document:
                 with gr.Accordion(label="使用されたSQL", open=False) as tab_load_document_sql_accordion:
                     tab_load_document_output_sql_text = gr.Textbox(label="使用されたSQL", show_label=False, lines=10,
@@ -2911,5 +3158,6 @@ if __name__ == "__main__":
         server_name=args.host,
         server_port=args.port,
         max_threads=200,
+        show_api=False,
         auth=do_auth,
     )
