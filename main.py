@@ -1363,7 +1363,7 @@ def generate_query(query_text, generate_query_radio):
         ])
 
         generate_sub_queries_chain = (
-            sub_query_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+                sub_query_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         sub_queries = generate_sub_queries_chain.invoke({"original_query": query_text})
         print(f"{sub_queries=}")
@@ -1390,7 +1390,7 @@ def generate_query(query_text, generate_query_radio):
         ])
 
         generate_rag_fusion_queries_chain = (
-            rag_fusion_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+                rag_fusion_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         rag_fusion_queries = generate_rag_fusion_queries_chain.invoke({"original_query": query_text})
         print(f"{rag_fusion_queries=}")
@@ -1410,7 +1410,7 @@ def generate_query(query_text, generate_query_radio):
         ])
 
         generate_hyde_answers_chain = (
-            hyde_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+                hyde_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         hyde_answers = generate_hyde_answers_chain.invoke({"original_query": query_text})
         print(f"{hyde_answers=}")
@@ -1430,7 +1430,7 @@ def generate_query(query_text, generate_query_radio):
         ])
 
         generate_step_back_queries_chain = (
-            step_back_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+                step_back_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         step_back_queries = generate_step_back_queries_chain.invoke({"original_query": query_text})
         print(f"{step_back_queries=}")
@@ -1735,8 +1735,9 @@ def search_document(reranker_model_radio_input,
         # Generate the combined SQL based on available query texts
         search_texts = requests.post(os.environ["GINZA_API_ENDPOINT"],
                                      json={'query_text': query_text_input, 'language': 'ja'}).json()
-        generated_combinations = generate_combinations(search_texts)
-        search_text = process_lists(generated_combinations, text_search_k_slider_input)
+        if search_texts and len(search_texts) > 0:
+            generated_combinations = generate_combinations(search_texts)
+            search_text = process_lists(generated_combinations, text_search_k_slider_input)
         if len(search_text) > 0:
             where_sql += """
                         AND (""" + search_text + """) """
