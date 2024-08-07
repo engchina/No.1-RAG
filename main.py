@@ -2944,8 +2944,9 @@ If I switch languages, please switch your responses accordingly.
                                           [tab_create_langfuse_cred_secret_key_text,
                                            tab_create_langfuse_cred_public_key_text,
                                            tab_create_langfuse_cred_host_text],
-                                          [tab_create_langfuse_cred_secret_key_text],
-                                          tab_create_langfuse_cred_public_key_text, tab_create_langfuse_cred_host_text)
+                                          [tab_create_langfuse_cred_secret_key_text,
+                                           tab_create_langfuse_cred_public_key_text,
+                                           tab_create_langfuse_cred_host_text])
     tab_chat_with_llm_answer_checkbox_group.change(set_chat_llm_answer, [tab_chat_with_llm_answer_checkbox_group],
                                                    [tab_chat_with_llm_command_r_accordion,
                                                     tab_chat_with_llm_command_r_plus_accordion,
