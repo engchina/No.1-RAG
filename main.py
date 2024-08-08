@@ -1730,17 +1730,18 @@ def search_document(reranker_model_radio_input,
         query_texts.append(":sub_query3")
     print(f"{query_texts=}")
 
-    search_text = []
+    search_texts = []
     if text_search_checkbox_input:
         # Generate the combined SQL based on available query texts
         search_texts = requests.post(os.environ["GINZA_API_ENDPOINT"],
                                      json={'query_text': query_text_input, 'language': 'ja'}).json()
+        search_text = ""
         if search_texts and len(search_texts) > 0:
             generated_combinations = generate_combinations(search_texts)
             search_text = process_lists(generated_combinations, text_search_k_slider_input)
         if len(search_text) > 0:
             where_sql += """
-                        AND (""" + search_text + """) """
+                        AND (""" + search_texts + """) """
             full_text_search_sql = f"""
                         SELECT dc.doc_id doc_id, dc.embed_id embed_id, vector_distance(dc.embed_vector, (
                                 SELECT to_vector(et.embed_vector) embed_vector
