@@ -1741,7 +1741,7 @@ def search_document(reranker_model_radio_input,
             search_text = process_lists(generated_combinations, text_search_k_slider_input)
         if len(search_text) > 0:
             where_sql += """
-                        AND (""" + search_texts + """) """
+                        AND (""" + search_text + """) """
             full_text_search_sql = f"""
                         SELECT dc.doc_id doc_id, dc.embed_id embed_id, vector_distance(dc.embed_vector, (
                                 SELECT to_vector(et.embed_vector) embed_vector
