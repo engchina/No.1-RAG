@@ -2921,7 +2921,7 @@ If I switch languages, please switch your responses accordingly.
                 with gr.Row() as tab_chat_document_chat_document_row:
                     with gr.Column():
                         tab_chat_document_chat_document_button = gr.Button(value="送信", variant="primary")
-
+    gr.Markdown(value="### Developed by Oracle Japan", elem_classes="sub_Header")
     tab_create_oci_clear_button.add([tab_create_oci_cred_user_ocid_text, tab_create_oci_cred_tenancy_ocid_text,
                                      tab_create_oci_cred_fingerprint_text,
                                      tab_create_oci_cred_private_key_file])
