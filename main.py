@@ -1107,9 +1107,12 @@ def load_document(file_path, server_directory):
     #     elements = partition(filename=server_path, strategy='hi_res',
     #                          languages=["jpn", "eng", "chi_sim"],
     #                          skip_infer_table_types=["doc", "docx"])
-    elements = partition(filename=server_path, strategy='hi_res',
+    elements = partition(filename=server_path, strategy='fast',
                          languages=["jpn", "eng", "chi_sim"],
-                         skip_infer_table_types=["doc", "docx"])
+                         extract_image_block_types=["Table"],
+                         extract_image_block_to_payload=False,
+                         # skip_infer_table_types=["pdf", "ppt", "pptx", "doc", "docx", "xls", "xlsx"])
+                         skip_infer_table_types=["pdf", "jpg", "png", "heic", "doc", "docx"])
     original_contents = "\n\n".join([str(el) for el in elements])
     print(f"{original_contents=}")
 
@@ -1229,10 +1232,12 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
     #                      languages=["jpn", "eng", "chi_sim"]
     #                      )
     # for issue: https://github.com/Unstructured-IO/unstructured/issues/3396
-    elements = partition(filename=server_path, strategy='hi_res',
+    elements = partition(filename=server_path, strategy='fast',
                          languages=["jpn", "eng", "chi_sim"],
-                         skip_infer_table_types=["doc", "docx"])
-
+                         extract_image_block_types=["Table"],
+                         extract_image_block_to_payload=False,
+                         # skip_infer_table_types=["pdf", "ppt", "pptx", "doc", "docx", "xls", "xlsx"])
+                         skip_infer_table_types=["pdf", "jpg", "png", "heic", "doc", "docx"])
     prev_page_number = 0
     table_idx = 1
     for el in elements:
@@ -1263,7 +1268,8 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
     unstructured_chunks = chunk_by_title(elements, include_orig_elements=True,
                                          max_characters=int(chunks_max_size),
                                          multipage_sections=True, new_after_n_chars=int(chunks_max_size),
-                                         overlap=int(float(chunks_max_size) * (float(chunks_overlap_size) / 100)))
+                                         overlap=int(float(chunks_max_size) * (float(chunks_overlap_size) / 100)),
+                                         overlap_all=True)
 
     chunks = process_text_chunks(unstructured_chunks)
     chunks_dataframe = pd.DataFrame(chunks)
@@ -3162,5 +3168,5 @@ if __name__ == "__main__":
         server_port=args.port,
         max_threads=200,
         show_api=False,
-        auth=do_auth,
+        # auth=do_auth,
     )
