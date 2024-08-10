@@ -926,7 +926,7 @@ def create_langfuse_cred(langfuse_cred_secret_key, langfuse_cred_public_key, lan
     set_key(env_path, "LANGFUSE_PUBLIC_KEY", langfuse_cred_public_key, quote_mode="never")
     set_key(env_path, "LANGFUSE_HOST", langfuse_cred_host, quote_mode="never")
     load_dotenv(env_path)
-    gr.Info("Claude API Keyの設定が完了しました")
+    gr.Info("LangFuseの設定が完了しました")
     return gr.Textbox(value=langfuse_cred_secret_key), gr.Textbox(value=langfuse_cred_public_key), gr.Textbox(
         value=langfuse_cred_host)
 
@@ -1260,7 +1260,7 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
                         print(f"After: {el.text=}")
             table_idx += 1
 
-    unstructured_chunks = chunk_by_title(elements, combine_text_under_n_chars=100, include_orig_elements=True,
+    unstructured_chunks = chunk_by_title(elements, include_orig_elements=True,
                                          max_characters=int(chunks_max_size),
                                          multipage_sections=True, new_after_n_chars=int(chunks_max_size),
                                          overlap=int(float(chunks_max_size) * (float(chunks_overlap_size) / 100)))
