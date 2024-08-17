@@ -10,6 +10,7 @@ from typing import List, Tuple
 
 import cohere
 import gradio as gr
+import oci
 import oracledb
 import pandas as pd
 import requests
@@ -21,8 +22,8 @@ from langchain_community.vectorstores.utils import DistanceStrategy
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langfuse.callback import CallbackHandler
 from langchain_openai import ChatOpenAI
+from langfuse.callback import CallbackHandler
 from oracledb import DatabaseError
 from unstructured.chunking.title import chunk_by_title
 from unstructured.partition.auto import partition
@@ -315,6 +316,36 @@ def do_auth(username, password):
         if username.lower() == match.group(1).lower() and password == match.group(2):
             return True
     return False
+
+
+config = oci.config.from_file('~/.oci/config', "DEFAULT")
+generative_ai_inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(config=config,
+                                                                                         service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+                                                                                         retry_strategy=oci.retry.NoneRetryStrategy(),
+                                                                                         timeout=(10, 240))
+
+
+def generate_embedding_response(inputs: List[str]):
+    batch_size = 96
+    all_embeddings = []
+
+    for i in range(0, len(inputs), batch_size):
+        batch = inputs[i:i + batch_size]
+
+        embed_text_detail = oci.generative_ai_inference.models.EmbedTextDetails()
+        embed_text_detail.serving_mode = oci.generative_ai_inference.models.OnDemandServingMode(
+            model_id=os.environ["OCI_COHERE_EMBED_MODEL"])
+        embed_text_detail.inputs = batch
+        embed_text_detail.truncate = "NONE"
+        embed_text_detail.compartment_id = os.environ["OCI_COMPARTMENT_OCID"]
+
+        embed_text_response = generative_ai_inference_client.embed_text(embed_text_detail)
+
+        print(f"Processed batch {i // batch_size + 1} of {(len(inputs) - 1) // batch_size + 1}")
+
+        all_embeddings.extend(embed_text_response.data.embeddings)
+
+    return all_embeddings
 
 
 def get_doc_list() -> List[Tuple[str, str]]:
@@ -1314,15 +1345,34 @@ def embed_save_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
     output_sql = ""
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
+            select_sql = f"""
+SELECT doc_id, embed_id, embed_data FROM {DEFAULT_COLLECTION_NAME}_embedding  WHERE doc_id = :doc_id            
+"""
+            cursor.execute(select_sql, doc_id=doc_id)
+            records = cursor.fetchall()
+            embed_datas = [record[2] for record in records]
+            embed_vectors = generate_embedding_response(embed_datas)
             update_sql = f"""
--- Update chunks
 UPDATE {DEFAULT_COLLECTION_NAME}_embedding 
-SET embed_vector = dbms_vector.utl_to_embedding(embed_data, json('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}'))
-WHERE doc_id = :doc_id """
-            output_sql += update_sql.replace(':doc_id', "'" + str(doc_id) + "'").lstrip() + ";"
+SET embed_vector = :embed_vector
+WHERE doc_id = :doc_id and embed_id = :embed_id
+"""
+
+            #             update_sql = f"""
+            # -- Update chunks
+            # UPDATE {DEFAULT_COLLECTION_NAME}_embedding
+            # SET embed_vector = dbms_vector.utl_to_embedding(embed_data, json('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}'))
+            # WHERE doc_id = :doc_id """
+            # cursor.execute(update_sql,
+            #                [doc_id])
+            cursor.setinputsizes(embed_vector=oracledb.DB_TYPE_VECTOR)
+            output_sql += update_sql.replace(':doc_id', "'" + str(doc_id) + "'"
+                                             ).replace(':embed_id', "'" + str('...') + "'"
+                                                       ).replace(':embed_vector', "'" + str('...') + "'").strip() + ";"
             print(f"{output_sql=}")
-            cursor.execute(update_sql,
-                           [doc_id])
+            cursor.executemany(update_sql,
+                               [{'doc_id': record[0], 'embed_id': record[1], 'embed_vector': embed_vector}
+                                for record, embed_vector in zip(records, embed_vectors)])
             conn.commit()
     return gr.Textbox(output_sql), gr.Textbox(), gr.Dataframe()
 
@@ -1369,7 +1419,7 @@ def generate_query(query_text, generate_query_radio):
         ])
 
         generate_sub_queries_chain = (
-                sub_query_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+            sub_query_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         sub_queries = generate_sub_queries_chain.invoke({"original_query": query_text})
         print(f"{sub_queries=}")
@@ -1396,7 +1446,7 @@ def generate_query(query_text, generate_query_radio):
         ])
 
         generate_rag_fusion_queries_chain = (
-                rag_fusion_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+            rag_fusion_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         rag_fusion_queries = generate_rag_fusion_queries_chain.invoke({"original_query": query_text})
         print(f"{rag_fusion_queries=}")
@@ -1416,7 +1466,7 @@ def generate_query(query_text, generate_query_radio):
         ])
 
         generate_hyde_answers_chain = (
-                hyde_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+            hyde_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         hyde_answers = generate_hyde_answers_chain.invoke({"original_query": query_text})
         print(f"{hyde_answers=}")
@@ -1436,7 +1486,7 @@ def generate_query(query_text, generate_query_radio):
         ])
 
         generate_step_back_queries_chain = (
-                step_back_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+            step_back_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         step_back_queries = generate_step_back_queries_chain.invoke({"original_query": query_text})
         print(f"{step_back_queries=}")
