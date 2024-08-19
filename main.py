@@ -1356,7 +1356,7 @@ SET embed_vector = :embed_vector
 WHERE doc_id = :doc_id and embed_id = :embed_id
 """
 
-            #             update_sql = f"""
+            # update_sql = f"""
             # -- Update chunks
             # UPDATE {DEFAULT_COLLECTION_NAME}_embedding
             # SET embed_vector = dbms_vector.utl_to_embedding(embed_data, json('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}'))
