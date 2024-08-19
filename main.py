@@ -318,14 +318,12 @@ def do_auth(username, password):
     return False
 
 
-config = oci.config.from_file('~/.oci/config', "DEFAULT")
-generative_ai_inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(config=config,
-                                                                                         service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
-                                                                                         retry_strategy=oci.retry.NoneRetryStrategy(),
-                                                                                         timeout=(10, 240))
-
-
 def generate_embedding_response(inputs: List[str]):
+    config = oci.config.from_file('~/.oci/config', "DEFAULT")
+    generative_ai_inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(config=config,
+                                                                                             service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+                                                                                             retry_strategy=oci.retry.NoneRetryStrategy(),
+                                                                                             timeout=(10, 240))
     batch_size = 96
     all_embeddings = []
 
