@@ -1561,6 +1561,15 @@ def search_document(reranker_model_radio_input,
     Retrieve relevant splits for any question using similarity search.
     This is simply "top K" retrieval where we select documents based on embedding similarity to the query.
     """
+    def cut_lists(lists, limit=10):
+        if len(lists) > limit:
+            # lists = random.sample(lists, limit)
+            half_limit = limit // 2
+            if limit % 2 == 0:
+                lists = lists[:half_limit] + lists[-half_limit:]
+            else:
+                lists = lists[:half_limit + 1] + lists[-half_limit:]
+        return lists
 
     def generate_combinations(words_list):
         sampled_list = []
@@ -1575,15 +1584,8 @@ def search_document(reranker_model_radio_input,
         sampled_list += list(combinations(words_list, min_required))
         return sampled_list
 
-    def process_lists(lists, limit=10):
+    def process_lists(lists):
         contains_sql_list = []
-        if len(lists) > limit:
-            # lists = random.sample(lists, limit)
-            half_limit = limit // 2
-            if limit % 2 == 0:
-                lists = lists[:half_limit] + lists[-half_limit:]
-            else:
-                lists = lists[:half_limit + 1] + lists[-half_limit:]
         for lst in lists:
             if isinstance(lst, str):
                 contains_sql_list.append(f"contains(dc.embed_data, '{lst}') > 0")
@@ -1791,8 +1793,9 @@ def search_document(reranker_model_radio_input,
                                      json={'query_text': query_text_input, 'language': 'ja'}).json()
         search_text = ""
         if search_texts and len(search_texts) > 0:
+            search_texts = cut_lists(search_texts, text_search_k_slider_input)
             generated_combinations = generate_combinations(search_texts)
-            search_text = process_lists(generated_combinations, text_search_k_slider_input)
+            search_text = process_lists(generated_combinations)
         if len(search_text) > 0:
             where_sql += """
                         AND (""" + search_text + """) """

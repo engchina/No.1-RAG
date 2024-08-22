@@ -1,6 +1,5 @@
 import re
 
-import jieba
 import spacy
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -37,18 +36,26 @@ def split_query(query: QueryText):
     try:
         if query.language == 'ja':
             # 日文分词处理
+            # ja_split_queries = [token.text for token in nlp_ja_ginza(query.query_text) if
+            #                     any(token.tag_.startswith(tag) for tag in
+            #                         ['名詞-数詞', '名詞-普通名詞', '名詞-固有名詞', '動詞-一般'])
+            #                     and not re.fullmatch(r'[0-9]+', token.text)]
             ja_split_queries = [token.text for token in nlp_ja_ginza(query.query_text) if
                                 any(token.tag_.startswith(tag) for tag in
-                                    ['名詞-数詞', '名詞-普通名詞', '名詞-固有名詞', '動詞-一般'])
+                                    ['名詞-普通名詞', '名詞-固有名詞'])
                                 and not re.fullmatch(r'[0-9]+', token.text)]
             # 英文分词处理
+            # en_split_queries = [token.text for token in nlp_en_core(query.query_text) if
+            #                     token.pos_ in ['PROPN', 'NOUN', 'VERB', 'NUM'] and re.match(r'^[a-zA-Z]', token.text)]
             en_split_queries = [token.text for token in nlp_en_core(query.query_text) if
-                                token.pos_ in ['PROPN', 'NOUN', 'VERB', 'NUM'] and re.match(r'^[a-zA-Z]', token.text)]
+                                token.pos_ in ['NOUN'] and re.match(r'^[a-zA-Z]', token.text)]
             final_split_queries = list(set(ja_split_queries + en_split_queries))
         elif query.language == 'en':
             # 只做英文分词处理
+            # final_split_queries = [token.text for token in nlp_en_core(query.query_text) if
+            #                        token.pos_ in ['PROPN', 'NOUN', 'VERB'] and re.match(r'^[a-zA-Z]', token.text)]
             final_split_queries = [token.text for token in nlp_en_core(query.query_text) if
-                                   token.pos_ in ['PROPN', 'NOUN', 'VERB'] and re.match(r'^[a-zA-Z]', token.text)]
+                                   token.pos_ in ['NOUN'] and re.match(r'^[a-zA-Z]', token.text)]
 
         # 定义英文停用词列表
         custom_stopwords = {
