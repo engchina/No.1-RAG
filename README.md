@@ -42,3 +42,7 @@ sudo apt install build-essential libmagic-dev poppler-utils tesseract-ocr libreo
 echo <your_secret> | openssl rand -base64 32
 echo <your_salt> | openssl rand -base64 32
 ```
+
+## Change Region Image ID
+
+[https://docs.oracle.com/en-us/iaas/images/image/50cf60da-4374-44e2-ab38-70185991f833/index.htm](https://docs.oracle.com/en-us/iaas/images/image/50cf60da-4374-44e2-ab38-70185991f833/index.htm)
