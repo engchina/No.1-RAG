@@ -79,7 +79,7 @@ def split_query(query: QueryText):
         # 过滤掉停用词
         final_split_queries = [word for word in set(final_split_queries)
                                if
-                               word.lower() not in custom_stopwords and word.lower() not in nlp_en_core.Defaults.stop_words]
+                               word.lower() not in custom_stopwords and word.lower() not in nlp_ja_ginza.Defaults.stop_words and word.lower() not in nlp_ja_core.Defaults.stop_words and word.lower() not in nlp_en_core.Defaults.stop_words]
         print(f"{final_split_queries=}")
         return final_split_queries
 

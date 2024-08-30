@@ -1561,9 +1561,14 @@ def search_document(reranker_model_radio_input,
     Retrieve relevant splits for any question using similarity search.
     This is simply "top K" retrieval where we select documents based on embedding similarity to the query.
     """
+
     def cut_lists(lists, limit=10):
+        if not lists or len(lists) == 0:
+            return lists
         if len(lists) > limit:
             # lists = random.sample(lists, limit)
+            if limit == 1:
+                return lists[0]
             half_limit = limit // 2
             if limit % 2 == 0:
                 lists = lists[:half_limit] + lists[-half_limit:]
@@ -1793,9 +1798,11 @@ def search_document(reranker_model_radio_input,
                                      json={'query_text': query_text_input, 'language': 'ja'}).json()
         search_text = ""
         if search_texts and len(search_texts) > 0:
+            # search_texts = cut_lists(search_texts, text_search_k_slider_input)
+            # generated_combinations = generate_combinations(search_texts)
+            # search_text = process_lists(generated_combinations)
             search_texts = cut_lists(search_texts, text_search_k_slider_input)
-            generated_combinations = generate_combinations(search_texts)
-            search_text = process_lists(generated_combinations)
+            search_text = process_lists(search_texts)
         if len(search_text) > 0:
             where_sql += """
                         AND (""" + search_text + """) """
@@ -2066,23 +2073,33 @@ async def chat_document(search_result,
 
     context = '\n'.join(search_result['CONTENT'].astype(str).values)
     print(f"{context=}")
+    # system_text = f"""
+    #         Use the following pieces of Context to answer the question at the end.
+    #         If you don't know the answer, just say that you don't know, don't try to make up an answer.
+    #         Use the EXACT TEXT from the Context WITHOUT ANY MODIFICATIONS, REORGANIZATION or EMBELLISHMENT.
+    #         Don't try to answer anything that isn't in Context.
+    #         Context:
+    #         ```
+    #         {context}
+    #         ```
+    #         """
     system_text = f"""
-            Use the following pieces of Context to answer the question at the end. 
-            If you don't know the answer, just say that you don't know, don't try to make up an answer.
-            Use the EXACT TEXT from the Context WITHOUT ANY MODIFICATIONS, REORGANIZATION or EMBELLISHMENT.
-            Don't try to answer anything that isn't in Context.
-            Context:
-            ```
-            {context}
-            ```
-            """
+次のコンテキストを使用して、最後にある質問に答えてください。  
+もし答えがわからない場合は、「わかりません」と言ってください。答えをでっち上げようとしないでください。  
+コンテキストの正確なテキストを使用し、**一切の修正、再構成、または脚色を加えずに**使用してください。  
+コンテキストにないことについては答えようとしないでください。  
+
+コンテキスト:
+```
+{context}
+``` \n"""
 
     user_text = f"""
-            Question: 
+            質問: 
             ```
             {query_text}
             ```
-            Helpful Answer:
+            役に立つ回答: \n
     """
 
     command_r_user_text = user_text
@@ -2126,12 +2143,14 @@ async def eval_ragas(llm_answer_checkbox,
         else:
             return text
 
+    if standard_answer_text:
+        standard_answer_text = standard_answer_text.strip()
+    else:
+        standard_answer_text = "入力されていません。"
     print(f"{llm_evaluation_checkbox=}")
     if not llm_evaluation_checkbox:
         yield ("", "", "", "", "", "", "")
     else:
-        standard_answer_text = standard_answer_text.strip()
-
         command_r_checkbox = False
         command_r_plus_checkbox = False
         openai_gpt4o_checkbox = False
@@ -2162,49 +2181,68 @@ async def eval_ragas(llm_answer_checkbox,
         claude_3_sonnet_response = remove_last_line(claude_3_sonnet_response)
         claude_3_haiku_response = remove_last_line(claude_3_haiku_response)
 
-        command_r_user_text = f"""Standard Answer: {standard_answer_text}
+        command_r_user_text = f"""
+-標準回答-
+ {standard_answer_text}
 
-                Given Answer: {command_r_response}
+-与えられた回答-
+ {command_r_response}
 
-                Please evaluate the given answer based on the criteria described:\n
-                """
+-出力-\n　"""
 
-        command_r_plus_user_text = f"""Standard Answer: {standard_answer_text}
+        command_r_plus_user_text = f"""
+-標準回答-
+{standard_answer_text}
 
-                Given Answer: {command_r_plus_response}
+-与えられた回答-
+{command_r_plus_response}
 
-                Please evaluate the given answer based on the criteria described:\n
-                """
-        openai_gpt4o_user_text = f"""Standard Answer: {standard_answer_text}
+-出力-\n　"""
 
-                Given Answer: {openai_gpt4o_response}
+        openai_gpt4o_user_text = f"""
+-標準回答-
+{standard_answer_text}
 
-                Please evaluate the given answer based on the criteria described:\n
-                """
-        openai_gpt4_user_text = f"""Standard Answer: {standard_answer_text}
+-与えられた回答-
+{openai_gpt4o_response}
 
-                Given Answer: {openai_gpt4_response}
+-出力-\n　"""
 
-                Please evaluate the given answer based on the criteria described:\n
-                """
-        claude_3_opus_user_text = f"""Standard Answer: {standard_answer_text}
+        openai_gpt4_user_text = f"""
+-標準回答-
+{standard_answer_text}
 
-                Given Answer: {claude_3_opus_response}
+-与えられた回答-
+{openai_gpt4_response}
 
-                Please evaluate the given answer based on the criteria described:\n
-                """
-        claude_3_sonnet_user_text = f"""Standard Answer: {standard_answer_text}
+-出力-\n　"""
 
-                Given Answer: {claude_3_sonnet_response}
+        claude_3_opus_user_text = f"""
+-標準回答-
+{standard_answer_text}
 
-                Please evaluate the given answer based on the criteria described:\n
-                """
-        claude_3_haiku_user_text = f"""Standard Answer: {standard_answer_text}
+-与えられた回答-
+{claude_3_opus_response}
 
-                Given Answer: {claude_3_haiku_response}
+-出力-\n　"""
 
-                Please evaluate the given answer based on the criteria described:\n
-                """
+        claude_3_sonnet_user_text = f"""
+-標準回答-
+{standard_answer_text}
+
+-与えられた回答-
+{claude_3_sonnet_response}
+
+-出力-\n　"""
+
+        claude_3_haiku_user_text = f"""
+-標準回答-
+{standard_answer_text}
+
+-与えられた回答-
+{claude_3_haiku_response}
+
+-出力-\n　"""
 
         eval_command_r_response = ""
         eval_command_r_plus_response = ""
@@ -2525,16 +2563,16 @@ with gr.Blocks(css=custom_css) as app:
                                                                           autoscroll=True, interactive=False,
                                                                           show_copy_button=True)
                 with gr.Accordion(open=False, label="システム・メッセージ"):
+                    #                     tab_chat_with_llm_system_text = gr.Textbox(label="システム・メッセージ*", show_label=False, lines=5,
+                    #                                                                max_lines=15,
+                    #                                                                value="You are a helpful assistant. \n\
+                    # Please respond to me in the same language I use for my messages. \n\
+                    # If I switch languages, please switch your responses accordingly.")
                     tab_chat_with_llm_system_text = gr.Textbox(label="システム・メッセージ*", show_label=False, lines=5,
                                                                max_lines=15,
-                                                               value="You are a helpful assistant. \n\
-Please respond to me in the same language I use for my messages. \n\
-If I switch languages, please switch your responses accordingly.")
-                #                     tab_chat_with_llm_system_text = gr.Textbox(label="システム・メッセージ*", show_label=False, lines=5,
-                #                                                                max_lines=15,
-                #                                                                value="あなたは役に立つアシスタントです。\n\
-                # 私のメッセージと同じ言語で返答してください。\n\
-                # 私が言語を切り替えた場合は、あなたもそれに合わせて切り替えてください。")
+                                                               value="""あなたは役立つアシスタントです。
+私のメッセージと同じ言語で返答してください。
+もし私が言語を切り替えた場合は、それに応じて返答の言語も切り替えてください。""")
                 with gr.Row():
                     with gr.Column():
                         tab_chat_with_llm_query_text = gr.Textbox(label="ユーザー・メッセージ*", lines=2, max_lines=5)
@@ -2710,18 +2748,182 @@ If I switch languages, please switch your responses accordingly.")
                     with gr.Column():
                         tab_delete_document_delete_button = gr.Button(value="削除", variant="primary")
             with gr.TabItem(label="Step-4.ドキュメントとチャット") as tab_chat_document:
+                with gr.Row():
+                    with gr.Column():
+                        tab_chat_document_llm_answer_checkbox_group = gr.CheckboxGroup(
+                            ["cohere/command-r", "cohere/command-r-plus", "openai/gpt-4o", "openai/gpt-4",
+                             "claude/opus",
+                             "claude/sonnet", "claude/haiku"],
+                            label="LLM モデル", value=[""])
+                with gr.Row():
+                    with gr.Column():
+                        tab_chat_document_question_embedding_model_checkbox_group = gr.CheckboxGroup(
+                            ["cohere/embed-multilingual-v3.0"],
+                            label="Embedding モデル*", value="cohere/embed-multilingual-v3.0", interactive=False)
+                    with gr.Column():
+                        tab_chat_document_reranker_model_radio = gr.Radio(
+                            ["None", "cohere/rerank-multilingual-v3.0",
+                             "cohere/rerank-english-v3.0"
+                             ],
+                            label="Rerank モデル*", value="None")
+                with gr.Row():
+                    with gr.Column():
+                        tab_chat_document_top_k_slider = gr.Slider(label="類似検索Top-K*", minimum=1,
+                                                                   maximum=100, step=1,
+                                                                   info="Default value: 25。類似度距離の低い順（=類似度の高い順）で上位K件のみを抽出する。",
+                                                                   interactive=True, value=25)
+                    with gr.Column():
+                        tab_chat_document_threshold_value_slider = gr.Slider(label="類似検索閾値*",
+                                                                             minimum=0.10,
+                                                                             info="Default value: 0.55。類似度距離が閾値以下のデータのみを抽出する。",
+                                                                             maximum=0.95, step=0.05, value=0.55)
+                with gr.Row():
+                    with gr.Column():
+                        tab_chat_document_reranker_top_k_slider = gr.Slider(label="Rerank Top-K*", minimum=1,
+                                                                            maximum=50, step=1,
+                                                                            info="Default value: 5。Rerank Scoreの高い順で上位K件のみを抽出する。",
+                                                                            interactive=True, value=5)
+                    with gr.Column():
+                        tab_chat_document_reranker_threshold_slider = gr.Slider(label="Rerank Score閾値*",
+                                                                                minimum=0.10,
+                                                                                info="Default value: 0.4。Rerank Scoreが閾値以上のデータのみを抽出する。",
+                                                                                maximum=0.99, step=0.05, value=0.40,
+                                                                                interactive=True)
+                with gr.Accordion("Advanced Settings", open=False):
+                    with gr.Row():
+                        with gr.Column():
+                            tab_chat_document_partition_by_k_slider = gr.Slider(label="Partition-By-K", minimum=0,
+                                                                                maximum=20, step=1,
+                                                                                interactive=True,
+                                                                                info="Default value: 0。類似検索の対象ドキュメント数を指定。0: 全部。1: 1個。2：2個。... n: n個。")
+                        with gr.Column():
+                            tab_chat_document_answer_by_one_checkbox = gr.Checkbox(
+                                label="Highest-Ranked-One 文書による回答",
+                                value=False,
+                                info="他のすべての文書を無視し、最上位にランクされた1つの文書のみによって回答する。")
+                    with gr.Row():
+                        with gr.Column():
+                            tab_chat_document_extend_first_chunk_size = gr.Slider(label="Extend-First-K", minimum=0,
+                                                                                  maximum=50, step=1,
+                                                                                  interactive=True,
+                                                                                  value=0,
+                                                                                  info="Default value: 0。DISTANCE計算対象外。検索されたチャンクを拡張する数を指定。0: 拡張しない。 1: 最初の1個を拡張。2: 最初の2個を拡張。 ... n: 最初のn個を拡張。")
+                        with gr.Column():
+                            tab_chat_document_extend_around_chunk_size = gr.Slider(label="Extend-Around-K", minimum=0,
+                                                                                   maximum=50, step=2,
+                                                                                   interactive=True,
+                                                                                   value=2,
+                                                                                   info="Default value: 2。DISTANCE計算対象外。検索されたチャンクを拡張する数を指定。0: 拡張しない。 2: 2個で前後それぞれ1個を拡張。4: 4個で前後それぞれ2個を拡張。... n: n個で前後それぞれn/2個を拡張。")
+                    with gr.Row():
+                        with gr.Column():
+                            tab_chat_document_text_search_checkbox = gr.Checkbox(label="テキスト検索", value=False,
+                                                                                 info="テキスト検索は元のクエリに限定され、クエリの拡張で生成されたクエリは無視される。")
+                        with gr.Column():
+                            tab_chat_document_text_search_k_slider = gr.Slider(label="テキスト検索Limit-K",
+                                                                               minimum=1,
+                                                                               maximum=15, step=1,
+                                                                               value=5,
+                                                                               info="Default value: 5。テキスト検索に使用できる単語数の制限。")
+                with gr.Row(visible=False):
+                    tab_chat_document_accuracy_plan_radio = gr.Radio(
+                        ["Somewhat Inaccurate", "Decent Accuracy", "Extremely Precise"],
+                        label="Accuracy Plan*", value="Somewhat Inaccurate", interactive=True)
+                with gr.Row():
+                    tab_chat_document_llm_evaluation_checkbox = gr.Checkbox(label="評価", show_label=True,
+                                                                            interactive=True, value=False)
+                with gr.Row():
+                    #                     tab_chat_document_system_message_text = gr.Textbox(label="システム・メッセージ*", lines=15,
+                    #                                                                        max_lines=20,
+                    #                                                                        interactive=True,
+                    #                                                                        visible=False,
+                    #                                                                        value=f"""You are an ANSWER EVALUATOR.
+                    # Your task is to compare a given answer to a standard answer and evaluate its quality.
+                    # Respond with a score from 0 to 10 for each of the following criteria:
+                    # 1. Correctness (0 being completely incorrect, 10 being perfectly correct)
+                    # 2. Completeness (0 being entirely incomplete, 10 being fully complete)
+                    # 3. Clarity (0 being very unclear, 10 being extremely clear)
+                    # 4. Conciseness (0 being extremely verbose, 10 being optimally concise)
+                    #
+                    # After providing scores, give a brief explanation for each score.
+                    # Finally, provide an overall score from 0 to 10 and a summary of the evaluation.
+                    # Please respond to me in the same language I use for my messages.
+                    # If I switch languages, please switch your responses accordingly.
+                    #                 """)
+                    tab_chat_document_system_message_text = gr.Textbox(label="システム・メッセージ*", lines=15,
+                                                                       max_lines=20,
+                                                                       interactive=True,
+                                                                       visible=False,
+                                                                       value=f"""
+-目標活動-
+あなたは「回答評価者」です。
+
+-目標-
+あなたの任務は、与えられた回答を標準回答と比較し、その質を評価することです。
+以下の各基準について0から10の評点で回答してください：
+1.正確さ（0は完全に不正確、10は完全に正確）
+2.完全性（0はまったく不完全、10は完全に満足）
+3.明確さ（0は非常に不明確、10は非常に明確）
+4.簡潔さ（0は非常に冗長、10は最適に簡潔）
+
+評点を付けた後、各評点について簡単な説明を加えてください。
+最後に、0から10の総合評価と評価の要約を提供してください。
+私のメッセージと同じ言語で返答してください。
+もし私が言語を切り替えた場合は、それに応じて返答の言語も切り替えてください。\n""")
+                with gr.Row():
+                    tab_chat_document_standard_answer_text = gr.Textbox(label="標準回答*", lines=2, interactive=True,
+                                                                        visible=False)
+                with gr.Accordion("ドキュメント*", open=True):
+                    with gr.Row():
+                        with gr.Column():
+                            tab_chat_document_doc_id_all_checkbox = gr.Checkbox(label="全部", value=True)
+                    with gr.Row():
+                        with gr.Column():
+                            # doc_id_text = gr.Textbox(label="Doc ID*", lines=1)
+                            tab_chat_document_doc_id_checkbox_group = gr.CheckboxGroup(
+                                choices=get_doc_list(),
+                                label="ドキュメント*",
+                                show_label=False,
+                                interactive=False
+                            )
+                with gr.Row() as tab_chat_document_searched_query_row:
+                    with gr.Column():
+                        tab_chat_document_query_text = gr.Textbox(label="クエリ*", lines=1)
+                # with gr.Accordion("Sub-Query/RAG-Fusion/HyDE/Step-Back-Prompting/Customized-Multi-Step-Query", open=True):
+                with gr.Accordion("クエリの拡張", open=False):
+                    with gr.Row():
+                        # generate_query_radio = gr.Radio(
+                        #     ["None", "Sub-Query", "RAG-Fusion", "HyDE", "Step-Back-Prompting",
+                        #      "Customized-Multi-Step-Query"],
+                        tab_chat_document_generate_query_radio = gr.Radio(
+                            [("None", "None"), ("サブクエリ", "Sub-Query"), ("類似クエリ", "RAG-Fusion"),
+                             ("仮回答", "HyDE"), ("抽象化クエリ", "Step-Back-Prompting")],
+                            label="LLMによって生成？", value="None", interactive=True)
+                    with gr.Row():
+                        tab_chat_document_sub_query1_text = gr.Textbox(
+                            # label="(Sub-Query)サブクエリ1/(RAG-Fusion)類似クエリ1/(HyDE)仮回答1/(Step-Back-Prompting)抽象化クエリ1/(Customized-Multi-Step-Query)マルチステップクエリ1",
+                            label="生成されたクエリ1",
+                            lines=1, interactive=True, info="")
+                    with gr.Row():
+                        tab_chat_document_sub_query2_text = gr.Textbox(
+                            # label="(Sub-Query)サブクエリ2/(RAG-Fusion)類似クエリ2/(HyDE)仮回答2/(Step-Back-Prompting)抽象化クエリ2/(Customized-Multi-Step-Query)マルチステップクエリ2",
+                            label="生成されたクエリ2",
+                            lines=1, interactive=True)
+                    with gr.Row():
+                        tab_chat_document_sub_query3_text = gr.Textbox(
+                            # label="(Sub-Query)サブクエリ3/(RAG-Fusion)類似クエリ3/(HyDE)仮回答3/(Step-Back-Prompting)抽象化クエリ3/(Customized-Multi-Step-Query)マルチステップクエリ3",
+                            label="生成されたクエリ3",
+                            lines=1, interactive=True)
+                with gr.Row() as tab_chat_document_chat_document_row:
+                    with gr.Column():
+                        tab_chat_document_chat_document_button = gr.Button(value="送信", variant="primary")
                 with gr.Accordion(label="使用されたSQL", open=False) as tab_chat_document_sql_accordion:
                     tab_chat_document_output_sql_text = gr.Textbox(label="使用されたSQL", show_label=False, lines=25,
                                                                    max_lines=25, autoscroll=False,
                                                                    show_copy_button=True)
                 with gr.Row() as tab_chat_document_searched_data_summary_row:
-                    with gr.Column():
+                    with gr.Column(scale=10):
                         tab_chat_document_searched_data_summary_text = gr.Markdown(value="", visible=False)
-                    with gr.Column():
-                        pass
-                    with gr.Column():
-                        pass
-                    with gr.Column():
+                    with gr.Column(scale=2):
                         tab_chat_document_download_output_button = gr.DownloadButton(label="ダウンロード",
                                                                                      visible=False,
                                                                                      variant="secondary", size="sm")
@@ -2737,13 +2939,6 @@ If I switch languages, please switch your responses accordingly.")
                             column_widths=["4%", "62%", "6%", "8%", "6%", "6%", "8%"],
                             interactive=False,
                         )
-                with gr.Row():
-                    with gr.Column():
-                        tab_chat_document_llm_answer_checkbox_group = gr.CheckboxGroup(
-                            ["cohere/command-r", "cohere/command-r-plus", "openai/gpt-4o", "openai/gpt-4",
-                             "claude/opus",
-                             "claude/sonnet", "claude/haiku"],
-                            label="LLM モデル", value=[""])
                 with gr.Accordion(label="Command-R メッセージ",
                                   visible=False,
                                   open=True) as tab_chat_document_llm_command_r_accordion:
@@ -2841,143 +3036,7 @@ If I switch languages, please switch your responses accordingly.")
                                                                                       autoscroll=True,
                                                                                       interactive=False,
                                                                                       show_copy_button=True)
-                with gr.Row():
-                    with gr.Column():
-                        tab_chat_document_question_embedding_model_checkbox_group = gr.CheckboxGroup(
-                            ["cohere/embed-multilingual-v3.0"],
-                            label="Embedding モデル*", value="cohere/embed-multilingual-v3.0", interactive=False)
-                    with gr.Column():
-                        tab_chat_document_reranker_model_radio = gr.Radio(
-                            ["None", "cohere/rerank-multilingual-v3.0",
-                             "cohere/rerank-english-v3.0"
-                             ],
-                            label="Reranker モデル*", value="None")
-                with gr.Row():
-                    with gr.Column():
-                        tab_chat_document_top_k_slider = gr.Slider(label="Top-K for Similarity Search*", minimum=1,
-                                                                   maximum=100, step=1,
-                                                                   interactive=True, value=50)
-                    with gr.Column():
-                        tab_chat_document_threshold_value_slider = gr.Slider(label="Threshold for Similarity Search*",
-                                                                             minimum=0.10,
-                                                                             maximum=0.95, step=0.05, value=0.55)
-                with gr.Row():
-                    with gr.Column():
-                        tab_chat_document_reranker_top_k_slider = gr.Slider(label="Top-K for Reranker*", minimum=1,
-                                                                            maximum=50, step=1,
-                                                                            interactive=True, value=5)
-                    with gr.Column():
-                        tab_chat_document_reranker_threshold_slider = gr.Slider(label="Threshold for Rerank Score*",
-                                                                                minimum=0.10,
-                                                                                maximum=0.99, step=0.05, value=0.40,
-                                                                                interactive=True)
-                with gr.Accordion("Advanced Settings", open=False):
-                    with gr.Row():
-                        with gr.Column():
-                            tab_chat_document_partition_by_k_slider = gr.Slider(label="Partition-By-K", minimum=0,
-                                                                                maximum=20, step=1,
-                                                                                interactive=True,
-                                                                                info="Default value: 0。類似検索の対象ドキュメント数を指定。0: 全部。1: 1個。2：2個。... n: n個。")
-                        with gr.Column():
-                            tab_chat_document_answer_by_one_checkbox = gr.Checkbox(
-                                label="Answered By Highest-Ranked-One Document",
-                                value=False,
-                                info="Answered by the highest-ranked-One document only, ignoring all other documents.")
-                    with gr.Row():
-                        with gr.Column():
-                            tab_chat_document_extend_first_chunk_size = gr.Slider(label="Extend-First-K", minimum=0,
-                                                                                  maximum=50, step=1,
-                                                                                  interactive=True,
-                                                                                  value=0,
-                                                                                  info="Default value: 5。DISTANCE計算対象外。検索されたチャンクを拡張する数を指定。0: 拡張しない。 1: 最初の1個を拡張。2: 最初の2個を拡張。 ... n: 最初のn個を拡張。")
-                        with gr.Column():
-                            tab_chat_document_extend_around_chunk_size = gr.Slider(label="Extend-Around-K", minimum=0,
-                                                                                   maximum=50, step=2,
-                                                                                   interactive=True,
-                                                                                   value=2,
-                                                                                   info="Default value: 2。DISTANCE計算対象外。検索されたチャンクを拡張する数を指定。0: 拡張しない。 2: 2個で前後それぞれ1個を拡張。4: 4個で前後それぞれ2個を拡張。... n: n個で前後それぞれn/2個を拡張。")
-                    with gr.Row():
-                        with gr.Column():
-                            tab_chat_document_text_search_checkbox = gr.Checkbox(label="Text Search", value=False,
-                                                                                 info="Text Search is limited to the original query and does not relate to other items.")
-                        with gr.Column():
-                            tab_chat_document_text_search_k_slider = gr.Slider(label="Limit-K for Text Search",
-                                                                               minimum=1,
-                                                                               maximum=10, step=1,
-                                                                               value=5,
-                                                                               info="The limitation on the number of words that can be used for Text Search")
-                with gr.Row(visible=False):
-                    tab_chat_document_accuracy_plan_radio = gr.Radio(
-                        ["Somewhat Inaccurate", "Decent Accuracy", "Extremely Precise"],
-                        label="Accuracy Plan*", value="Somewhat Inaccurate", interactive=True)
-                with gr.Accordion("ドキュメント*", open=True):
-                    with gr.Row():
-                        with gr.Column():
-                            tab_chat_document_doc_id_all_checkbox = gr.Checkbox(label="全部", value=True)
-                    with gr.Row():
-                        with gr.Column():
-                            # doc_id_text = gr.Textbox(label="Doc ID*", lines=1)
-                            tab_chat_document_doc_id_checkbox_group = gr.CheckboxGroup(
-                                choices=get_doc_list(),
-                                label="ドキュメント*",
-                                show_label=False,
-                                interactive=False
-                            )
-                with gr.Row() as tab_chat_document_searched_query_row:
-                    with gr.Column():
-                        tab_chat_document_query_text = gr.Textbox(label="クエリ*", lines=1)
-                # with gr.Accordion("Sub-Query/RAG-Fusion/HyDE/Step-Back-Prompting/Customized-Multi-Step-Query", open=True):
-                with gr.Accordion("クエリの拡張(Sub-Query/RAG-Fusion/HyDE/Step-Back-Prompting)", open=False):
-                    with gr.Row():
-                        # generate_query_radio = gr.Radio(
-                        #     ["None", "Sub-Query", "RAG-Fusion", "HyDE", "Step-Back-Prompting",
-                        #      "Customized-Multi-Step-Query"],
-                        tab_chat_document_generate_query_radio = gr.Radio(
-                            ["None", "Sub-Query", "RAG-Fusion", "HyDE", "Step-Back-Prompting"],
-                            label="LLMによって生成？", value="None", interactive=True)
-                    with gr.Row():
-                        tab_chat_document_sub_query1_text = gr.Textbox(
-                            # label="(Sub-Query)サブクエリ1/(RAG-Fusion)類似クエリ1/(HyDE)仮回答1/(Step-Back-Prompting)抽象化クエリ1/(Customized-Multi-Step-Query)マルチステップクエリ1",
-                            label="(Sub-Query)サブクエリ1/(RAG-Fusion)類似クエリ1/(HyDE)仮回答1/(Step-Back-Prompting)抽象化クエリ1",
-                            lines=1, interactive=True, info="")
-                    with gr.Row():
-                        tab_chat_document_sub_query2_text = gr.Textbox(
-                            # label="(Sub-Query)サブクエリ2/(RAG-Fusion)類似クエリ2/(HyDE)仮回答2/(Step-Back-Prompting)抽象化クエリ2/(Customized-Multi-Step-Query)マルチステップクエリ2",
-                            label="(Sub-Query)サブクエリ2/(RAG-Fusion)類似クエリ2/(HyDE)仮回答2/(Step-Back-Prompting)抽象化クエリ2",
-                            lines=1, interactive=True)
-                    with gr.Row():
-                        tab_chat_document_sub_query3_text = gr.Textbox(
-                            # label="(Sub-Query)サブクエリ3/(RAG-Fusion)類似クエリ3/(HyDE)仮回答3/(Step-Back-Prompting)抽象化クエリ3/(Customized-Multi-Step-Query)マルチステップクエリ3",
-                            label="(Sub-Query)サブクエリ3/(RAG-Fusion)類似クエリ3/(HyDE)仮回答3/(Step-Back-Prompting)抽象化クエリ3",
-                            lines=1, interactive=True)
-                with gr.Row():
-                    tab_chat_document_llm_evaluation_checkbox = gr.Checkbox(label="評価", show_label=True,
-                                                                            interactive=True, value=False)
-                with gr.Row():
-                    tab_chat_document_system_message_text = gr.Textbox(label="システム・メッセージ*", lines=15,
-                                                                       max_lines=20,
-                                                                       interactive=True,
-                                                                       visible=False,
-                                                                       value=f"""You are an ANSWER EVALUATOR. 
-Your task is to compare a given answer to a standard answer and evaluate its quality.
-Respond with a score from 0 to 10 for each of the following criteria:
-1. Correctness (0 being completely incorrect, 10 being perfectly correct)
-2. Completeness (0 being entirely incomplete, 10 being fully complete)
-3. Clarity (0 being very unclear, 10 being extremely clear)
-4. Conciseness (0 being extremely verbose, 10 being optimally concise)
 
-After providing scores, give a brief explanation for each score.
-Finally, provide an overall score from 0 to 10 and a summary of the evaluation.
-Please respond to me in the same language I use for my messages. 
-If I switch languages, please switch your responses accordingly.
-                """)
-                with gr.Row():
-                    tab_chat_document_standard_answer_text = gr.Textbox(label="標準回答*", lines=2, interactive=True,
-                                                                        visible=False)
-
-                with gr.Row() as tab_chat_document_chat_document_row:
-                    with gr.Column():
-                        tab_chat_document_chat_document_button = gr.Button(value="送信", variant="primary")
     gr.Markdown(value="### Developed by Oracle Japan", elem_classes="sub_Header")
     tab_create_oci_clear_button.add([tab_create_oci_cred_user_ocid_text, tab_create_oci_cred_tenancy_ocid_text,
                                      tab_create_oci_cred_fingerprint_text,
@@ -3125,6 +3184,11 @@ If I switch languages, please switch your responses accordingly.
                tab_chat_document_llm_claude_3_opus_evaluation_accordion,
                tab_chat_document_llm_claude_3_sonnet_evaluation_accordion,
                tab_chat_document_llm_claude_3_haiku_evaluation_accordion])
+    tab_chat_document_generate_query_radio.change(
+        lambda x: (gr.Textbox(value=""), gr.Textbox(value=""), gr.Textbox(value="")),
+        [tab_chat_document_generate_query_radio],
+        [tab_chat_document_sub_query1_text, tab_chat_document_sub_query2_text,
+         tab_chat_document_sub_query3_text])
     tab_chat_document_chat_document_button.click(generate_query, [tab_chat_document_query_text,
                                                                   tab_chat_document_generate_query_radio],
                                                  [tab_chat_document_sub_query1_text,
