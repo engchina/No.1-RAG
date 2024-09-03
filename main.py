@@ -1798,11 +1798,11 @@ def search_document(reranker_model_radio_input,
                                      json={'query_text': query_text_input, 'language': 'ja'}).json()
         search_text = ""
         if search_texts and len(search_texts) > 0:
-            # search_texts = cut_lists(search_texts, text_search_k_slider_input)
-            # generated_combinations = generate_combinations(search_texts)
-            # search_text = process_lists(generated_combinations)
             search_texts = cut_lists(search_texts, text_search_k_slider_input)
-            search_text = process_lists(search_texts)
+            generated_combinations = generate_combinations(search_texts)
+            search_text = process_lists(generated_combinations)
+            # search_texts = cut_lists(search_texts, text_search_k_slider_input)
+            # search_text = process_lists(search_texts)
         if len(search_text) > 0:
             where_sql += """
                         AND (""" + search_text + """) """
@@ -2821,9 +2821,9 @@ with gr.Blocks(css=custom_css) as app:
                         with gr.Column():
                             tab_chat_document_text_search_k_slider = gr.Slider(label="テキスト検索Limit-K",
                                                                                minimum=1,
-                                                                               maximum=15, step=1,
-                                                                               value=5,
-                                                                               info="Default value: 5。テキスト検索に使用できる単語数の制限。")
+                                                                               maximum=10, step=1,
+                                                                               value=6,
+                                                                               info="Default value: 6。テキスト検索に使用できる単語数の制限。")
                 with gr.Row(visible=False):
                     tab_chat_document_accuracy_plan_radio = gr.Radio(
                         ["Somewhat Inaccurate", "Decent Accuracy", "Extremely Precise"],
