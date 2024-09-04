@@ -1,5 +1,4 @@
 --find-links https://download.pytorch.org/whl/cu121/torch_stable.html
---find-links https://download.pytorch.org/whl/cu121/torch_stable.html
 aiofiles==23.2.1
 aiohappyeyeballs==2.3.4
 aiohttp==3.10.1
