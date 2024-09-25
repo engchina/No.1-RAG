@@ -1,5 +1,6 @@
 import re
 
+import jieba
 import spacy
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -9,6 +10,7 @@ app = FastAPI()
 # 加载模型
 nlp_ja_ginza = spacy.load('ja_ginza_electra')
 nlp_ja_core = spacy.load('ja_core_news_lg')
+nlp_zh_core = spacy.load('zh_core_web_lg')
 nlp_en_core = spacy.load('en_core_web_lg')
 
 
@@ -50,6 +52,23 @@ def split_query(query: QueryText):
             en_split_queries = [token.text for token in nlp_en_core(query.query_text) if
                                 token.pos_ in ['NOUN'] and re.match(r'^[a-zA-Z]', token.text)]
             final_split_queries = list(set(ja_split_queries + en_split_queries))
+        elif query.language == 'zh':  # 使用jieba进行中文分词
+            jieba_split_queries = list(jieba.cut(query.query_text))
+            # # 中文分词处理
+            # zh_split_queries = [token.text for token in nlp_zh_core(query.query_text) if
+            #                     token.pos_ in ['NOUN', 'PROPN', 'VERB'] and 1 < len(token.text) < 5
+            #                     and not re.fullmatch(r'[a-zA-Z]+', token.text)]
+            # # 使用spaCy的中文模型处理jieba的分词结果
+            docs = nlp_zh_core.pipe(jieba_split_queries)
+            zh_split_queries = [token.text for doc in docs for token in doc if
+                                token.pos_ in ['NOUN', 'PROPN', 'VERB', 'NUM']
+                                and 1 < len(token.text) < 5
+                                and not re.fullmatch(r'^[0-9]+$', token.text)]
+            # 英文分词处理（中文文本中可能包含英文）
+            en_split_queries = [token.text for token in nlp_en_core(query.query_text) if
+                                token.pos_ in ['PROPN', 'NOUN', 'VERB', 'NUM'] and re.match(r'^[a-zA-Z]+$', token.text)]
+            final_split_queries = list(set(zh_split_queries + en_split_queries))
+
         elif query.language == 'en':
             # 只做英文分词处理
             # final_split_queries = [token.text for token in nlp_en_core(query.query_text) if
