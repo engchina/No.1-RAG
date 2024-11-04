@@ -33,8 +33,47 @@ from utils.common_util import get_dict_value
 from utils.generator_util import generate_unique_id
 
 custom_css = """
-body {
-  font-family: "Noto Sans JP", Arial, sans-serif !important;
+@font-face {
+  font-family: 'Noto Sans JP';
+  src: url('fonts/NotoSansJP-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Noto Sans SC';
+  src: url('fonts/NotoSansSC-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Noto Sans TC';
+  src: url('fonts/NotoSansSC-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Noto Sans HK';
+  src: url('fonts/NotoSansHK-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Roboto';
+  src: url('fonts/Roboto-Regular.ttf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+:root {
+  --global-font-family: "Noto Sans JP", "Noto Sans SC", "Noto Sans TC", "Noto Sans HK", "Roboto", Arial, sans-serif;
+}
+
+html, body, div, table, tr, td, p, strong, button {
+  font-family: var(--global-font-family) !important;
 }
 
 /* Hide sort buttons at gr.DataFrame */
@@ -1795,7 +1834,7 @@ def search_document(reranker_model_radio_input,
     if text_search_checkbox_input:
         # Generate the combined SQL based on available query texts
         search_texts = requests.post(os.environ["GINZA_API_ENDPOINT"],
-                                     json={'query_text': query_text_input, 'language': 'ja'}).json()
+                                     json={'query_text': query_text_input, 'language': 'zh'}).json()
         search_text = ""
         if search_texts and len(search_texts) > 0:
             search_texts = cut_lists(search_texts, text_search_k_slider_input)
@@ -1912,10 +1951,13 @@ def search_document(reranker_model_radio_input,
                 cohere_reranker = reranker_model_radio_input.split('/')[1]
                 print(f"{os.environ['COHERE_API_KEY']=}")
                 cohere_client = cohere.Client(api_key=os.environ["COHERE_API_KEY"])
+                print(f"{unranked=}")
+                print(f"{query_text_input=}")
                 ranked_results = cohere_client.rerank(query=query_text_input,
                                                       documents=unranked,
                                                       top_n=len(unranked),
                                                       model=cohere_reranker)
+                print(f"{ranked_results=}")
                 ranked_scores = [0.0] * len(unranked_docs)
                 for result in ranked_results.results:
                     ranked_scores[result.index] = result.relevance_score
@@ -2785,9 +2827,9 @@ with gr.Blocks(css=custom_css) as app:
                                                                             interactive=True, value=5)
                     with gr.Column():
                         tab_chat_document_reranker_threshold_slider = gr.Slider(label="Rerank Score 阈值*",
-                                                                                minimum=0.10,
+                                                                                minimum=0.0,
                                                                                 info="Default value: 0.4。只抽取Rerank Score超过阈值的数据。",
-                                                                                maximum=0.99, step=0.05, value=0.40,
+                                                                                maximum=0.99, step=0.001, value=0.40,
                                                                                 interactive=True)
                 with gr.Accordion("Advanced Settings", open=False):
                     with gr.Row():
@@ -3283,4 +3325,5 @@ if __name__ == "__main__":
         max_threads=200,
         show_api=False,
         # auth=do_auth,
+        share=True,
     )

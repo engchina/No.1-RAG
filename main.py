@@ -1010,7 +1010,7 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_collection (
 CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_embedding (
     doc_id VARCHAR2(200),
     embed_id NUMBER,
-    embed_data VARCHAR2(2000),
+    embed_data VARCHAR2(4000),
     embed_vector VECTOR(embedding_dim, FLOAT32),
     cmetadata CLOB
 );
@@ -2785,9 +2785,9 @@ with gr.Blocks(css=custom_css) as app:
                                                                             interactive=True, value=5)
                     with gr.Column():
                         tab_chat_document_reranker_threshold_slider = gr.Slider(label="Rerank Score閾値*",
-                                                                                minimum=0.10,
+                                                                                minimum=0.0,
                                                                                 info="Default value: 0.4。Rerank Scoreが閾値以上のデータのみを抽出する。",
-                                                                                maximum=0.99, step=0.05, value=0.40,
+                                                                                maximum=0.99, step=0.001, value=0.40,
                                                                                 interactive=True)
                 with gr.Accordion("Advanced Settings", open=False):
                     with gr.Row():
