@@ -2,6 +2,7 @@
 
 ## Deploy
 
+> 現在は東京リージョンのみをサポートしています。
 Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-tokyo-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/no.1_rag_v1.0.0/v1.0.0.zip)
 
 ## Setup
