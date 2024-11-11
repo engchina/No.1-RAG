@@ -1,5 +1,9 @@
 # Aim for No. 1 RAG
 
+## Deploy
+
+Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-tokyo-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/no.1_rag_v1.0.0/v1.0.0.zip)
+
 ## Setup
 
 ```
@@ -8,7 +12,8 @@ conda activate no.1-rag
 ```
 
 ```
-pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+# pip list --format=freeze > requirements.txt
 ```
 
 ```angular2html
