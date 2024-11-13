@@ -15,7 +15,6 @@ variableGroups:
       - instance_boot_volume_vpus
       - instance_flex_shape_memory
       - instance_flex_shape_ocpus
-      - instance_image_source_id
       - instance_shape
 
   - title: Required Configuration
@@ -112,6 +111,16 @@ variables:
     required: true
     visible: true
 
+  instance_image_source_id:
+    type: enum
+    required: true
+    visible: true
+    title: "Choose the image according to your region."
+    enum:
+      - "ocid1.image.oc1.ap-tokyo-1.aaaaaaaaoiusqhftxmiyjlulnxx5mdnqfv6pjx4hdcoks3exn7gsrcwpkpdq"
+      - "ocid1.image.oc1.ap-osaka-1.aaaaaaaa7sbmd5q54w466eojxqwqfvvp554awzjpt2behuwsiefrxnwomq5a"
+    default: "ocid1.image.oc1.ap-tokyo-1.aaaaaaaaoiusqhftxmiyjlulnxx5mdnqfv6pjx4hdcoks3exn7gsrcwpkpdq"
+
   instance_boot_volume_size:
     visible: false
   instance_boot_volume_vpus:
@@ -119,8 +128,6 @@ variables:
   instance_flex_shape_memory:
     visible: false
   instance_flex_shape_ocpus:
-    visible: false
-  instance_image_source_id:
     visible: false
   instance_shape:
     visible: false
