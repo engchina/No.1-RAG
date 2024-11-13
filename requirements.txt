@@ -82,7 +82,7 @@ langchain-core==0.2.28
 langchain-openai==0.1.11
 langchain-text-splitters==0.2.2
 langdetect==1.0.9
-langfuse==2.40.0
+langfuse==2.53.9
 langsmith==0.1.98
 layoutparser==0.3.4
 lxml==5.2.2
