@@ -846,7 +846,10 @@ END;
 
                 # Execute the PL/SQL statement
                 cursor.execute(append_acl_sql)
+            except DatabaseError as de:
+                print(f"DatabaseError={de}")
 
+            try:
                 drop_oci_cred_sql = "BEGIN dbms_vector.drop_credential('OCI_CRED'); END;"
                 cursor.execute(drop_oci_cred_sql)
             except DatabaseError as de:
@@ -1417,7 +1420,7 @@ def generate_query(query_text, generate_query_radio):
         ])
 
         generate_sub_queries_chain = (
-            sub_query_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+                sub_query_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         sub_queries = generate_sub_queries_chain.invoke({"original_query": query_text})
         print(f"{sub_queries=}")
@@ -1444,7 +1447,7 @@ def generate_query(query_text, generate_query_radio):
         ])
 
         generate_rag_fusion_queries_chain = (
-            rag_fusion_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+                rag_fusion_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         rag_fusion_queries = generate_rag_fusion_queries_chain.invoke({"original_query": query_text})
         print(f"{rag_fusion_queries=}")
@@ -1464,7 +1467,7 @@ def generate_query(query_text, generate_query_radio):
         ])
 
         generate_hyde_answers_chain = (
-            hyde_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+                hyde_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         hyde_answers = generate_hyde_answers_chain.invoke({"original_query": query_text})
         print(f"{hyde_answers=}")
@@ -1484,7 +1487,7 @@ def generate_query(query_text, generate_query_radio):
         ])
 
         generate_step_back_queries_chain = (
-            step_back_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
+                step_back_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         step_back_queries = generate_step_back_queries_chain.invoke({"original_query": query_text})
         print(f"{step_back_queries=}")
