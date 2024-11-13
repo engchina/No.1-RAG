@@ -2,7 +2,7 @@
 
 ## Deploy
 - v1.0.1: 東京リージョンと大阪リージョンのみをサポートしています。
-Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-tokyo-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/no.1_rag_v1.0.1/v1.0.1.zip)
+Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-tokyo-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.0.1/v1.0.1.zip)
 
 - v1.0.0: 東京リージョンのみをサポートしています。
 Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-tokyo-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/no.1_rag_v1.0.0/v1.0.0.zip)
