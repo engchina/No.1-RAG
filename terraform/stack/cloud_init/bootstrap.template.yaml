@@ -70,6 +70,7 @@ runcmd:
   - conda create -n no.1-rag python=3.11 -y
   - conda activate no.1-rag
   - pip install -r requirements.txt
+  - python -m nltk.downloader -u https://pastebin.com/raw/D3TBY4Mj punkt averaged_perceptron_tagger
   - chmod +x main.sh
   - ./main.sh &
   # run ginza-api
