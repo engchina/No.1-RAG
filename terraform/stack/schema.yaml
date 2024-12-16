@@ -119,7 +119,8 @@ variables:
     enum:
       - "ocid1.image.oc1.ap-tokyo-1.aaaaaaaaoiusqhftxmiyjlulnxx5mdnqfv6pjx4hdcoks3exn7gsrcwpkpdq"
       - "ocid1.image.oc1.ap-osaka-1.aaaaaaaa7sbmd5q54w466eojxqwqfvvp554awzjpt2behuwsiefrxnwomq5a"
-    default: "ocid1.image.oc1.ap-tokyo-1.aaaaaaaaoiusqhftxmiyjlulnxx5mdnqfv6pjx4hdcoks3exn7gsrcwpkpdq"
+      - "ocid1.image.oc1.us-chicago-1.aaaaaaaal25tbfrlwhh27tzgiatqr3oq5y3qzz7wgpezjouvjk2cdfdr4mnq"
+    default: "ocid1.image.oc1.ap-osaka-1.aaaaaaaa7sbmd5q54w466eojxqwqfvvp554awzjpt2behuwsiefrxnwomq5a"
 
   instance_boot_volume_size:
     visible: false

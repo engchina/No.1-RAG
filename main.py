@@ -14,7 +14,7 @@ import oci
 import oracledb
 import pandas as pd
 import requests
-from dotenv import load_dotenv, find_dotenv, set_key
+from dotenv import load_dotenv, find_dotenv, set_key, get_key
 from langchain_anthropic import ChatAnthropic
 from langchain_community.chat_models import ChatOCIGenAI
 from langchain_community.embeddings import OCIGenAIEmbeddings
@@ -318,10 +318,17 @@ def do_auth(username, password):
     return False
 
 
+def get_region():
+    oci_config_path = find_dotenv("/root/.oci/config")
+    region = get_key(oci_config_path, "region")
+    return region
+
+
 def generate_embedding_response(inputs: List[str]):
     config = oci.config.from_file('~/.oci/config', "DEFAULT")
+    region = get_region()
     generative_ai_inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(config=config,
-                                                                                             service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+                                                                                             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
                                                                                              retry_strategy=oci.retry.NoneRetryStrategy(),
                                                                                              timeout=(10, 240))
     batch_size = 96
@@ -405,10 +412,11 @@ def process_text_chunks(unstructured_chunks):
 
 
 async def command_r_task(system_text, query_text, command_r_checkbox):
+    region = get_region()
     if command_r_checkbox:
         command_r_16k = ChatOCIGenAI(
-            model_id="cohere.command-r-16k",
-            service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+            model_id="cohere.command-r-08-2024",
+            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
             model_kwargs={"temperature": 0.0, "max_tokens": 2048},
         )
@@ -425,7 +433,7 @@ async def command_r_task(system_text, query_text, command_r_checkbox):
         )
         async for chunk in command_r_16k.astream(messages, config={"callbacks": [langfuse_handler],
                                                                    "metadata": {
-                                                                       "ls_model_name": "cohere.command-r-16k"}}):
+                                                                       "ls_model_name": "cohere.command-r-08-2024"}}):
             yield chunk.content
         end_time = time.time()
         print(f"{end_time=}")
@@ -438,10 +446,11 @@ async def command_r_task(system_text, query_text, command_r_checkbox):
 
 
 async def command_r_plus_task(system_text, query_text, command_r_plus_checkbox):
+    region = get_region()
     if command_r_plus_checkbox:
         command_r_plus = ChatOCIGenAI(
-            model_id="cohere.command-r-plus",
-            service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+            model_id="cohere.command-r-plus-08-2024",
+            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
             model_kwargs={"temperature": 0.0, "max_tokens": 2048},
         )
@@ -458,7 +467,7 @@ async def command_r_plus_task(system_text, query_text, command_r_plus_checkbox):
         )
         async for chunk in command_r_plus.astream(messages, config={"callbacks": [langfuse_handler],
                                                                     "metadata": {
-                                                                        "ls_model_name": "cohere.command-r-plus"}}):
+                                                                        "ls_model_name": "cohere.command-r-plus-08-2024"}}):
             yield chunk.content
         end_time = time.time()
         print(f"{end_time=}")
@@ -791,7 +800,7 @@ async def chat_stream(system_text, query_text, llm_answer_checkbox):
                claude_3_opus_response, claude_3_sonnet_response, claude_3_haiku_response)
 
 
-def create_oci_cred(user_ocid, tenancy_ocid, fingerprint, private_key_file):
+def create_oci_cred(user_ocid, tenancy_ocid, fingerprint, private_key_file, region):
     def process_private_key(private_key_file_path):
         with open(private_key_file_path, 'r') as file:
             lines = file.readlines()
@@ -807,10 +816,13 @@ def create_oci_cred(user_ocid, tenancy_ocid, fingerprint, private_key_file):
         raise gr.Error("Fingerprintを入力してください")
     if not private_key_file:
         raise gr.Error("Private Keyを入力してください")
+    if not region:
+        raise gr.Error("Regionを選択してください")
 
     user_ocid = user_ocid.strip()
     tenancy_ocid = tenancy_ocid.strip()
     fingerprint = fingerprint.strip()
+    region = region.strip()
 
     # set up OCI config
     if not os.path.exists("/root/.oci"):
@@ -821,7 +833,7 @@ def create_oci_cred(user_ocid, tenancy_ocid, fingerprint, private_key_file):
     key_file_path = '/root/.oci/oci_api_key.pem'
     set_key(oci_config_path, "user", user_ocid, quote_mode="never")
     set_key(oci_config_path, "tenancy", tenancy_ocid, quote_mode="never")
-    set_key(oci_config_path, "region", 'us-chicago-1', quote_mode="never")
+    set_key(oci_config_path, "region", region, quote_mode="never")
     set_key(oci_config_path, "fingerprint", fingerprint, quote_mode="never")
     set_key(oci_config_path, "key_file", key_file_path, quote_mode="never")
     shutil.copy(private_key_file.name, key_file_path)
@@ -1022,10 +1034,11 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_embedding (
     output_sql_text += "\n" + create_preference_plsql.strip() + "\n"
     output_sql_text += "\n" + create_index_sql.strip() + ";"
 
+    region = get_region()
     # Default config file and profile
     embed = OCIGenAIEmbeddings(
         model_id=os.environ["OCI_COHERE_EMBED_MODEL"],
-        service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+        service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
         compartment_id=os.environ["OCI_COMPARTMENT_OCID"]
     )
 
@@ -1061,10 +1074,11 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_embedding (
 
 def test_oci_cred(test_query_text):
     test_query_vector = ""
+    region = get_region()
     embed_genai_params = {
         "provider": "ocigenai",
         "credential_name": "OCI_CRED",
-        "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText",
+        "url": f"https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText",
         "model": "cohere.embed-multilingual-v3.0"
     }
 
@@ -1388,9 +1402,10 @@ def generate_query(query_text, generate_query_radio):
 
     # chat_llm = ChatOpenAI(api_key=os.environ["OPENAI_API_KEY"], base_url=os.environ["OPENAI_BASE_URL"],
     #                       model=os.environ["OPENAI_MODEL_NAME"], temperature=0)
+    region = get_region()
     chat_llm = ChatOCIGenAI(
-        model_id="cohere.command-r-plus",
-        service_endpoint="https://inference.generativeai.us-chicago-1.oci.oraclecloud.com",
+        model_id="cohere.command-r-plus-08-2024",
+        service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
         compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
         model_kwargs={"temperature": 0.0, "max_tokens": 2048},
     )
@@ -1497,6 +1512,7 @@ def generate_query(query_text, generate_query_radio):
             generate_query2 = re.sub(r'^2\. ', '', step_back_queries[1])
             generate_query3 = re.sub(r'^3\. ', '', step_back_queries[2])
     elif generate_query_radio == "Customized-Multi-Step-Query":
+        region = get_region()
         select_multi_step_query_sql = f"""
                 SELECT json_value(dt.cmetadata, '$.file_name') name, dc.embed_id embed_id, dc.embed_data embed_data, dc.doc_id doc_id
                 FROM {DEFAULT_COLLECTION_NAME}_embedding dc, {DEFAULT_COLLECTION_NAME}_collection dt
@@ -1504,7 +1520,7 @@ def generate_query(query_text, generate_query_radio):
                 ORDER BY vector_distance(dc.embed_vector , (
                         SELECT to_vector(et.embed_vector) embed_vector
                         FROM
-                            dbms_vector_chain.utl_to_embeddings(:query_text, JSON('{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}')) t,
+                            dbms_vector_chain.utl_to_embeddings(:query_text, JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
                             JSON_TABLE ( t.column_value, '$[*]'
                                     COLUMNS (
                                         embed_id NUMBER PATH '$.embed_id',
@@ -1647,13 +1663,14 @@ def search_document(reranker_model_radio_input,
     """
     where_sql = """
                     WHERE 1 = 1 """
-    where_threshold_sql = """
+    region = get_region()
+    where_threshold_sql = f"""
                     AND vector_distance(dc.embed_vector, (
                             SELECT to_vector(et.embed_vector) embed_vector
                             FROM
                                 dbms_vector_chain.utl_to_embeddings(
                                         :query_text, 
-                                        JSON('{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}')) t,
+                                        JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
                                 JSON_TABLE ( t.column_value, '$[*]'
                                         COLUMNS (
                                             embed_id NUMBER PATH '$.embed_id',
@@ -1677,13 +1694,14 @@ def search_document(reranker_model_radio_input,
                         CONNECT BY REGEXP_SUBSTR(:doc_ids, '''[^'']+''', 1, LEVEL) IS NOT NULL
                     ) """
     # v4
+    region = get_region()
     base_sql = f"""
                     SELECT dc.doc_id doc_id, dc.embed_id embed_id, vector_distance(dc.embed_vector, (
                             SELECT to_vector(et.embed_vector) embed_vector
                             FROM
                                 dbms_vector_chain.utl_to_embeddings(
                                         :query_text, 
-                                        JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
+                                        JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
                                 JSON_TABLE ( t.column_value, '$[*]'
                                         COLUMNS (
                                             embed_id NUMBER PATH '$.embed_id',
@@ -1809,13 +1827,14 @@ def search_document(reranker_model_radio_input,
         if len(search_text) > 0:
             where_sql += """
                         AND (""" + search_text + """) """
+            region = get_region()
             full_text_search_sql = f"""
                         SELECT dc.doc_id doc_id, dc.embed_id embed_id, vector_distance(dc.embed_vector, (
                                 SELECT to_vector(et.embed_vector) embed_vector
                                 FROM
                                     dbms_vector_chain.utl_to_embeddings(
                                             :query_text, 
-                                            JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
+                                            JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
                                     JSON_TABLE ( t.column_value, '$[*]'
                                             COLUMNS (
                                                 embed_id NUMBER PATH '$.embed_id',
@@ -2444,6 +2463,14 @@ with gr.Blocks(css=custom_css) as app:
                                                                        type="filepath", interactive=True)
                 with gr.Row():
                     with gr.Column():
+                        tab_create_oci_cred_region_text = gr.Dropdown(
+                            choices=["ap-osaka-1", "us-chicago-1"],
+                            label="Region*",
+                            interactive=True,
+                            value="ap-osaka-1",
+                        )
+                with gr.Row():
+                    with gr.Column():
                         tab_create_oci_clear_button = gr.ClearButton(value="クリア")
                     with gr.Column():
                         tab_create_oci_cred_button = gr.Button(value="設定/再設定", variant="primary")
@@ -2676,7 +2703,7 @@ with gr.Blocks(css=custom_css) as app:
                             tab_split_document_chunks_max_slider = gr.Slider(label="Max",
                                                                              value=256,
                                                                              minimum=64,
-                                                                             maximum=384,
+                                                                             maximum=512,
                                                                              step=1,
                                                                              )
                         with gr.Column():
@@ -3045,9 +3072,13 @@ with gr.Blocks(css=custom_css) as app:
                                      tab_create_oci_cred_fingerprint_text,
                                      tab_create_oci_cred_private_key_file])
     tab_create_oci_cred_button.click(create_oci_cred,
-                                     [tab_create_oci_cred_user_ocid_text, tab_create_oci_cred_tenancy_ocid_text,
-                                      tab_create_oci_cred_fingerprint_text,
-                                      tab_create_oci_cred_private_key_file],
+                                     [
+                                         tab_create_oci_cred_user_ocid_text,
+                                         tab_create_oci_cred_tenancy_ocid_text,
+                                         tab_create_oci_cred_fingerprint_text,
+                                         tab_create_oci_cred_private_key_file,
+                                         tab_create_oci_cred_region_text,
+                                     ],
                                      [tab_create_oci_cred_sql_accordion, tab_create_oci_cred_sql_text])
     tab_create_oci_cred_test_button.click(test_oci_cred, [tab_create_oci_cred_test_query_text],
                                           [tab_create_oci_cred_test_vector_text])
