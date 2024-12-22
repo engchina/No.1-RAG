@@ -1117,21 +1117,29 @@ def create_openai_cred(openai_cred_base_url, openai_cred_api_key):
 def create_azure_openai_cred(
         azure_openai_cred_api_key,
         azure_openai_cred_endpoint_gpt_4o,
-        azure_openai_cred_api_version_gpt_4o,
         azure_openai_cred_endpoint_gpt_4,
-        azure_openai_cred_api_version_gpt_4,
 ):
     if not azure_openai_cred_api_key:
         raise gr.Error("Azure OpenAI API Keyを入力してください")
     if not azure_openai_cred_endpoint_gpt_4o:
         raise gr.Error("Azure OpenAI GPT-4O Endpointを入力してください")
-    if not azure_openai_cred_api_version_gpt_4o:
-        raise gr.Error("Azure OpenAI GPT-4O API Versionを入力してください")
+    if 'api-version=' not in azure_openai_cred_endpoint_gpt_4o:
+        raise gr.Error("Azure OpenAI GPT-4O Endpointにはapi-versionを入力してください")
+    if azure_openai_cred_endpoint_gpt_4 and 'api-version=' not in azure_openai_cred_endpoint_gpt_4:
+        raise gr.Error("Azure OpenAI GPT-4 Endpointにはapi-versionを入力してください")
+
+    # if not azure_openai_cred_api_version_gpt_4o:
+    #     raise gr.Error("Azure OpenAI GPT-4O API Versionを入力してください")
     azure_openai_cred_api_key = azure_openai_cred_api_key.strip()
     azure_openai_cred_endpoint_gpt_4o = azure_openai_cred_endpoint_gpt_4o.strip() if azure_openai_cred_endpoint_gpt_4o else ""
-    azure_openai_cred_api_version_gpt_4o = azure_openai_cred_api_version_gpt_4o.strip() if azure_openai_cred_api_version_gpt_4o else ""
+    azure_openai_cred_api_version_gpt_4o = re.search(r"api-version=([^&]+)", azure_openai_cred_endpoint_gpt_4o).group(
+        1).strip()
+    # azure_openai_cred_api_version_gpt_4o = azure_openai_cred_api_version_gpt_4o.strip() if azure_openai_cred_api_version_gpt_4o else ""
     azure_openai_cred_endpoint_gpt_4 = azure_openai_cred_endpoint_gpt_4.strip() if azure_openai_cred_endpoint_gpt_4 else ""
-    azure_openai_cred_api_version_gpt_4 = azure_openai_cred_api_version_gpt_4.strip() if azure_openai_cred_api_version_gpt_4 else ""
+    azure_openai_cred_api_version_gpt_4 = ""
+    if azure_openai_cred_endpoint_gpt_4:
+        azure_openai_cred_api_version_gpt_4 = re.search(r"api-version=([^&]+)", azure_openai_cred_endpoint_gpt_4).group(
+            1).strip()
 
     env_path = find_dotenv()
 
@@ -1152,9 +1160,7 @@ def create_azure_openai_cred(
     gr.Info("Azure OpenAI API Keyの設定が完了しました")
     return gr.Textbox(value=azure_openai_cred_api_key), \
         gr.Textbox(value=azure_openai_cred_endpoint_gpt_4o), \
-        gr.Textbox(value=azure_openai_cred_api_version_gpt_4o), \
-        gr.Textbox(value=azure_openai_cred_endpoint_gpt_4), \
-        gr.Textbox(value=azure_openai_cred_api_version_gpt_4)
+        gr.Textbox(value=azure_openai_cred_endpoint_gpt_4)
 
 
 def create_claude_cred(claude_cred_api_key):
@@ -2905,22 +2911,10 @@ with gr.Blocks(css=custom_css) as app:
                             lines=1,
                             interactive=True
                         )
-                    with gr.Column():
-                        tab_create_azure_openai_cred_api_version_gpt_4o_text = gr.Textbox(
-                            label="GPT-4O API Version*",
-                            lines=1,
-                            interactive=True
-                        )
                 with gr.Row():
                     with gr.Column():
                         tab_create_azure_openai_cred_endpoint_gpt_4_text = gr.Textbox(
                             label="GPT-4 Endpoint(オプション)",
-                            lines=1,
-                            interactive=True
-                        )
-                    with gr.Column():
-                        tab_create_azure_openai_cred_api_version_gpt_4_text = gr.Textbox(
-                            label="GPT-4 API Version(オプション)",
                             lines=1,
                             interactive=True
                         )
@@ -3917,16 +3911,12 @@ with gr.Blocks(css=custom_css) as app:
         inputs=[
             tab_create_azure_openai_cred_api_key_text,
             tab_create_azure_openai_cred_endpoint_gpt_4o_text,
-            tab_create_azure_openai_cred_api_version_gpt_4o_text,
             tab_create_azure_openai_cred_endpoint_gpt_4_text,
-            tab_create_azure_openai_cred_api_version_gpt_4_text,
         ],
         outputs=[
             tab_create_azure_openai_cred_api_key_text,
             tab_create_azure_openai_cred_endpoint_gpt_4o_text,
-            tab_create_azure_openai_cred_api_version_gpt_4o_text,
             tab_create_azure_openai_cred_endpoint_gpt_4_text,
-            tab_create_azure_openai_cred_api_version_gpt_4_text,
         ]
     )
     tab_create_claude_cred_button.click(
