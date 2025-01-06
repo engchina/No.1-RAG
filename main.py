@@ -2710,17 +2710,44 @@ def generate_download_file(search_result, llm_answer_checkbox, llm_evaluation_ch
         claude_3_haiku_response = ""
         claude_3_haiku_evaluation = ""
 
-    df3 = pd.DataFrame({'LLM モデル': ["cohere/command-r", "cohere/command-r-plus", "openai/gpt-4o", "openai/gpt-4",
-                                       "azure_openai/gpt-4o", "azure_openai/gpt-4",
-                                       "claude/opus", "claude/sonnet", "claude/haiku"],
-                        'LLM メッセージ': [command_r_response, command_r_plus_response, openai_gpt4o_response,
-                                           openai_gpt4_response, azure_openai_gpt4o_response,
-                                           azure_openai_gpt4_response, claude_3_opus_response, claude_3_sonnet_response,
-                                           claude_3_haiku_response],
-                        'LLM 評価': [command_r_evaluation, command_r_plus_evaluation, openai_gpt4o_evaluation,
-                                     openai_gpt4_evaluation, azure_openai_gpt4o_evaluation,
-                                     azure_openai_gpt4_evaluation, claude_3_opus_evaluation, claude_3_sonnet_evaluation,
-                                     claude_3_haiku_evaluation]})
+    df3 = pd.DataFrame(
+        {
+            'LLM モデル':
+                [
+                    "cohere/command-r",
+                    # "cohere/command-r-plus",
+                    "openai/gpt-4o",
+                    "openai/gpt-4",
+                    "azure_openai/gpt-4o",
+                    "azure_openai/gpt-4",
+                    "claude/opus",
+                    "claude/sonnet",
+                    "claude/haiku"
+                ],
+            'LLM メッセージ': [
+                command_r_response,
+                # command_r_plus_response,
+                openai_gpt4o_response,
+                openai_gpt4_response,
+                azure_openai_gpt4o_response,
+                azure_openai_gpt4_response,
+                claude_3_opus_response,
+                claude_3_sonnet_response,
+                claude_3_haiku_response
+            ],
+            'LLM 評価': [
+                command_r_evaluation,
+                # command_r_plus_evaluation,
+                openai_gpt4o_evaluation,
+                openai_gpt4_evaluation,
+                azure_openai_gpt4o_evaluation,
+                azure_openai_gpt4_evaluation,
+                claude_3_opus_evaluation,
+                claude_3_sonnet_evaluation,
+                claude_3_haiku_evaluation
+            ]
+        }
+    )
 
     # 定义文件路径
     filepath = '/tmp/result.xlsx'
@@ -2967,7 +2994,7 @@ with gr.Blocks(css=custom_css) as app:
                         tab_chat_with_llm_answer_checkbox_group = gr.CheckboxGroup(
                             [
                                 "cohere/command-r",
-                                "cohere/command-r-plus",
+                                # "cohere/command-r-plus",
                                 "openai/gpt-4o",
                                 "openai/gpt-4",
                                 "azure_openai/gpt-4o",
@@ -3349,7 +3376,7 @@ with gr.Blocks(css=custom_css) as app:
                         tab_chat_document_llm_answer_checkbox_group = gr.CheckboxGroup(
                             [
                                 "cohere/command-r",
-                                "cohere/command-r-plus",
+                                # "cohere/command-r-plus",
                                 "openai/gpt-4o",
                                 "openai/gpt-4",
                                 "azure_openai/gpt-4o",
