@@ -335,13 +335,13 @@ load_dotenv(find_dotenv())
 DEFAULT_COLLECTION_NAME = os.environ["DEFAULT_COLLECTION_NAME"]
 
 if platform.system() == 'Linux':
-    oracledb.init_oracle_client(lib_dir="/u01/aipoc/instantclient_23_5")
+    oracledb.init_oracle_client(lib_dir=os.environ["ORACLE_CLIENT_LIB_DIR"])
 
 # 初始化一个数据库连接
 pool = oracledb.create_pool(
     dsn=os.environ["ORACLE_23AI_CONNECTION_STRING"],
-    min=10,
-    max=50,
+    min=2,
+    max=5,
     increment=1
 )
 
@@ -364,7 +364,7 @@ def get_region():
 
 
 def generate_embedding_response(inputs: List[str]):
-    config = oci.config.from_file('~/.oci/config', "DEFAULT")
+    config = oci.config.from_file('/root/.oci/config', "DEFAULT")
     region = get_region()
     generative_ai_inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(config=config,
                                                                                              service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
@@ -969,9 +969,73 @@ async def chat_stream(system_text, query_text, llm_answer_checkbox):
         claude_3_opus_response += opus
         claude_3_sonnet_response += sonnet
         claude_3_haiku_response += haiku
-        yield (command_r_response, command_r_plus_response, openai_gpt4o_response, openai_gpt4_response,
-               azure_openai_gpt4o_response, azure_openai_gpt4_response,
-               claude_3_opus_response, claude_3_sonnet_response, claude_3_haiku_response)
+        yield (
+            command_r_response,
+            command_r_plus_response,
+            openai_gpt4o_response,
+            openai_gpt4_response,
+            azure_openai_gpt4o_response,
+            azure_openai_gpt4_response,
+            claude_3_opus_response,
+            claude_3_sonnet_response,
+            claude_3_haiku_response
+        )
+
+
+def reset_eval_by_human_result():
+    return (
+        gr.Radio(value="good"),
+        gr.Textbox(value=""),
+        gr.Radio(value="good"),
+        gr.Textbox(value=""),
+        gr.Radio(value="good"),
+        gr.Textbox(value=""),
+        gr.Radio(value="good"),
+        gr.Textbox(value=""),
+        gr.Radio(value="good"),
+        gr.Textbox(value=""),
+        gr.Radio(value="good"),
+        gr.Textbox(value=""),
+        gr.Radio(value="good"),
+        gr.Textbox(value=""),
+        gr.Radio(value="good"),
+        gr.Textbox(value=""),
+        gr.Radio(value="good"),
+        gr.Textbox(value=""),
+    )
+
+
+def eval_by_human(
+        query_id,
+        llm_name,
+        human_evaluation_result,
+        user_comment,
+):
+    print("eval_by_human() start...")
+    with pool.acquire() as conn:
+        with conn.cursor() as cursor:
+            update_sql = """
+                            UPDATE RAG_QA_FEEDBACK 
+                            SET human_evaluation_result = :1,
+                                user_comment = :2
+                            WHERE query_id = :3 AND llm_name = :4
+                        """
+            cursor.execute(
+                update_sql,
+                [
+                    human_evaluation_result,
+                    user_comment,
+                    query_id,
+                    llm_name
+                ]
+            )
+
+            conn.commit()
+
+    return (
+        gr.Radio(),
+        gr.Textbox(value=user_comment)
+    )
 
 
 def create_oci_cred(user_ocid, tenancy_ocid, fingerprint, private_key_file, region):
@@ -1254,8 +1318,44 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_embedding (
 );
 """
 
+    drop_rag_qa_result_sql = """
+DROP TABLE IF EXISTS RAG_QA_RESULT
+    """
+
+    create_rag_qa_result_sql = """
+CREATE TABLE IF NOT EXISTS RAG_QA_RESULT (
+    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    query_id VARCHAR2(100),
+    query VARCHAR2(4000),
+    standard_answer VARCHAR2(4000),
+    sql CLOB,
+    created_date TIMESTAMP DEFAULT TO_TIMESTAMP(TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS')
+)
+    """
+
+    drop_rag_qa_feedback_sql = """
+DROP TABLE IF EXISTS RAG_QA_FEEDBACK
+"""
+
+    create_rag_qa_feedback_sql = """
+CREATE TABLE IF NOT EXISTS RAG_QA_FEEDBACK (
+    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    query_id VARCHAR2(100),
+    llm_name VARCHAR2(100),
+    llm_answer VARCHAR2(4000),
+    ragas_evaluation_result VARCHAR2(4000),
+    human_evaluation_result VARCHAR2(20),
+    user_comment VARCHAR2(4000),
+    created_date TIMESTAMP DEFAULT TO_TIMESTAMP(TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS')
+)
+"""
+
     output_sql_text += "\n" + create_preference_plsql.strip() + "\n"
+    output_sql_text += "\n" + drop_rag_qa_result_sql.strip() + ";"
+    output_sql_text += "\n" + drop_rag_qa_feedback_sql.strip() + ";"
     output_sql_text += "\n" + create_index_sql.strip() + ";"
+    output_sql_text += "\n" + create_rag_qa_result_sql.strip() + ";"
+    output_sql_text += "\n" + create_rag_qa_feedback_sql.strip() + ";"
 
     region = get_region()
     # Default config file and profile
@@ -1289,6 +1389,27 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_embedding (
             # else:
             #     print(f"Index '{DEFAULT_COLLECTION_NAME.upper()}_EMBED_DATA_IDX' does not exist.")
             cursor.execute(create_index_sql)
+
+            try:
+                cursor.execute(drop_rag_qa_result_sql)
+            except DatabaseError as e:
+                print(f"{e}")
+
+            try:
+                cursor.execute(create_rag_qa_result_sql)
+            except DatabaseError as e:
+                print(f"{e}")
+
+            try:
+                cursor.execute(drop_rag_qa_feedback_sql)
+            except DatabaseError as e:
+                print(f"{e}")
+
+            try:
+                cursor.execute(create_rag_qa_feedback_sql)
+            except DatabaseError as e:
+                print(f"{e}")
+
             conn.commit()
 
     gr.Info("テーブルの作成が完了しました")
@@ -1391,7 +1512,7 @@ def load_document(file_path, server_directory):
 
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
-            cursor.setinputsizes(**{"data": oracledb.DB_TYPE_BLOB})
+            cursor.setinputsizes(**{"data": oracledb.BLOB})
             load_document_sql = f"""
 -- (Only for Reference) Insert to table {DEFAULT_COLLECTION_NAME}_collection 
 INSERT INTO {DEFAULT_COLLECTION_NAME}_collection(id, data, cmetadata)
@@ -1478,8 +1599,11 @@ WHERE
             conn.commit()
 
     chunks_dataframe = pd.DataFrame(chunks)
-    return gr.Textbox(utl_to_chunks_sql_output.strip()), gr.Textbox(value=str(chunks_dataframe.shape[0])), gr.Dataframe(
-        value=chunks_dataframe)
+    return (
+        gr.Textbox(utl_to_chunks_sql_output.strip()),
+        gr.Textbox(value=str(len(chunks_dataframe))),
+        gr.Dataframe(value=chunks_dataframe)
+    )
 
 
 def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
@@ -1569,8 +1693,11 @@ VALUES (:doc_id, :embed_id, :embed_data) """
             cursor.executemany(save_chunks_sql, data_to_insert)
             conn.commit()
 
-    return gr.Textbox(value=output_sql), gr.Textbox(value=str(chunks_dataframe.shape[0])), gr.Dataframe(
-        value=chunks_dataframe)
+    return (
+        gr.Textbox(value=output_sql),
+        gr.Textbox(value=str(len(chunks_dataframe))),
+        gr.Dataframe(value=chunks_dataframe, row_count=(len(chunks_dataframe), "fixed"))
+    )
 
 
 def embed_save_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
@@ -1612,7 +1739,11 @@ WHERE doc_id = :doc_id and embed_id = :embed_id
                                [{'doc_id': record[0], 'embed_id': record[1], 'embed_vector': embed_vector}
                                 for record, embed_vector in zip(records, embed_vectors)])
             conn.commit()
-    return gr.Textbox(output_sql), gr.Textbox(), gr.Dataframe()
+    return (
+        gr.Textbox(output_sql),
+        gr.Textbox(),
+        gr.Dataframe()
+    )
 
 
 def generate_query(query_text, generate_query_radio):
@@ -1627,7 +1758,7 @@ def generate_query(query_text, generate_query_radio):
     #                       model=os.environ["OPENAI_MODEL_NAME"], temperature=0)
     region = get_region()
     chat_llm = ChatOCIGenAI(
-        model_id="cohere.command-r-plus",
+        model_id="cohere.command-r-08-2024",
         service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
         compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
         model_kwargs={"temperature": 0.0, "max_tokens": 2048},
@@ -1869,15 +2000,15 @@ def search_document(
     sub_query1_text_input = sub_query1_text_input.strip()
     sub_query2_text_input = sub_query2_text_input.strip()
     sub_query3_text_input = sub_query3_text_input.strip()
-    command_r_result = "Not queried"
-    command_r_plus_result = "Not queried."
-    gpt4o_result = "Not queried."
-    gpt4_result = "Not queried."
-    azure_gpt4o_result = "Not queried."
-    azure_gpt4_result = "Not queried."
-    opus_result = "Not queried."
-    sonnet_result = "Not queried."
-    haiku_result = "Not queried."
+    # command_r_result = "Not queried"
+    # command_r_plus_result = "Not queried."
+    # gpt4o_result = "Not queried."
+    # gpt4_result = "Not queried."
+    # azure_gpt4o_result = "Not queried."
+    # azure_gpt4_result = "Not queried."
+    # opus_result = "Not queried."
+    # sonnet_result = "Not queried."
+    # haiku_result = "Not queried."
 
     # Use OracleAIVector
     unranked_docs = []
@@ -2146,18 +2277,32 @@ def search_document(
                 docs_dataframe = pd.DataFrame(
                     columns=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "SCORE", "KEY_WORDS"])
 
-                return (gr.Textbox(value=query_sql_output.strip()), gr.Markdown("**検索結果数**: " + str(
-                    docs_dataframe.shape[0]) + "   |   **検索キーワード**: (" + str(
-                    len(search_texts)) + ")[" + ', '.join(
-                    search_texts) + "]", visible=True),
-                        gr.Dataframe(value=docs_dataframe, wrap=True,
-                                     headers=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "SCORE", "KEY_WORDS"],
-                                     column_widths=["4%", "68%", "6%", "8%", "6%", "8%"]),
-                        gr.Textbox(command_r_result), gr.Textbox(command_r_plus_result), gr.Textbox(gpt4o_result),
-                        gr.Textbox(gpt4_result), gr.Textbox(azure_gpt4o_result),
-                        gr.Textbox(azure_gpt4_result), gr.Textbox(opus_result), gr.Textbox(sonnet_result),
-                        gr.Textbox(haiku_result), gr.Textbox(sub_query1_text_input), gr.Textbox(sub_query2_text_input),
-                        gr.Textbox(sub_query3_text_input))
+                return (
+                    gr.Textbox(value=query_sql_output.strip()),
+                    gr.Markdown(
+                        "**検索結果数**: " + str(len(docs_dataframe)) + "   |   **検索キーワード**: (" + str(
+                            len(search_texts)) + ")[" + ', '.join(search_texts) + "]",
+                        visible=True),
+                    gr.Dataframe(
+                        value=docs_dataframe,
+                        wrap=True,
+                        headers=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "SCORE", "KEY_WORDS"],
+                        column_widths=["4%", "68%", "6%", "8%", "6%", "8%"],
+                        row_count=(1, "fixed"),
+                    ),
+                    # gr.Textbox(command_r_result),
+                    # gr.Textbox(command_r_plus_result),
+                    # gr.Textbox(gpt4o_result),
+                    # gr.Textbox(gpt4_result),
+                    # gr.Textbox(azure_gpt4o_result),
+                    # gr.Textbox(azure_gpt4_result),
+                    # gr.Textbox(opus_result),
+                    # gr.Textbox(sonnet_result),
+                    # gr.Textbox(haiku_result),
+                    # gr.Textbox(sub_query1_text_input),
+                    # gr.Textbox(sub_query2_text_input),
+                    # gr.Textbox(sub_query3_text_input)
+                )
 
             # ToDo: In case of error
             if len(unranked_docs) > 999:
@@ -2285,12 +2430,21 @@ ORDER
                 docs_dataframe = pd.DataFrame(
                     columns=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "SCORE", "KEY_WORDS"])
 
-            return (gr.Textbox(value=query_sql_output.strip()), gr.Markdown("**検索結果数**: " + str(
-                docs_dataframe.shape[0]) + "   |   **検索キーワード**: (" + str(len(search_texts)) + ")[" + ', '.join(
-                search_texts) + "]", visible=True),
-                    gr.Dataframe(value=docs_dataframe, wrap=True,
-                                 headers=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "SCORE", "KEY_WORDS"],
-                                 column_widths=["4%", "62%", "6%", "8%", "6%", "6%", "8%"]))
+            return (
+                gr.Textbox(value=query_sql_output.strip()),
+                gr.Markdown(
+                    "**検索結果数**: " + str(len(docs_dataframe)) + "   |   **検索キーワード**: (" + str(
+                        len(search_texts)) + ")[" + ', '.join(search_texts) + "]",
+                    visible=True
+                ),
+                gr.Dataframe(
+                    value=docs_dataframe,
+                    wrap=True,
+                    headers=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "SCORE", "KEY_WORDS"],
+                    column_widths=["4%", "62%", "6%", "8%", "6%", "6%", "8%"],
+                    row_count=(len(docs_dataframe) if len(docs_dataframe) > 0 else 1, "fixed")
+                )
+            )
 
 
 async def chat_document(search_result,
@@ -2407,12 +2561,20 @@ async def chat_document(search_result,
         claude_3_opus_response += opus
         claude_3_sonnet_response += sonnet
         claude_3_haiku_response += haiku
-        yield (command_r_response, command_r_plus_response, openai_gpt4o_response, openai_gpt4_response,
-               azure_openai_gpt4o_response, azure_openai_gpt4_response,
-               claude_3_opus_response, claude_3_sonnet_response, claude_3_haiku_response)
+        yield (
+            command_r_response,
+            command_r_plus_response,
+            openai_gpt4o_response,
+            openai_gpt4_response,
+            azure_openai_gpt4o_response,
+            azure_openai_gpt4_response,
+            claude_3_opus_response,
+            claude_3_sonnet_response,
+            claude_3_haiku_response
+        )
 
 
-async def eval_ragas(
+async def eval_by_ragas(
         llm_answer_checkbox,
         llm_evaluation_checkbox,
         system_text,
@@ -2442,7 +2604,7 @@ async def eval_ragas(
         standard_answer_text = "入力されていません。"
     print(f"{llm_evaluation_checkbox=}")
     if not llm_evaluation_checkbox:
-        yield ("", "", "", "", "", "", "")
+        yield ("", "", "", "", "", "", "", "", "")
     else:
         command_r_checkbox = False
         command_r_plus_checkbox = False
@@ -2603,22 +2765,44 @@ async def eval_ragas(
             eval_claude_3_opus_response += opus
             eval_claude_3_sonnet_response += sonnet
             eval_claude_3_haiku_response += haiku
-            yield (eval_command_r_response, eval_command_r_plus_response, eval_openai_gpt4o_response,
-                   eval_openai_gpt4_response, eval_azure_openai_gpt4o_response, eval_azure_openai_gpt4_response,
-                   eval_claude_3_opus_response, eval_claude_3_sonnet_response, eval_claude_3_haiku_response)
+            yield (
+                eval_command_r_response,
+                eval_command_r_plus_response,
+                eval_openai_gpt4o_response,
+                eval_openai_gpt4_response,
+                eval_azure_openai_gpt4o_response,
+                eval_azure_openai_gpt4_response,
+                eval_claude_3_opus_response,
+                eval_claude_3_sonnet_response,
+                eval_claude_3_haiku_response
+            )
 
 
-def generate_download_file(search_result, llm_answer_checkbox, llm_evaluation_checkbox,
-                           query_text, standard_answer_text,
-                           command_r_response, command_r_plus_response, openai_gpt4o_response,
-                           openai_gpt4_response, azure_openai_gpt4o_response,
-                           azure_openai_gpt4_response, claude_3_opus_response, claude_3_sonnet_response,
-                           claude_3_haiku_response,
-                           command_r_evaluation, command_r_plus_evaluation, openai_gpt4o_evaluation,
-                           openai_gpt4_evaluation, azure_openai_gpt4o_evaluation,
-                           azure_openai_gpt4_evaluation, claude_3_opus_evaluation, claude_3_sonnet_evaluation,
-                           claude_3_haiku_evaluation
-                           ):
+def generate_download_file(
+        search_result,
+        llm_answer_checkbox,
+        llm_evaluation_checkbox,
+        query_text,
+        standard_answer_text,
+        command_r_response,
+        command_r_plus_response,
+        openai_gpt4o_response,
+        openai_gpt4_response,
+        azure_openai_gpt4o_response,
+        azure_openai_gpt4_response,
+        claude_3_opus_response,
+        claude_3_sonnet_response,
+        claude_3_haiku_response,
+        command_r_evaluation,
+        command_r_plus_evaluation,
+        openai_gpt4o_evaluation,
+        openai_gpt4_evaluation,
+        azure_openai_gpt4o_evaluation,
+        azure_openai_gpt4_evaluation,
+        claude_3_opus_evaluation,
+        claude_3_sonnet_evaluation,
+        claude_3_haiku_evaluation
+):
     # 创建一些示例 DataFrame
     if llm_evaluation_checkbox:
         standard_answer_text = standard_answer_text
@@ -2735,7 +2919,7 @@ def generate_download_file(search_result, llm_answer_checkbox, llm_evaluation_ch
                 claude_3_sonnet_response,
                 claude_3_haiku_response
             ],
-            'LLM 評価': [
+            'Ragas 評価結果': [
                 command_r_evaluation,
                 # command_r_plus_evaluation,
                 openai_gpt4o_evaluation,
@@ -2760,6 +2944,349 @@ def generate_download_file(search_result, llm_answer_checkbox, llm_evaluation_ch
 
     print(f"Excel 文件已保存到 {filepath}")
     return gr.DownloadButton(value=filepath, visible=True)
+
+
+def set_query_id_state():
+    print("in set_query_id_state() start...")
+    query_id_state = generate_unique_id("query_")
+    return query_id_state
+
+
+def insert_query_result(
+        query_id,
+        query,
+        sql,
+        llm_answer_checkbox,
+        llm_evaluation_checkbox,
+        standard_answer_text,
+        command_r_response,
+        command_r_plus_response,
+        openai_gpt4o_response,
+        openai_gpt4_response,
+        azure_openai_gpt4o_response,
+        azure_openai_gpt4_response,
+        claude_3_opus_response,
+        claude_3_sonnet_response,
+        claude_3_haiku_response,
+        command_r_evaluation,
+        command_r_plus_evaluation,
+        openai_gpt4o_evaluation,
+        openai_gpt4_evaluation,
+        azure_openai_gpt4o_evaluation,
+        azure_openai_gpt4_evaluation,
+        claude_3_opus_evaluation,
+        claude_3_sonnet_evaluation,
+        claude_3_haiku_evaluation
+):
+    print("in insert_query_result() start...")
+    with pool.acquire() as conn:
+        with conn.cursor() as cursor:
+            # 如果不存在记录，执行插入操作
+            insert_sql = """
+                            INSERT INTO RAG_QA_RESULT (
+                                query_id,
+                                query,
+                                standard_answer,
+                                sql
+                            ) VALUES (
+                                :1,
+                                :2,
+                                :3,
+                                :4
+                            )
+                        """
+            cursor.setinputsizes(None, None, oracledb.CLOB)
+            cursor.execute(
+                insert_sql,
+                [
+                    query_id,
+                    query,
+                    standard_answer_text,
+                    sql
+                ]
+            )
+
+            if "cohere/command-r" in llm_answer_checkbox:
+                command_r_response = command_r_response
+                if llm_evaluation_checkbox:
+                    command_r_evaluation = command_r_evaluation
+                else:
+                    command_r_evaluation = ""
+
+                insert_sql = """
+                                                INSERT INTO RAG_QA_FEEDBACK (
+                                                    query_id,
+                                                    llm_name,
+                                                    llm_answer,
+                                                    ragas_evaluation_result
+                                                ) VALUES (
+                                                    :1,
+                                                    :2,
+                                                    :3,
+                                                    :4
+                                                )
+                                            """
+                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.execute(
+                    insert_sql,
+                    [
+                        query_id,
+                        "cohere/command-r",
+                        command_r_response,
+                        command_r_evaluation
+                    ]
+                )
+
+            if "cohere/command-r-plus" in llm_answer_checkbox:
+                command_r_plus_response = command_r_plus_response
+                if llm_evaluation_checkbox:
+                    command_r_plus_evaluation = command_r_plus_evaluation
+                else:
+                    command_r_plus_evaluation = ""
+
+                insert_sql = """
+                                                INSERT INTO RAG_QA_FEEDBACK (
+                                                    query_id,
+                                                    llm_name,
+                                                    llm_answer,
+                                                    ragas_evaluation_result
+                                                ) VALUES (
+                                                    :1,
+                                                    :2,
+                                                    :3,
+                                                    :4
+                                                )
+                                            """
+                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.execute(
+                    insert_sql,
+                    [
+                        query_id,
+                        "cohere/command-r-plus",
+                        command_r_plus_response,
+                        command_r_plus_evaluation
+                    ]
+                )
+
+            if "openai/gpt-4o" in llm_answer_checkbox:
+                openai_gpt4o_response = openai_gpt4o_response
+                if llm_evaluation_checkbox:
+                    openai_gpt4o_evaluation = openai_gpt4o_evaluation
+                else:
+                    openai_gpt4o_evaluation = ""
+
+                insert_sql = """
+                                                INSERT INTO RAG_QA_FEEDBACK (
+                                                    query_id,
+                                                    llm_name,
+                                                    llm_answer,
+                                                    ragas_evaluation_result
+                                                ) VALUES (
+                                                    :1,
+                                                    :2,
+                                                    :3,
+                                                    :4
+                                                )
+                                            """
+                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.execute(
+                    insert_sql,
+                    [
+                        query_id,
+                        "openai/gpt-4o",
+                        openai_gpt4o_response,
+                        openai_gpt4o_evaluation
+                    ]
+                )
+
+            if "openai/gpt-4" in llm_answer_checkbox:
+                openai_gpt4_response = openai_gpt4_response
+                if llm_evaluation_checkbox:
+                    openai_gpt4_evaluation = openai_gpt4_evaluation
+                else:
+                    openai_gpt4_evaluation = ""
+
+                insert_sql = """
+                                                INSERT INTO RAG_QA_FEEDBACK (
+                                                    query_id,
+                                                    llm_name,
+                                                    llm_answer,
+                                                    ragas_evaluation_result
+                                                ) VALUES (
+                                                    :1,
+                                                    :2,
+                                                    :3,
+                                                    :4
+                                                )
+                                            """
+                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.execute(
+                    insert_sql,
+                    [
+                        query_id,
+                        "openai/gpt-4",
+                        openai_gpt4_response,
+                        openai_gpt4_evaluation
+                    ]
+                )
+
+            if "azure_openai/gpt-4o" in llm_answer_checkbox:
+                azure_openai_gpt4o_response = azure_openai_gpt4o_response
+                if llm_evaluation_checkbox:
+                    azure_openai_gpt4o_evaluation = azure_openai_gpt4o_evaluation
+                else:
+                    azure_openai_gpt4o_evaluation = ""
+
+                insert_sql = """
+                                                INSERT INTO RAG_QA_FEEDBACK (
+                                                    query_id,
+                                                    llm_name,
+                                                    llm_answer,
+                                                    ragas_evaluation_result
+                                                ) VALUES (
+                                                    :1,
+                                                    :2,
+                                                    :3,
+                                                    :4
+                                                )
+                                            """
+                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.execute(
+                    insert_sql,
+                    [
+                        query_id,
+                        "azure_openai/gpt-4o",
+                        azure_openai_gpt4o_response,
+                        azure_openai_gpt4o_evaluation
+                    ]
+                )
+
+            if "azure_openai/gpt-4" in llm_answer_checkbox:
+                azure_openai_gpt4_response = azure_openai_gpt4_response
+                if llm_evaluation_checkbox:
+                    azure_openai_gpt4_evaluation = azure_openai_gpt4_evaluation
+                else:
+                    azure_openai_gpt4_evaluation = ""
+
+                insert_sql = """
+                                                INSERT INTO RAG_QA_FEEDBACK (
+                                                    query_id,
+                                                    llm_name,
+                                                    llm_answer,
+                                                    ragas_evaluation_result
+                                                ) VALUES (
+                                                    :1,
+                                                    :2,
+                                                    :3,
+                                                    :4
+                                                )
+                                            """
+                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.execute(
+                    insert_sql,
+                    [
+                        query_id,
+                        "azure_openai/gpt-4",
+                        azure_openai_gpt4_response,
+                        azure_openai_gpt4_evaluation
+                    ]
+                )
+
+            if "claude/opus" in llm_answer_checkbox:
+                claude_3_opus_response = claude_3_opus_response
+                if llm_evaluation_checkbox:
+                    claude_3_opus_evaluation = claude_3_opus_evaluation
+                else:
+                    claude_3_opus_evaluation = ""
+
+                insert_sql = """
+                                                INSERT INTO RAG_QA_FEEDBACK (
+                                                    query_id,
+                                                    llm_name,
+                                                    llm_answer,
+                                                    ragas_evaluation_result
+                                                ) VALUES (
+                                                    :1,
+                                                    :2,
+                                                    :3,
+                                                    :4
+                                                )
+                                            """
+                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.execute(
+                    insert_sql,
+                    [
+                        query_id,
+                        "claude/opus",
+                        claude_3_opus_response,
+                        claude_3_opus_evaluation
+                    ]
+                )
+
+            if "claude/sonnet" in llm_answer_checkbox:
+                claude_3_sonnet_response = claude_3_sonnet_response
+                if llm_evaluation_checkbox:
+                    claude_3_sonnet_evaluation = claude_3_sonnet_evaluation
+                else:
+                    claude_3_sonnet_evaluation = ""
+
+                insert_sql = """
+                                                INSERT INTO RAG_QA_FEEDBACK (
+                                                    query_id,
+                                                    llm_name,
+                                                    llm_answer,
+                                                    ragas_evaluation_result
+                                                ) VALUES (
+                                                    :1,
+                                                    :2,
+                                                    :3,
+                                                    :4
+                                                )
+                                            """
+                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.execute(
+                    insert_sql,
+                    [
+                        query_id,
+                        "claude/sonnet",
+                        claude_3_sonnet_response,
+                        claude_3_sonnet_evaluation
+                    ]
+                )
+
+            if "claude/haiku" in llm_answer_checkbox:
+                claude_3_haiku_response = claude_3_haiku_response
+                if llm_evaluation_checkbox:
+                    claude_3_haiku_evaluation = claude_3_haiku_evaluation
+                else:
+                    claude_3_haiku_evaluation = ""
+
+                insert_sql = """
+                                                INSERT INTO RAG_QA_FEEDBACK (
+                                                    query_id,
+                                                    llm_name,
+                                                    llm_answer,
+                                                    ragas_evaluation_result
+                                                ) VALUES (
+                                                    :1,
+                                                    :2,
+                                                    :3,
+                                                    :4
+                                                )
+                                            """
+                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.execute(
+                    insert_sql,
+                    [
+                        query_id,
+                        "claude/haiku",
+                        claude_3_haiku_response,
+                        claude_3_haiku_evaluation
+                    ]
+                )
+
+        conn.commit()
+
 
 
 def delete_document(server_directory, doc_ids):
@@ -2804,6 +3331,9 @@ WHERE id = :doc_id """
 with gr.Blocks(css=custom_css) as app:
     gr.Markdown(value="# RAG精度あげたろう", elem_classes="main_Header")
     gr.Markdown(value="### LLM&RAG精度検証ツール", elem_classes="sub_Header")
+
+    query_id_state = gr.State()
+
     with gr.Tabs() as tabs:
         with gr.TabItem(label="環境設定") as tab_setting:
             with gr.TabItem(label="OCI GenAIの設定*") as tab_create_oci_cred:
@@ -3226,7 +3756,7 @@ with gr.Blocks(css=custom_css) as app:
                         label="チャンク結果",
                         headers=["CHUNK_ID", "CHUNK_OFFSET", "CHUNK_LENGTH", "CHUNK_DATA"],
                         datatype=["str", "str", "str", "str"],
-                        row_count=20,
+                        row_count=(1, "fixed"),
                         col_count=(4, "fixed"),
                         wrap=True,
                         column_widths=["10%", "10%", "10%", "70%"]
@@ -3276,7 +3806,7 @@ with gr.Blocks(css=custom_css) as app:
                                 label="Max",
                                 value=256,
                                 minimum=64,
-                                maximum=384,
+                                maximum=512,
                                 step=1,
                             )
                         with gr.Column():
@@ -3405,7 +3935,7 @@ with gr.Blocks(css=custom_css) as app:
                 with gr.Row():
                     with gr.Column():
                         tab_chat_document_top_k_slider = gr.Slider(
-                            label="類似検索Top-K*",
+                            label="類似検索 Top-K*",
                             minimum=1,
                             maximum=100,
                             step=1,
@@ -3435,7 +3965,7 @@ with gr.Blocks(css=custom_css) as app:
                         )
                     with gr.Column():
                         tab_chat_document_reranker_threshold_slider = gr.Slider(
-                            label="Rerank Score閾値*",
+                            label="Rerank Score 閾値*",
                             minimum=0.0,
                             info="Default value: 0.4。Rerank Scoreが閾値以上のデータのみを抽出する。",
                             maximum=0.99,
@@ -3508,7 +4038,7 @@ with gr.Blocks(css=custom_css) as app:
                     )
                 with gr.Row():
                     tab_chat_document_llm_evaluation_checkbox = gr.Checkbox(
-                        label="評価",
+                        label="Ragas 評価",
                         show_label=True,
                         interactive=True,
                         value=False
@@ -3575,7 +4105,7 @@ with gr.Blocks(css=custom_css) as app:
                             )
                 with gr.Row() as tab_chat_document_searched_query_row:
                     with gr.Column():
-                        tab_chat_document_query_text = gr.Textbox(label="クエリ*", lines=1)
+                        tab_chat_document_query_text = gr.Textbox(label="クエリ*", lines=2)
                 # with gr.Accordion("Sub-Query/RAG-Fusion/HyDE/Step-Back-Prompting/Customized-Multi-Step-Query", open=True):
                 with gr.Accordion("クエリの拡張", open=False):
                     with gr.Row():
@@ -3646,7 +4176,7 @@ with gr.Blocks(css=custom_css) as app:
                         tab_chat_document_searched_result_dataframe = gr.Dataframe(
                             headers=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "SCORE", "KEY_WORDS"],
                             datatype=["str", "str", "str", "str", "str", "str", "str"],
-                            row_count=10,
+                            row_count=(1, "fixed"),
                             height=400,
                             col_count=(7, "fixed"),
                             wrap=True,
@@ -3659,19 +4189,53 @@ with gr.Blocks(css=custom_css) as app:
                         open=True
                 ) as tab_chat_document_llm_command_r_accordion:
                     tab_chat_document_command_r_answer_text = gr.Textbox(
-                        label="LLM メッセージ", show_label=False,
+                        label="LLM メッセージ",
+                        show_label=False,
                         lines=2,
                         autoscroll=True,
                         interactive=False,
                         show_copy_button=True
                     )
                     with gr.Accordion(
-                            label="評価結果",
+                            label="Human 評価",
+                            visible=True,
+                            open=True
+                    ) as tab_chat_document_llm_command_r_human_evaluation_accordion:
+                        with gr.Row():
+                            tab_chat_document_command_r_answer_human_eval_feedback_radio = gr.Radio(
+                                show_label=False,
+                                choices=[
+                                    ("Good response", "good"),
+                                    ("Neutral response", "neutral"),
+                                    ("Bad response", "bad"),
+                                ],
+                                value="good",
+                                container=False,
+                                interactive=True,
+                            )
+                        with gr.Row():
+                            with gr.Column(scale=11):
+                                tab_chat_document_command_r_answer_human_eval_feedback_text = gr.Textbox(
+                                    show_label=False,
+                                    container=False,
+                                    lines=2,
+                                    interactive=True,
+                                    autoscroll=True,
+                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                )
+                            with gr.Column(scale=1):
+                                tab_chat_document_command_r_answer_human_eval_feedback_send_button = gr.Button(
+                                    value="送信",
+                                    variant="primary",
+                                )
+                    with gr.Accordion(
+                            label="Ragas 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_command_r_evaluation_accordion:
                         tab_chat_document_command_r_evaluation_text = gr.Textbox(
-                            label="評価結果", show_label=False,
+                            label="Ragas 評価結果",
+                            show_label=False,
                             lines=2,
                             autoscroll=True,
                             interactive=False,
@@ -3691,12 +4255,44 @@ with gr.Blocks(css=custom_css) as app:
                         show_copy_button=True
                     )
                     with gr.Accordion(
-                            label="評価結果",
+                            label="Human 評価",
+                            visible=True,
+                            open=True
+                    ) as tab_chat_document_llm_command_r_plus_human_evaluation_accordion:
+                        with gr.Row():
+                            tab_chat_document_command_r_plus_answer_human_eval_feedback_radio = gr.Radio(
+                                show_label=False,
+                                choices=[
+                                    ("Good response", "good"),
+                                    ("Neutral response", "neutral"),
+                                    ("Bad response", "bad"),
+                                ],
+                                value="good",
+                                container=False,
+                                interactive=True,
+                            )
+                        with gr.Row():
+                            with gr.Column(scale=11):
+                                tab_chat_document_command_r_plus_answer_human_eval_feedback_text = gr.Textbox(
+                                    show_label=False,
+                                    container=False,
+                                    lines=2,
+                                    interactive=True,
+                                    autoscroll=True,
+                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                )
+                            with gr.Column(scale=1):
+                                tab_chat_document_command_r_plus_answer_human_eval_feedback_send_button = gr.Button(
+                                    value="送信",
+                                    variant="primary",
+                                )
+                    with gr.Accordion(
+                            label="Ragas 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_command_r_plus_evaluation_accordion:
                         tab_chat_document_command_r_plus_evaluation_text = gr.Textbox(
-                            label="評価結果",
+                            label="Ragas 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -3714,12 +4310,44 @@ with gr.Blocks(css=custom_css) as app:
                         interactive=False,
                         show_copy_button=True)
                     with gr.Accordion(
-                            label="評価結果",
+                            label="Human 評価",
+                            visible=True,
+                            open=True
+                    ) as tab_chat_document_llm_openai_gpt4o_human_evaluation_accordion:
+                        with gr.Row():
+                            tab_chat_document_openai_gpt4o_answer_human_eval_feedback_radio = gr.Radio(
+                                show_label=False,
+                                choices=[
+                                    ("Good response", "good"),
+                                    ("Neutral response", "neutral"),
+                                    ("Bad response", "bad"),
+                                ],
+                                value="good",
+                                container=False,
+                                interactive=True,
+                            )
+                        with gr.Row():
+                            with gr.Column(scale=11):
+                                tab_chat_document_openai_gpt4o_answer_human_eval_feedback_text = gr.Textbox(
+                                    show_label=False,
+                                    container=False,
+                                    lines=2,
+                                    interactive=True,
+                                    autoscroll=True,
+                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                )
+                            with gr.Column(scale=1):
+                                tab_chat_document_openai_gpt4o_answer_human_eval_feedback_send_button = gr.Button(
+                                    value="送信",
+                                    variant="primary",
+                                )
+                    with gr.Accordion(
+                            label="Ragas 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_openai_gpt4o_evaluation_accordion:
                         tab_chat_document_openai_gpt4o_evaluation_text = gr.Textbox(
-                            label="評価結果",
+                            label="Ragas 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -3740,12 +4368,44 @@ with gr.Blocks(css=custom_css) as app:
                         show_copy_button=True
                     )
                     with gr.Accordion(
-                            label="評価結果",
+                            label="Human 評価",
+                            visible=True,
+                            open=True
+                    ) as tab_chat_document_llm_openai_gpt4_human_evaluation_accordion:
+                        with gr.Row():
+                            tab_chat_document_openai_gpt4_answer_human_eval_feedback_radio = gr.Radio(
+                                show_label=False,
+                                choices=[
+                                    ("Good response", "good"),
+                                    ("Neutral response", "neutral"),
+                                    ("Bad response", "bad"),
+                                ],
+                                value="good",
+                                container=False,
+                                interactive=True,
+                            )
+                        with gr.Row():
+                            with gr.Column(scale=11):
+                                tab_chat_document_openai_gpt4_answer_human_eval_feedback_text = gr.Textbox(
+                                    show_label=False,
+                                    container=False,
+                                    lines=2,
+                                    interactive=True,
+                                    autoscroll=True,
+                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                )
+                            with gr.Column(scale=1):
+                                tab_chat_document_openai_gpt4_answer_human_eval_feedback_send_button = gr.Button(
+                                    value="送信",
+                                    variant="primary",
+                                )
+                    with gr.Accordion(
+                            label="Ragas 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_openai_gpt4_evaluation_accordion:
                         tab_chat_document_openai_gpt4_evaluation_text = gr.Textbox(
-                            label="評価結果",
+                            label="Ragas 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -3766,12 +4426,44 @@ with gr.Blocks(css=custom_css) as app:
                         show_copy_button=True
                     )
                     with gr.Accordion(
-                            label="評価結果",
+                            label="Human 評価",
+                            visible=True,
+                            open=True
+                    ) as tab_chat_document_llm_azure_openai_gpt4o_human_evaluation_accordion:
+                        with gr.Row():
+                            tab_chat_document_azure_openai_gpt4o_answer_human_eval_feedback_radio = gr.Radio(
+                                show_label=False,
+                                choices=[
+                                    ("Good response", "good"),
+                                    ("Neutral response", "neutral"),
+                                    ("Bad response", "bad"),
+                                ],
+                                value="good",
+                                container=False,
+                                interactive=True,
+                            )
+                        with gr.Row():
+                            with gr.Column(scale=11):
+                                tab_chat_document_azure_openai_gpt4o_answer_human_eval_feedback_text = gr.Textbox(
+                                    show_label=False,
+                                    container=False,
+                                    lines=2,
+                                    interactive=True,
+                                    autoscroll=True,
+                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                )
+                            with gr.Column(scale=1):
+                                tab_chat_document_azure_openai_gpt4o_answer_human_eval_feedback_send_button = gr.Button(
+                                    value="送信",
+                                    variant="primary",
+                                )
+                    with gr.Accordion(
+                            label="Ragas 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_azure_openai_gpt4o_evaluation_accordion:
                         tab_chat_document_azure_openai_gpt4o_evaluation_text = gr.Textbox(
-                            label="評価結果",
+                            label="Ragas 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -3792,12 +4484,44 @@ with gr.Blocks(css=custom_css) as app:
                         show_copy_button=True
                     )
                     with gr.Accordion(
-                            label="評価結果",
+                            label="Human 評価",
+                            visible=True,
+                            open=True
+                    ) as tab_chat_document_llm_azure_openai_gpt4_human_evaluation_accordion:
+                        with gr.Row():
+                            tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_radio = gr.Radio(
+                                show_label=False,
+                                choices=[
+                                    ("Good response", "good"),
+                                    ("Neutral response", "neutral"),
+                                    ("Bad response", "bad"),
+                                ],
+                                value="good",
+                                container=False,
+                                interactive=True,
+                            )
+                        with gr.Row():
+                            with gr.Column(scale=11):
+                                tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_text = gr.Textbox(
+                                    show_label=False,
+                                    container=False,
+                                    lines=2,
+                                    interactive=True,
+                                    autoscroll=True,
+                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                )
+                            with gr.Column(scale=1):
+                                tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_send_button = gr.Button(
+                                    value="送信",
+                                    variant="primary",
+                                )
+                    with gr.Accordion(
+                            label="Ragas 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_azure_openai_gpt4_evaluation_accordion:
                         tab_chat_document_azure_openai_gpt4_evaluation_text = gr.Textbox(
-                            label="評価結果",
+                            label="Ragas 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -3818,12 +4542,44 @@ with gr.Blocks(css=custom_css) as app:
                         show_copy_button=True
                     )
                     with gr.Accordion(
-                            label="評価結果",
+                            label="Human 評価",
+                            visible=True,
+                            open=True
+                    ) as tab_chat_document_llm_claude_3_opus_human_evaluation_accordion:
+                        with gr.Row():
+                            tab_chat_document_claude_3_opus_answer_human_eval_feedback_radio = gr.Radio(
+                                show_label=False,
+                                choices=[
+                                    ("Good response", "good"),
+                                    ("Neutral response", "neutral"),
+                                    ("Bad response", "bad"),
+                                ],
+                                value="good",
+                                container=False,
+                                interactive=True,
+                            )
+                        with gr.Row():
+                            with gr.Column(scale=11):
+                                tab_chat_document_claude_3_opus_answer_human_eval_feedback_text = gr.Textbox(
+                                    show_label=False,
+                                    container=False,
+                                    lines=2,
+                                    interactive=True,
+                                    autoscroll=True,
+                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                )
+                            with gr.Column(scale=1):
+                                tab_chat_document_claude_3_opus_answer_human_eval_feedback_send_button = gr.Button(
+                                    value="送信",
+                                    variant="primary",
+                                )
+                    with gr.Accordion(
+                            label="Ragas 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_claude_3_opus_evaluation_accordion:
                         tab_chat_document_claude_3_opus_evaluation_text = gr.Textbox(
-                            label="評価結果",
+                            label="Ragas 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -3833,7 +4589,8 @@ with gr.Blocks(css=custom_css) as app:
                 with gr.Accordion(
                         label="Claude 3.5 Sonnet メッセージ",
                         visible=False,
-                        open=True) as tab_chat_document_llm_claude_3_sonnet_accordion:
+                        open=True
+                ) as tab_chat_document_llm_claude_3_sonnet_accordion:
                     tab_chat_document_claude_3_sonnet_answer_text = gr.Textbox(
                         label="LLM メッセージ",
                         show_label=False,
@@ -3843,12 +4600,44 @@ with gr.Blocks(css=custom_css) as app:
                         show_copy_button=True
                     )
                     with gr.Accordion(
-                            label="評価結果",
+                            label="Human 評価",
+                            visible=True,
+                            open=True
+                    ) as tab_chat_document_llm_claude_3_sonnet_human_evaluation_accordion:
+                        with gr.Row():
+                            tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_radio = gr.Radio(
+                                show_label=False,
+                                choices=[
+                                    ("Good response", "good"),
+                                    ("Neutral response", "neutral"),
+                                    ("Bad response", "bad"),
+                                ],
+                                value="good",
+                                container=False,
+                                interactive=True,
+                            )
+                        with gr.Row():
+                            with gr.Column(scale=11):
+                                tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_text = gr.Textbox(
+                                    show_label=False,
+                                    container=False,
+                                    lines=2,
+                                    interactive=True,
+                                    autoscroll=True,
+                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                )
+                            with gr.Column(scale=1):
+                                tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_send_button = gr.Button(
+                                    value="送信",
+                                    variant="primary",
+                                )
+                    with gr.Accordion(
+                            label="Ragas 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_claude_3_sonnet_evaluation_accordion:
                         tab_chat_document_claude_3_sonnet_evaluation_text = gr.Textbox(
-                            label="評価結果",
+                            label="Ragas 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -3868,12 +4657,44 @@ with gr.Blocks(css=custom_css) as app:
                         show_copy_button=True
                     )
                     with gr.Accordion(
-                            label="評価結果",
+                            label="Human 評価",
+                            visible=True,
+                            open=True
+                    ) as tab_chat_document_llm_claude_3_haiku_human_evaluation_accordion:
+                        with gr.Row():
+                            tab_chat_document_claude_3_haiku_answer_human_eval_feedback_radio = gr.Radio(
+                                show_label=False,
+                                choices=[
+                                    ("Good response", "good"),
+                                    ("Neutral response", "neutral"),
+                                    ("Bad response", "bad"),
+                                ],
+                                value="good",
+                                container=False,
+                                interactive=True,
+                            )
+                        with gr.Row():
+                            with gr.Column(scale=11):
+                                tab_chat_document_claude_3_haiku_answer_human_eval_feedback_text = gr.Textbox(
+                                    show_label=False,
+                                    container=False,
+                                    lines=2,
+                                    interactive=True,
+                                    autoscroll=True,
+                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                )
+                            with gr.Column(scale=1):
+                                tab_chat_document_claude_3_haiku_answer_human_eval_feedback_send_button = gr.Button(
+                                    value="送信",
+                                    variant="primary",
+                                )
+                    with gr.Accordion(
+                            label="Ragas 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_claude_3_haiku_evaluation_accordion:
                         tab_chat_document_claude_3_haiku_evaluation_text = gr.Textbox(
-                            label="評価結果",
+                            label="Ragas 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -4188,6 +5009,7 @@ with gr.Blocks(css=custom_css) as app:
             tab_chat_document_llm_claude_3_haiku_evaluation_accordion
         ]
     )
+
     tab_chat_document_generate_query_radio.change(
         lambda x: (gr.Textbox(value=""),
                    gr.Textbox(value=""),
@@ -4201,6 +5023,7 @@ with gr.Blocks(css=custom_css) as app:
             tab_chat_document_sub_query3_text
         ]
     )
+
     tab_chat_document_chat_document_button.click(
         generate_query,
         inputs=[
@@ -4210,7 +5033,30 @@ with gr.Blocks(css=custom_css) as app:
         outputs=[
             tab_chat_document_sub_query1_text,
             tab_chat_document_sub_query2_text,
-            tab_chat_document_sub_query3_text
+            tab_chat_document_sub_query3_text,
+        ]
+    ).then(
+        reset_eval_by_human_result,
+        inputs=[],
+        outputs=[
+            tab_chat_document_command_r_answer_human_eval_feedback_radio,
+            tab_chat_document_command_r_answer_human_eval_feedback_text,
+            tab_chat_document_command_r_plus_answer_human_eval_feedback_radio,
+            tab_chat_document_command_r_plus_answer_human_eval_feedback_text,
+            tab_chat_document_openai_gpt4o_answer_human_eval_feedback_radio,
+            tab_chat_document_openai_gpt4o_answer_human_eval_feedback_text,
+            tab_chat_document_openai_gpt4_answer_human_eval_feedback_radio,
+            tab_chat_document_openai_gpt4_answer_human_eval_feedback_text,
+            tab_chat_document_azure_openai_gpt4o_answer_human_eval_feedback_radio,
+            tab_chat_document_azure_openai_gpt4o_answer_human_eval_feedback_text,
+            tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_radio,
+            tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_text,
+            tab_chat_document_claude_3_opus_answer_human_eval_feedback_radio,
+            tab_chat_document_claude_3_opus_answer_human_eval_feedback_text,
+            tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_radio,
+            tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_text,
+            tab_chat_document_claude_3_haiku_answer_human_eval_feedback_radio,
+            tab_chat_document_claude_3_haiku_answer_human_eval_feedback_text,
         ]
     ).then(
         search_document,
@@ -4257,7 +5103,7 @@ with gr.Blocks(css=custom_css) as app:
             tab_chat_document_claude_3_haiku_answer_text
         ]
     ).then(
-        eval_ragas,
+        eval_by_ragas,
         inputs=[
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_llm_evaluation_checkbox,
@@ -4313,6 +5159,167 @@ with gr.Blocks(css=custom_css) as app:
         ],
         outputs=[
             tab_chat_document_download_output_button
+        ]
+    ).then(
+        set_query_id_state,
+        inputs=[],
+        outputs=[
+            query_id_state,
+        ]
+    ).then(
+        insert_query_result,
+        inputs=[
+            query_id_state,
+            tab_chat_document_query_text,
+            tab_chat_document_output_sql_text,
+            tab_chat_document_llm_answer_checkbox_group,
+            tab_chat_document_llm_evaluation_checkbox,
+            tab_chat_document_standard_answer_text,
+            tab_chat_document_command_r_answer_text,
+            tab_chat_document_command_r_plus_answer_text,
+            tab_chat_document_openai_gpt4o_answer_text,
+            tab_chat_document_openai_gpt4_answer_text,
+            tab_chat_document_azure_openai_gpt4o_answer_text,
+            tab_chat_document_azure_openai_gpt4_answer_text,
+            tab_chat_document_claude_3_opus_answer_text,
+            tab_chat_document_claude_3_sonnet_answer_text,
+            tab_chat_document_claude_3_haiku_answer_text,
+            tab_chat_document_command_r_evaluation_text,
+            tab_chat_document_command_r_plus_evaluation_text,
+            tab_chat_document_openai_gpt4o_evaluation_text,
+            tab_chat_document_openai_gpt4_evaluation_text,
+            tab_chat_document_azure_openai_gpt4o_evaluation_text,
+            tab_chat_document_azure_openai_gpt4_evaluation_text,
+            tab_chat_document_claude_3_opus_evaluation_text,
+            tab_chat_document_claude_3_sonnet_evaluation_text,
+            tab_chat_document_claude_3_haiku_evaluation_text,
+        ],
+        outputs=[]
+    )
+
+    tab_chat_document_command_r_answer_human_eval_feedback_send_button.click(
+        eval_by_human,
+        inputs=[
+            query_id_state,
+            gr.State(value="cohere/command-r"),
+            tab_chat_document_command_r_answer_human_eval_feedback_radio,
+            tab_chat_document_command_r_answer_human_eval_feedback_text,
+        ],
+        outputs=[
+            tab_chat_document_command_r_answer_human_eval_feedback_radio,
+            tab_chat_document_command_r_answer_human_eval_feedback_text,
+        ]
+    )
+
+    tab_chat_document_command_r_plus_answer_human_eval_feedback_send_button.click(
+        eval_by_human,
+        inputs=[
+            query_id_state,
+            gr.State(value="cohere/command-r-plus"),
+            tab_chat_document_command_r_plus_answer_human_eval_feedback_radio,
+            tab_chat_document_command_r_plus_answer_human_eval_feedback_text,
+        ],
+        outputs=[
+            tab_chat_document_command_r_plus_answer_human_eval_feedback_radio,
+            tab_chat_document_command_r_plus_answer_human_eval_feedback_text,
+        ]
+    )
+
+    tab_chat_document_openai_gpt4o_answer_human_eval_feedback_send_button.click(
+        eval_by_human,
+        inputs=[
+            query_id_state,
+            gr.State(value="openai/gpt-4o"),
+            tab_chat_document_openai_gpt4o_answer_human_eval_feedback_radio,
+            tab_chat_document_openai_gpt4o_answer_human_eval_feedback_text,
+        ],
+        outputs=[
+            tab_chat_document_openai_gpt4o_answer_human_eval_feedback_radio,
+            tab_chat_document_openai_gpt4o_answer_human_eval_feedback_text,
+        ]
+    )
+
+    tab_chat_document_openai_gpt4_answer_human_eval_feedback_send_button.click(
+        eval_by_human,
+        inputs=[
+            query_id_state,
+            gr.State(value="openai/gpt-4"),
+            tab_chat_document_openai_gpt4_answer_human_eval_feedback_radio,
+            tab_chat_document_openai_gpt4_answer_human_eval_feedback_text,
+        ],
+        outputs=[
+            tab_chat_document_openai_gpt4_answer_human_eval_feedback_radio,
+            tab_chat_document_openai_gpt4_answer_human_eval_feedback_text,
+        ]
+    )
+
+    tab_chat_document_azure_openai_gpt4o_answer_human_eval_feedback_send_button.click(
+        eval_by_human,
+        inputs=[
+            query_id_state,
+            gr.State(value="azure_openai/gpt-4o"),
+            tab_chat_document_azure_openai_gpt4o_answer_human_eval_feedback_radio,
+            tab_chat_document_azure_openai_gpt4o_answer_human_eval_feedback_text,
+        ],
+        outputs=[
+            tab_chat_document_azure_openai_gpt4o_answer_human_eval_feedback_radio,
+            tab_chat_document_azure_openai_gpt4o_answer_human_eval_feedback_text,
+        ]
+    )
+
+    tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_send_button.click(
+        eval_by_human,
+        inputs=[
+            query_id_state,
+            gr.State(value="azure_openai/gpt-4"),
+            tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_radio,
+            tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_text,
+        ],
+        outputs=[
+            tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_radio,
+            tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_text,
+        ]
+    )
+
+    tab_chat_document_claude_3_opus_answer_human_eval_feedback_send_button.click(
+        eval_by_human,
+        inputs=[
+            query_id_state,
+            gr.State(value="claude/opus"),
+            tab_chat_document_claude_3_opus_answer_human_eval_feedback_radio,
+            tab_chat_document_claude_3_opus_answer_human_eval_feedback_text,
+        ],
+        outputs=[
+            tab_chat_document_claude_3_opus_answer_human_eval_feedback_radio,
+            tab_chat_document_claude_3_opus_answer_human_eval_feedback_text,
+        ]
+    )
+
+    tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_send_button.click(
+        eval_by_human,
+        inputs=[
+            query_id_state,
+            gr.State(value="claude/sonnet"),
+            tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_radio,
+            tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_text,
+        ],
+        outputs=[
+            tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_radio,
+            tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_text,
+        ]
+    )
+
+    tab_chat_document_claude_3_haiku_answer_human_eval_feedback_send_button.click(
+        eval_by_human,
+        inputs=[
+            query_id_state,
+            gr.State(value="claude/haiku"),
+            tab_chat_document_claude_3_haiku_answer_human_eval_feedback_radio,
+            tab_chat_document_claude_3_haiku_answer_human_eval_feedback_text,
+        ],
+        outputs=[
+            tab_chat_document_claude_3_haiku_answer_human_eval_feedback_radio,
+            tab_chat_document_claude_3_haiku_answer_human_eval_feedback_text,
         ]
     )
 
