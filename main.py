@@ -1746,7 +1746,23 @@ WHERE doc_id = :doc_id and embed_id = :embed_id
     )
 
 
+# def check_chat_document_input(
+#         llm_answer_checkbox_group,
+#         llm_evaluation_checkbox,
+#         eval_system_message_text,
+#         eval_standard_answer_text
+# ):
+#     if llm_evaluation_checkbox and (not llm_answer_checkbox_group or llm_answer_checkbox_group == [""]):
+#         raise gr.Error("Ragas 評価をオンにする場合、少なくとも1つのLLM モデルを選択してください")
+#     if llm_evaluation_checkbox and not eval_system_message_text:
+#         raise gr.Error("Ragas 評価のシステム・メッセージを入力してください")
+#     if llm_evaluation_checkbox and not eval_standard_answer_text:
+#         raise gr.Error("Ragas 評価の標準回答を入力してください")
+
+
 def generate_query(query_text, generate_query_radio):
+    if not query_text:
+        raise gr.Error("クエリを入力してください")
     generate_query1 = ""
     generate_query2 = ""
     generate_query3 = ""
@@ -1943,6 +1959,8 @@ def search_document(
     Retrieve relevant splits for any question using similarity search.
     This is simply "top K" retrieval where we select documents based on embedding similarity to the query.
     """
+    if not doc_id_all_checkbox_input and (not doc_id_checkbox_group_input or doc_id_checkbox_group_input == [""]):
+        raise gr.Error("ドキュメントを選択してください")
 
     def cut_lists(lists, limit=10):
         if not lists or len(lists) == 0:
@@ -2575,7 +2593,7 @@ async def chat_document(search_result,
 
 
 async def eval_by_ragas(
-        llm_answer_checkbox,
+        llm_answer_checkbox_group,
         llm_evaluation_checkbox,
         system_text,
         standard_answer_text,
@@ -2589,6 +2607,13 @@ async def eval_by_ragas(
         claude_3_sonnet_response,
         claude_3_haiku_response
 ):
+    if llm_evaluation_checkbox and (not llm_answer_checkbox_group or llm_answer_checkbox_group == [""]):
+        raise gr.Error("Ragas 評価をオンにする場合、少なくとも1つのLLM モデルを選択してください")
+    if llm_evaluation_checkbox and not system_text:
+        raise gr.Error("Ragas 評価のシステム・メッセージを入力してください")
+    if llm_evaluation_checkbox and not standard_answer_text:
+        raise gr.Error("Ragas 評価の標準回答を入力してください")
+
     def remove_last_line(text):
         if text:
             lines = text.splitlines()
@@ -2615,23 +2640,23 @@ async def eval_by_ragas(
         claude_3_opus_checkbox = False
         claude_3_sonnet_checkbox = False
         claude_3_haiku_checkbox = False
-        if "cohere/command-r" in llm_answer_checkbox:
+        if "cohere/command-r" in llm_answer_checkbox_group:
             command_r_checkbox = True
-        if "cohere/command-r-plus" in llm_answer_checkbox:
+        if "cohere/command-r-plus" in llm_answer_checkbox_group:
             command_r_plus_checkbox = True
-        if "openai/gpt-4o" in llm_answer_checkbox:
+        if "openai/gpt-4o" in llm_answer_checkbox_group:
             openai_gpt4o_checkbox = True
-        if "openai/gpt-4" in llm_answer_checkbox:
+        if "openai/gpt-4" in llm_answer_checkbox_group:
             openai_gpt4_checkbox = True
-        if "azure_openai/gpt-4o" in llm_answer_checkbox:
+        if "azure_openai/gpt-4o" in llm_answer_checkbox_group:
             azure_openai_gpt4o_checkbox = True
-        if "azure_openai/gpt-4" in llm_answer_checkbox:
+        if "azure_openai/gpt-4" in llm_answer_checkbox_group:
             azure_openai_gpt4_checkbox = True
-        if "claude/opus" in llm_answer_checkbox:
+        if "claude/opus" in llm_answer_checkbox_group:
             claude_3_opus_checkbox = True
-        if "claude/sonnet" in llm_answer_checkbox:
+        if "claude/sonnet" in llm_answer_checkbox_group:
             claude_3_sonnet_checkbox = True
-        if "claude/haiku" in llm_answer_checkbox:
+        if "claude/haiku" in llm_answer_checkbox_group:
             claude_3_haiku_checkbox = True
 
         command_r_response = remove_last_line(command_r_response)
@@ -2780,7 +2805,7 @@ async def eval_by_ragas(
 
 def generate_download_file(
         search_result,
-        llm_answer_checkbox,
+        llm_answer_checkbox_group,
         llm_evaluation_checkbox,
         query_text,
         standard_answer_text,
@@ -2812,7 +2837,7 @@ def generate_download_file(
 
     df2 = search_result
 
-    if "cohere/command-r" in llm_answer_checkbox:
+    if "cohere/command-r" in llm_answer_checkbox_group:
         command_r_response = command_r_response
         if llm_evaluation_checkbox:
             command_r_evaluation = command_r_evaluation
@@ -2821,7 +2846,7 @@ def generate_download_file(
     else:
         command_r_response = ""
         command_r_evaluation = ""
-    if "cohere/command-r-plus" in llm_answer_checkbox:
+    if "cohere/command-r-plus" in llm_answer_checkbox_group:
         command_r_plus_response = command_r_plus_response
         if llm_evaluation_checkbox:
             command_r_plus_evaluation = command_r_plus_evaluation
@@ -2830,7 +2855,7 @@ def generate_download_file(
     else:
         command_r_plus_response = ""
         command_r_plus_evaluation = ""
-    if "openai/gpt-4o" in llm_answer_checkbox:
+    if "openai/gpt-4o" in llm_answer_checkbox_group:
         openai_gpt4o_response = openai_gpt4o_response
         if llm_evaluation_checkbox:
             openai_gpt4o_evaluation = openai_gpt4o_evaluation
@@ -2839,7 +2864,7 @@ def generate_download_file(
     else:
         openai_gpt4o_response = ""
         openai_gpt4o_evaluation = ""
-    if "openai/gpt-4" in llm_answer_checkbox:
+    if "openai/gpt-4" in llm_answer_checkbox_group:
         openai_gpt4_response = openai_gpt4_response
         if llm_evaluation_checkbox:
             openai_gpt4_evaluation = openai_gpt4_evaluation
@@ -2848,7 +2873,7 @@ def generate_download_file(
     else:
         openai_gpt4_response = ""
         openai_gpt4_evaluation = ""
-    if "azure_openai/gpt-4o" in llm_answer_checkbox:
+    if "azure_openai/gpt-4o" in llm_answer_checkbox_group:
         azure_openai_gpt4o_response = azure_openai_gpt4o_response
         if llm_evaluation_checkbox:
             azure_openai_gpt4o_evaluation = azure_openai_gpt4o_evaluation
@@ -2857,7 +2882,7 @@ def generate_download_file(
     else:
         azure_openai_gpt4o_response = ""
         azure_openai_gpt4o_evaluation = ""
-    if "azure_openai/gpt-4" in llm_answer_checkbox:
+    if "azure_openai/gpt-4" in llm_answer_checkbox_group:
         azure_openai_gpt4_response = azure_openai_gpt4_response
         if llm_evaluation_checkbox:
             azure_openai_gpt4_evaluation = azure_openai_gpt4_evaluation
@@ -2866,7 +2891,7 @@ def generate_download_file(
     else:
         azure_openai_gpt4_response = ""
         azure_openai_gpt4_evaluation = ""
-    if "claude/opus" in llm_answer_checkbox:
+    if "claude/opus" in llm_answer_checkbox_group:
         claude_3_opus_response = claude_3_opus_response
         if llm_evaluation_checkbox:
             claude_3_opus_evaluation = claude_3_opus_evaluation
@@ -2875,7 +2900,7 @@ def generate_download_file(
     else:
         claude_3_opus_response = ""
         claude_3_opus_evaluation = ""
-    if "claude/sonnet" in llm_answer_checkbox:
+    if "claude/sonnet" in llm_answer_checkbox_group:
         claude_3_sonnet_response = claude_3_sonnet_response
         if llm_evaluation_checkbox:
             claude_3_sonnet_evaluation = claude_3_sonnet_evaluation
@@ -2884,7 +2909,7 @@ def generate_download_file(
     else:
         claude_3_sonnet_response = ""
         claude_3_sonnet_evaluation = ""
-    if "claude/haiku" in llm_answer_checkbox:
+    if "claude/haiku" in llm_answer_checkbox_group:
         claude_3_haiku_response = claude_3_haiku_response
         if llm_evaluation_checkbox:
             claude_3_haiku_evaluation = claude_3_haiku_evaluation
@@ -2934,7 +2959,7 @@ def generate_download_file(
     )
 
     # 定义文件路径
-    filepath = '/tmp/result.xlsx'
+    filepath = '/tmp/query_result.xlsx'
 
     # 使用 ExcelWriter 将多个 DataFrame 写入不同的 sheet
     with pd.ExcelWriter(filepath) as writer:
@@ -2944,6 +2969,77 @@ def generate_download_file(
 
     print(f"Excel 文件已保存到 {filepath}")
     return gr.DownloadButton(value=filepath, visible=True)
+
+
+def generate_eval_result_file():
+    print("in generate_eval_result_file() start...")
+
+    with pool.acquire() as conn:
+        with conn.cursor() as cursor:
+            select_sql = """
+            SELECT 
+                r.query_id,
+                r.query,
+                r.standard_answer,
+                r.sql,
+                f.llm_name,
+                f.llm_answer,
+                f.ragas_evaluation_result,
+                f.human_evaluation_result,
+                f.user_comment,
+                TO_CHAR(r.created_date, 'YYYY-MM-DD HH24:MI:SS') AS created_date
+            FROM 
+                RAG_QA_RESULT r
+            JOIN 
+                RAG_QA_FEEDBACK f
+            ON 
+                r.query_id = f.query_id
+            """
+
+            cursor.execute(select_sql)
+
+            # 获取列名
+            columns = [col[0] for col in cursor.description]
+
+            # 获取数据
+            data = cursor.fetchall()
+
+            print(f"{columns=}")
+
+            # 将数据转换为DataFrame
+            result_df = pd.DataFrame(data, columns=columns)
+
+            print(f"{result_df=}")
+
+            # 修改列名为日文
+            result_df.rename(columns={
+                'QUERY_ID': 'クエリID',
+                'QUERY': 'クエリ',
+                'STANDARD_ANSWER': '標準回答',
+                'SQL': '使用されたSQL',
+                'LLM_NAME': 'LLM モデル',
+                'LLM_ANSWER': 'LLM メッセージ',
+                'RAGAS_EVALUATION_RESULT': 'Ragas 評価結果',
+                'HUMAN_EVALUATION_RESULT': 'Human 評価結果',
+                'USER_COMMENT': 'Human コメント',
+                'CREATED_DATE': '作成日時'
+            }, inplace=True)
+
+            print(f"{result_df=}")
+
+            # 如果需要将 created_date 列转换为 datetime 类型
+            result_df['作成日時'] = pd.to_datetime(result_df['作成日時'], format='%Y-%m-%d %H:%M:%S')
+
+            # 定义文件路径
+            filepath = '/tmp/evaluation_result.xlsx'
+
+            # 使用 ExcelWriter 将多个 DataFrame 写入不同的 sheet
+            with pd.ExcelWriter(filepath) as writer:
+                result_df.to_excel(writer, sheet_name='Sheet1', index=False)
+
+            print(f"Excel 文件已保存到 {filepath}")
+            gr.Info("評価レポートの生成が完了しました")
+            return gr.DownloadButton(value=filepath, visible=True)
 
 
 def set_query_id_state():
@@ -2956,7 +3052,7 @@ def insert_query_result(
         query_id,
         query,
         sql,
-        llm_answer_checkbox,
+        llm_answer_checkbox_group,
         llm_evaluation_checkbox,
         standard_answer_text,
         command_r_response,
@@ -2979,6 +3075,8 @@ def insert_query_result(
         claude_3_haiku_evaluation
 ):
     print("in insert_query_result() start...")
+    if not query:
+        raise gr.Error("クエリを入力してください")
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
             # 如果不存在记录，执行插入操作
@@ -3006,7 +3104,7 @@ def insert_query_result(
                 ]
             )
 
-            if "cohere/command-r" in llm_answer_checkbox:
+            if "cohere/command-r" in llm_answer_checkbox_group:
                 command_r_response = command_r_response
                 if llm_evaluation_checkbox:
                     command_r_evaluation = command_r_evaluation
@@ -3037,7 +3135,7 @@ def insert_query_result(
                     ]
                 )
 
-            if "cohere/command-r-plus" in llm_answer_checkbox:
+            if "cohere/command-r-plus" in llm_answer_checkbox_group:
                 command_r_plus_response = command_r_plus_response
                 if llm_evaluation_checkbox:
                     command_r_plus_evaluation = command_r_plus_evaluation
@@ -3068,7 +3166,7 @@ def insert_query_result(
                     ]
                 )
 
-            if "openai/gpt-4o" in llm_answer_checkbox:
+            if "openai/gpt-4o" in llm_answer_checkbox_group:
                 openai_gpt4o_response = openai_gpt4o_response
                 if llm_evaluation_checkbox:
                     openai_gpt4o_evaluation = openai_gpt4o_evaluation
@@ -3099,7 +3197,7 @@ def insert_query_result(
                     ]
                 )
 
-            if "openai/gpt-4" in llm_answer_checkbox:
+            if "openai/gpt-4" in llm_answer_checkbox_group:
                 openai_gpt4_response = openai_gpt4_response
                 if llm_evaluation_checkbox:
                     openai_gpt4_evaluation = openai_gpt4_evaluation
@@ -3130,7 +3228,7 @@ def insert_query_result(
                     ]
                 )
 
-            if "azure_openai/gpt-4o" in llm_answer_checkbox:
+            if "azure_openai/gpt-4o" in llm_answer_checkbox_group:
                 azure_openai_gpt4o_response = azure_openai_gpt4o_response
                 if llm_evaluation_checkbox:
                     azure_openai_gpt4o_evaluation = azure_openai_gpt4o_evaluation
@@ -3161,7 +3259,7 @@ def insert_query_result(
                     ]
                 )
 
-            if "azure_openai/gpt-4" in llm_answer_checkbox:
+            if "azure_openai/gpt-4" in llm_answer_checkbox_group:
                 azure_openai_gpt4_response = azure_openai_gpt4_response
                 if llm_evaluation_checkbox:
                     azure_openai_gpt4_evaluation = azure_openai_gpt4_evaluation
@@ -3192,7 +3290,7 @@ def insert_query_result(
                     ]
                 )
 
-            if "claude/opus" in llm_answer_checkbox:
+            if "claude/opus" in llm_answer_checkbox_group:
                 claude_3_opus_response = claude_3_opus_response
                 if llm_evaluation_checkbox:
                     claude_3_opus_evaluation = claude_3_opus_evaluation
@@ -3223,7 +3321,7 @@ def insert_query_result(
                     ]
                 )
 
-            if "claude/sonnet" in llm_answer_checkbox:
+            if "claude/sonnet" in llm_answer_checkbox_group:
                 claude_3_sonnet_response = claude_3_sonnet_response
                 if llm_evaluation_checkbox:
                     claude_3_sonnet_evaluation = claude_3_sonnet_evaluation
@@ -3254,7 +3352,7 @@ def insert_query_result(
                     ]
                 )
 
-            if "claude/haiku" in llm_answer_checkbox:
+            if "claude/haiku" in llm_answer_checkbox_group:
                 claude_3_haiku_response = claude_3_haiku_response
                 if llm_evaluation_checkbox:
                     claude_3_haiku_evaluation = claude_3_haiku_evaluation
@@ -3286,7 +3384,6 @@ def insert_query_result(
                 )
 
         conn.commit()
-
 
 
 def delete_document(server_directory, doc_ids):
@@ -4702,6 +4799,18 @@ with gr.Blocks(css=custom_css) as app:
                             show_copy_button=True
                         )
 
+            with gr.TabItem(label="Step-5.評価レポートの取得") as tab_download_eval_result:
+                with gr.Row():
+                    tab_download_eval_result_generate_button = gr.Button(
+                        value="評価レポートの生成",
+                        variant="primary",
+                    )
+
+                    tab_download_eval_result_download_button = gr.DownloadButton(
+                        label="評価レポートのダウンロード",
+                        variant="primary",
+                    )
+
     gr.Markdown(value="### Developed by Oracle Japan", elem_classes="sub_Header")
     tab_create_oci_clear_button.add(
         [
@@ -5024,6 +5133,16 @@ with gr.Blocks(css=custom_css) as app:
         ]
     )
 
+    # tab_chat_document_chat_document_button.click(
+    #     check_chat_document_input,
+    #     inputs=[
+    #         tab_chat_document_llm_answer_checkbox_group,
+    #         tab_chat_document_llm_evaluation_checkbox,
+    #         tab_chat_document_system_message_text,
+    #         tab_chat_document_standard_answer_text,
+    #     ],
+    #     outputs=[]
+    # ).then(
     tab_chat_document_chat_document_button.click(
         generate_query,
         inputs=[
@@ -5089,7 +5208,7 @@ with gr.Blocks(css=custom_css) as app:
         inputs=[
             tab_chat_document_searched_result_dataframe,
             tab_chat_document_llm_answer_checkbox_group,
-            tab_chat_document_query_text
+            tab_chat_document_query_text,
         ],
         outputs=[
             tab_chat_document_command_r_answer_text,
@@ -5320,6 +5439,14 @@ with gr.Blocks(css=custom_css) as app:
         outputs=[
             tab_chat_document_claude_3_haiku_answer_human_eval_feedback_radio,
             tab_chat_document_claude_3_haiku_answer_human_eval_feedback_text,
+        ]
+    )
+
+    tab_download_eval_result_generate_button.click(
+        generate_eval_result_file,
+        inputs=[],
+        outputs=[
+            tab_download_eval_result_download_button,
         ]
     )
 
