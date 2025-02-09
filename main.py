@@ -1503,7 +1503,7 @@ def load_document(file_path, server_directory):
                          extract_image_block_to_payload=False,
                          # skip_infer_table_types=["pdf", "ppt", "pptx", "doc", "docx", "xls", "xlsx"])
                          skip_infer_table_types=["pdf", "jpg", "png", "heic", "doc", "docx"])
-    original_contents = "\n\n".join([str(el) for el in elements])
+    original_contents = "\n\n".join(el.text.replace('\x0b', '\n') for el in elements)
     print(f"{original_contents=}")
 
     collection_cmeta['file_name'] = file_name
@@ -1658,6 +1658,8 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
                         print(f"After: {el.text=}")
             table_idx += 1
 
+    for element in elements:
+        element.text = element.text.replace('\x0b', '\n')
     unstructured_chunks = chunk_by_title(elements, include_orig_elements=True,
                                          max_characters=int(chunks_max_size),
                                          multipage_sections=True, new_after_n_chars=int(chunks_max_size),
