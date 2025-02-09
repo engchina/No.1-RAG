@@ -518,6 +518,40 @@ async def command_r_plus_task(system_text, query_text, command_r_plus_checkbox):
         yield "TASK_DONE"
 
 
+async def llama_3_3_70b_task(system_text, query_text, llama_3_3_70b_checkbox):
+    region = get_region()
+    if llama_3_3_70b_checkbox:
+        llama_3_3_70b = ChatOCIGenAI(
+            model_id="meta.llama-3.3-70b-instruct",
+            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+            model_kwargs={"temperature": 0.0, "max_tokens": 2048},
+        )
+        messages = [
+            SystemMessage(content=system_text),
+            HumanMessage(content=query_text),
+        ]
+        start_time = time.time()
+        print(f"{start_time=}")
+        langfuse_handler = CallbackHandler(
+            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+            host=os.environ["LANGFUSE_HOST"],
+        )
+        async for chunk in llama_3_3_70b.astream(messages, config={"callbacks": [langfuse_handler],
+                                                                   "metadata": {
+                                                                       "ls_model_name": "meta.llama-3.3-70b-instruct"}}):
+            yield chunk.content
+        end_time = time.time()
+        print(f"{end_time=}")
+        inference_time = end_time - start_time
+        print(f"\n推論時間: {inference_time:.2f}秒")
+        yield f"\n推論時間: {inference_time:.2f}秒"
+        yield "TASK_DONE"
+    else:
+        yield "TASK_DONE"
+
+
 async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
     if openai_gpt4o_checkbox:
         load_dotenv(find_dotenv())
@@ -763,6 +797,7 @@ async def chat(
         system_text,
         command_r_user_text,
         command_r_plus_user_text,
+        llama_3_3_70b_user_text,
         openai_gpt4o_user_text,
         openai_gpt4_user_text,
         azure_openai_gpt4o_user_text,
@@ -772,6 +807,7 @@ async def chat(
         claude_3_haiku_user_text,
         command_r_checkbox,
         command_r_plus_checkbox,
+        llama_3_3_70b_checkbox,
         openai_gpt4o_gen_checkbox,
         openai_gpt4_gen_checkbox,
         azure_openai_gpt4o_gen_checkbox,
@@ -782,6 +818,7 @@ async def chat(
 ):
     command_r_gen = command_r_task(system_text, command_r_user_text, command_r_checkbox)
     command_r_plus_gen = command_r_plus_task(system_text, command_r_plus_user_text, command_r_plus_checkbox)
+    llama_3_3_70b_gen = llama_3_3_70b_task(system_text, llama_3_3_70b_user_text, llama_3_3_70b_checkbox)
     openai_gpt4o_gen = openai_gpt4o_task(system_text, openai_gpt4o_user_text, openai_gpt4o_gen_checkbox)
     openai_gpt4_gen = openai_gpt4_task(system_text, openai_gpt4_user_text, openai_gpt4_gen_checkbox)
     azure_openai_gpt4o_gen = azure_openai_gpt4o_task(system_text, azure_openai_gpt4o_user_text,
@@ -792,10 +829,11 @@ async def chat(
     claude_3_sonnet_gen = claude_3_sonnet_task(system_text, claude_3_sonnet_user_text, claude_3_sonnet_checkbox)
     claude_3_haiku_gen = claude_3_haiku_task(system_text, claude_3_haiku_user_text, claude_3_haiku_checkbox)
 
-    responses_status = ["", "", "", "", "", "", "", "", ""]
+    responses_status = ["", "", "", "", "", "", "", "", "", ""]
     while True:
-        responses = ["", "", "", "", "", "", "", "", ""]
-        generators = [command_r_gen, command_r_plus_gen, openai_gpt4o_gen, openai_gpt4_gen,
+        responses = ["", "", "", "", "", "", "", "", "", ""]
+        generators = [command_r_gen, command_r_plus_gen, llama_3_3_70b_gen,
+                      openai_gpt4o_gen, openai_gpt4_gen,
                       azure_openai_gpt4o_gen, azure_openai_gpt4_gen,
                       claude_3_opus_gen, claude_3_sonnet_gen, claude_3_haiku_gen]
 
@@ -820,6 +858,7 @@ async def chat(
 def set_chat_llm_answer(llm_answer_checkbox):
     command_r_answer_visible = False
     command_r_plus_answer_visible = False
+    llama_3_3_70b_answer_visible = False
     openai_gpt4o_answer_visible = False
     openai_gpt4_answer_visible = False
     azure_openai_gpt4o_answer_visible = False
@@ -831,6 +870,8 @@ def set_chat_llm_answer(llm_answer_checkbox):
         command_r_answer_visible = True
     if "cohere/command-r-plus" in llm_answer_checkbox:
         command_r_plus_answer_visible = True
+    if "meta/llama-3-3-70b" in llm_answer_checkbox:
+        llama_3_3_70b_answer_visible = True
     if "openai/gpt-4o" in llm_answer_checkbox:
         openai_gpt4o_answer_visible = True
     if "openai/gpt-4" in llm_answer_checkbox:
@@ -847,6 +888,7 @@ def set_chat_llm_answer(llm_answer_checkbox):
         claude_3_haiku_answer_visible = True
     return (gr.Accordion(visible=command_r_answer_visible),
             gr.Accordion(visible=command_r_plus_answer_visible),
+            gr.Accordion(visible=llama_3_3_70b_answer_visible),
             gr.Accordion(visible=openai_gpt4o_answer_visible),
             gr.Accordion(visible=openai_gpt4_answer_visible),
             gr.Accordion(visible=azure_openai_gpt4o_answer_visible),
@@ -859,6 +901,7 @@ def set_chat_llm_answer(llm_answer_checkbox):
 def set_chat_llm_evaluation(llm_evaluation_checkbox):
     command_r_evaluation_visible = False
     command_r_plus_evaluation_visible = False
+    llama_3_3_70b_evaluation_visible = False
     openai_gpt4o_evaluation_visible = False
     openai_gpt4_evaluation_visible = False
     azure_openai_gpt4o_evaluation_visible = False
@@ -869,6 +912,7 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
     if llm_evaluation_checkbox:
         command_r_evaluation_visible = True
         command_r_plus_evaluation_visible = True
+        llama_3_3_70b_evaluation_visible = True
         openai_gpt4o_evaluation_visible = True
         openai_gpt4_evaluation_visible = True
         azure_openai_gpt4o_evaluation_visible = True
@@ -878,6 +922,7 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
         claude_3_haiku_evaluation_visible = True
     return (gr.Accordion(visible=command_r_evaluation_visible),
             gr.Accordion(visible=command_r_plus_evaluation_visible),
+            gr.Accordion(visible=llama_3_3_70b_evaluation_visible),
             gr.Accordion(visible=openai_gpt4o_evaluation_visible),
             gr.Accordion(visible=openai_gpt4_evaluation_visible),
             gr.Accordion(visible=azure_openai_gpt4o_evaluation_visible),
@@ -894,6 +939,7 @@ async def chat_stream(system_text, query_text, llm_answer_checkbox):
         raise gr.Error("ユーザー・メッセージを入力してください")
     command_r_user_text = query_text
     command_r_plus_user_text = query_text
+    llama_3_3_70b_user_text = query_text
     openai_gpt4o_user_text = query_text
     openai_gpt4_user_text = query_text
     azure_openai_gpt4o_user_text = query_text
@@ -904,6 +950,7 @@ async def chat_stream(system_text, query_text, llm_answer_checkbox):
 
     command_r_checkbox = False
     command_r_plus_checkbox = False
+    llama_3_3_70b_checkbox = False
     openai_gpt4o_checkbox = False
     openai_gpt4_checkbox = False
     azure_openai_gpt4o_checkbox = False
@@ -915,6 +962,8 @@ async def chat_stream(system_text, query_text, llm_answer_checkbox):
         command_r_checkbox = True
     if "cohere/command-r-plus" in llm_answer_checkbox:
         command_r_plus_checkbox = True
+    if "meta/llama-3-3-70b" in llm_answer_checkbox:
+        llama_3_3_70b_checkbox = True
     if "openai/gpt-4o" in llm_answer_checkbox:
         openai_gpt4o_checkbox = True
     if "openai/gpt-4" in llm_answer_checkbox:
@@ -932,6 +981,7 @@ async def chat_stream(system_text, query_text, llm_answer_checkbox):
     # ChatOCIGenAI
     command_r_response = ""
     command_r_plus_response = ""
+    llama_3_3_70b_response = ""
     openai_gpt4o_response = ""
     openai_gpt4_response = ""
     azure_openai_gpt4o_response = ""
@@ -939,10 +989,11 @@ async def chat_stream(system_text, query_text, llm_answer_checkbox):
     claude_3_opus_response = ""
     claude_3_sonnet_response = ""
     claude_3_haiku_response = ""
-    async for r, r_plus, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
+    async for r, r_plus, llama_3_3_70b, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
             system_text,
             command_r_user_text,
             command_r_plus_user_text,
+            llama_3_3_70b_user_text,
             openai_gpt4o_user_text,
             openai_gpt4_user_text,
             azure_openai_gpt4o_user_text,
@@ -952,6 +1003,7 @@ async def chat_stream(system_text, query_text, llm_answer_checkbox):
             claude_3_haiku_user_text,
             command_r_checkbox,
             command_r_plus_checkbox,
+            llama_3_3_70b_checkbox,
             openai_gpt4o_checkbox,
             openai_gpt4_checkbox,
             azure_openai_gpt4o_checkbox,
@@ -962,6 +1014,7 @@ async def chat_stream(system_text, query_text, llm_answer_checkbox):
     ):
         command_r_response += r
         command_r_plus_response += r_plus
+        llama_3_3_70b_response += llama_3_3_70b
         openai_gpt4o_response += gpt4o
         openai_gpt4_response += gpt4
         azure_openai_gpt4o_response += azure_gpt4o
@@ -972,6 +1025,7 @@ async def chat_stream(system_text, query_text, llm_answer_checkbox):
         yield (
             command_r_response,
             command_r_plus_response,
+            llama_3_3_70b_response,
             openai_gpt4o_response,
             openai_gpt4_response,
             azure_openai_gpt4o_response,
@@ -984,6 +1038,8 @@ async def chat_stream(system_text, query_text, llm_answer_checkbox):
 
 def reset_eval_by_human_result():
     return (
+        gr.Radio(value="good"),
+        gr.Textbox(value=""),
         gr.Radio(value="good"),
         gr.Textbox(value=""),
         gr.Radio(value="good"),
@@ -2470,10 +2526,13 @@ ORDER
 async def chat_document(search_result,
                         llm_answer_checkbox,
                         query_text):
+    if search_result.empty or len(search_result) == 0:
+        raise gr.Error("検索結果が見つかりませんでした。設定もしくはクエリを変更して再度ご確認ください。")
     query_text = query_text.strip()
 
     command_r_response = ""
     command_r_plus_response = ""
+    llama_3_3_70b_response = ""
     openai_gpt4o_response = ""
     openai_gpt4_response = ""
     azure_openai_gpt4o_response = ""
@@ -2484,6 +2543,7 @@ async def chat_document(search_result,
 
     command_r_checkbox = False
     command_r_plus_checkbox = False
+    llama_3_3_70b_checkbox = False
     openai_gpt4o_checkbox = False
     openai_gpt4_checkbox = False
     azure_openai_gpt4o_checkbox = False
@@ -2495,6 +2555,8 @@ async def chat_document(search_result,
         command_r_checkbox = True
     if "cohere/command-r-plus" in llm_answer_checkbox:
         command_r_plus_checkbox = True
+    if "meta/llama-3-3-70b" in llm_answer_checkbox:
+        llama_3_3_70b_checkbox = True
     if "openai/gpt-4o" in llm_answer_checkbox:
         openai_gpt4o_checkbox = True
     if "openai/gpt-4" in llm_answer_checkbox:
@@ -2510,7 +2572,8 @@ async def chat_document(search_result,
     if "claude/haiku" in llm_answer_checkbox:
         claude_3_haiku_checkbox = True
 
-    context = '\n'.join(search_result['CONTENT'].astype(str).values)
+    # context = '\n'.join(search_result['CONTENT'].astype(str).values)
+    context = search_result[['EMBED_ID', 'SOURCE', 'CONTENT']].to_dict('records')
     print(f"{context=}")
     # system_text = f"""
     #         Use the following pieces of Context to answer the question at the end.
@@ -2528,6 +2591,19 @@ async def chat_document(search_result,
 コンテキストの正確なテキストを使用し、**一切の修正、再構成、または脚色を加えずに**使用してください。  
 コンテキストにないことについては答えようとしないでください。  
 
+After providing the answer, include the 'EMBED_ID' and 'SOURCE' and 'CONTENT' of the 'CONTENT' used to formulate the answer in JSON format.
+The JSON array must strictly follow this structure:
+
+[
+    {{
+        "EMBED_ID": <A unique identifier for the content piece.>,
+        "SOURCE": "<A string indicating the origin of the content.>",
+        "CONTENT": "<The exact original text from the source, with no modifications, summarizations, or paraphrasing.>"
+    }}
+]
+
+If multiple pieces of CONTENT are used, include all relevant EMBED_IDs and SOURCEs in the JSON array.
+
 コンテキスト:
 ```
 {context}
@@ -2543,6 +2619,7 @@ async def chat_document(search_result,
 
     command_r_user_text = user_text
     command_r_plus_user_text = user_text
+    llama_3_3_70b_user_text = user_text
     openai_gpt4o_user_text = user_text
     openai_gpt4_user_text = user_text
     azure_openai_gpt4o_user_text = user_text
@@ -2551,10 +2628,11 @@ async def chat_document(search_result,
     claude_3_sonnet_user_text = user_text
     claude_3_haiku_user_text = user_text
 
-    async for r, r_plus, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
+    async for r, r_plus, llama_3_3_70b, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
             system_text,
             command_r_user_text,
             command_r_plus_user_text,
+            llama_3_3_70b_user_text,
             openai_gpt4o_user_text,
             openai_gpt4_user_text,
             azure_openai_gpt4o_user_text,
@@ -2564,6 +2642,7 @@ async def chat_document(search_result,
             claude_3_haiku_user_text,
             command_r_checkbox,
             command_r_plus_checkbox,
+            llama_3_3_70b_checkbox,
             openai_gpt4o_checkbox,
             openai_gpt4_checkbox,
             azure_openai_gpt4o_checkbox,
@@ -2574,6 +2653,7 @@ async def chat_document(search_result,
     ):
         command_r_response += r
         command_r_plus_response += r_plus
+        llama_3_3_70b_response += llama_3_3_70b
         openai_gpt4o_response += gpt4o
         openai_gpt4_response += gpt4
         azure_openai_gpt4o_response += azure_gpt4o
@@ -2584,6 +2664,7 @@ async def chat_document(search_result,
         yield (
             command_r_response,
             command_r_plus_response,
+            llama_3_3_70b_response,
             openai_gpt4o_response,
             openai_gpt4_response,
             azure_openai_gpt4o_response,
@@ -2595,12 +2676,14 @@ async def chat_document(search_result,
 
 
 async def eval_by_ragas(
+        search_result,
         llm_answer_checkbox_group,
         llm_evaluation_checkbox,
         system_text,
         standard_answer_text,
         command_r_response,
         command_r_plus_response,
+        llama_3_3_70b_response,
         openai_gpt4o_response,
         openai_gpt4_response,
         azure_openai_gpt4o_response,
@@ -2609,6 +2692,8 @@ async def eval_by_ragas(
         claude_3_sonnet_response,
         claude_3_haiku_response
 ):
+    if search_result.empty or len(search_result) == 0:
+        raise gr.Error("検索結果が見つかりませんでした。設定もしくはクエリを変更して再度ご確認ください。")
     if llm_evaluation_checkbox and (not llm_answer_checkbox_group or llm_answer_checkbox_group == [""]):
         raise gr.Error("Ragas 評価をオンにする場合、少なくとも1つのLLM モデルを選択してください")
     if llm_evaluation_checkbox and not system_text:
@@ -2631,10 +2716,11 @@ async def eval_by_ragas(
         standard_answer_text = "入力されていません。"
     print(f"{llm_evaluation_checkbox=}")
     if not llm_evaluation_checkbox:
-        yield ("", "", "", "", "", "", "", "", "")
+        yield ("", "", "", "", "", "", "", "", "", "")
     else:
         command_r_checkbox = False
         command_r_plus_checkbox = False
+        llama_3_3_70b_checkbox = False
         openai_gpt4o_checkbox = False
         openai_gpt4_checkbox = False
         azure_openai_gpt4o_checkbox = False
@@ -2646,6 +2732,8 @@ async def eval_by_ragas(
             command_r_checkbox = True
         if "cohere/command-r-plus" in llm_answer_checkbox_group:
             command_r_plus_checkbox = True
+        if "meta/llama-3-3-70b" in llm_answer_checkbox_group:
+            llama_3_3_70b_checkbox = True
         if "openai/gpt-4o" in llm_answer_checkbox_group:
             openai_gpt4o_checkbox = True
         if "openai/gpt-4" in llm_answer_checkbox_group:
@@ -2663,6 +2751,7 @@ async def eval_by_ragas(
 
         command_r_response = remove_last_line(command_r_response)
         command_r_plus_response = remove_last_line(command_r_plus_response)
+        llama_3_3_70b_response = remove_last_line(llama_3_3_70b_response)
         openai_gpt4o_response = remove_last_line(openai_gpt4o_response)
         openai_gpt4_response = remove_last_line(openai_gpt4_response)
         azure_openai_gpt4o_response = remove_last_line(azure_openai_gpt4o_response)
@@ -2686,6 +2775,15 @@ async def eval_by_ragas(
 
 -与えられた回答-
 {command_r_plus_response}
+
+-出力-\n　"""
+
+        llama_3_3_70b_user_text = f"""
+-標準回答-
+{standard_answer_text}
+
+-与えられた回答-
+{llama_3_3_70b_response}
 
 -出力-\n　"""
 
@@ -2754,6 +2852,7 @@ async def eval_by_ragas(
 
         eval_command_r_response = ""
         eval_command_r_plus_response = ""
+        eval_llama_3_3_70b_response = ""
         eval_openai_gpt4o_response = ""
         eval_openai_gpt4_response = ""
         eval_azure_openai_gpt4o_response = ""
@@ -2762,10 +2861,11 @@ async def eval_by_ragas(
         eval_claude_3_sonnet_response = ""
         eval_claude_3_haiku_response = ""
 
-        async for r, r_plus, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
+        async for r, r_plus, llama_3_3_70b, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
                 system_text,
                 command_r_user_text,
                 command_r_plus_user_text,
+                llama_3_3_70b_user_text,
                 openai_gpt4o_user_text,
                 openai_gpt4_user_text,
                 azure_openai_gpt4o_user_text,
@@ -2775,6 +2875,7 @@ async def eval_by_ragas(
                 claude_3_haiku_user_text,
                 command_r_checkbox,
                 command_r_plus_checkbox,
+                llama_3_3_70b_checkbox,
                 openai_gpt4o_checkbox,
                 openai_gpt4_checkbox,
                 azure_openai_gpt4o_checkbox,
@@ -2785,6 +2886,7 @@ async def eval_by_ragas(
         ):
             eval_command_r_response += r
             eval_command_r_plus_response += r_plus
+            eval_llama_3_3_70b_response += llama_3_3_70b
             eval_openai_gpt4o_response += gpt4o
             eval_openai_gpt4_response += gpt4
             eval_azure_openai_gpt4o_response += azure_gpt4o
@@ -2795,6 +2897,7 @@ async def eval_by_ragas(
             yield (
                 eval_command_r_response,
                 eval_command_r_plus_response,
+                eval_llama_3_3_70b_response,
                 eval_openai_gpt4o_response,
                 eval_openai_gpt4_response,
                 eval_azure_openai_gpt4o_response,
@@ -2813,6 +2916,7 @@ def generate_download_file(
         standard_answer_text,
         command_r_response,
         command_r_plus_response,
+        llama_3_3_70b_response,
         openai_gpt4o_response,
         openai_gpt4_response,
         azure_openai_gpt4o_response,
@@ -2822,6 +2926,7 @@ def generate_download_file(
         claude_3_haiku_response,
         command_r_evaluation,
         command_r_plus_evaluation,
+        llama_3_3_70b_evaluation,
         openai_gpt4o_evaluation,
         openai_gpt4_evaluation,
         azure_openai_gpt4o_evaluation,
@@ -2830,6 +2935,8 @@ def generate_download_file(
         claude_3_sonnet_evaluation,
         claude_3_haiku_evaluation
 ):
+    if search_result.empty or len(search_result) == 0:
+        return gr.DownloadButton(visible=False)
     # 创建一些示例 DataFrame
     if llm_evaluation_checkbox:
         standard_answer_text = standard_answer_text
@@ -2857,6 +2964,15 @@ def generate_download_file(
     else:
         command_r_plus_response = ""
         command_r_plus_evaluation = ""
+    if "meta/llama-3-3-70b" in llm_answer_checkbox_group:
+        llama_3_3_70b_response = llama_3_3_70b_response
+        if llm_evaluation_checkbox:
+            llama_3_3_70b_evaluation = llama_3_3_70b_evaluation
+        else:
+            llama_3_3_70b_evaluation = ""
+    else:
+        llama_3_3_70b_response = ""
+        llama_3_3_70b_evaluation = ""
     if "openai/gpt-4o" in llm_answer_checkbox_group:
         openai_gpt4o_response = openai_gpt4o_response
         if llm_evaluation_checkbox:
@@ -2927,6 +3043,7 @@ def generate_download_file(
                 [
                     "cohere/command-r",
                     # "cohere/command-r-plus",
+                    "meta/llama-3-3-70b",
                     "openai/gpt-4o",
                     "openai/gpt-4",
                     "azure_openai/gpt-4o",
@@ -2938,6 +3055,7 @@ def generate_download_file(
             'LLM メッセージ': [
                 command_r_response,
                 # command_r_plus_response,
+                llama_3_3_70b_response,
                 openai_gpt4o_response,
                 openai_gpt4_response,
                 azure_openai_gpt4o_response,
@@ -2949,6 +3067,7 @@ def generate_download_file(
             'Ragas 評価結果': [
                 command_r_evaluation,
                 # command_r_plus_evaluation,
+                llama_3_3_70b_evaluation,
                 openai_gpt4o_evaluation,
                 openai_gpt4_evaluation,
                 azure_openai_gpt4o_evaluation,
@@ -3051,6 +3170,7 @@ def set_query_id_state():
 
 
 def insert_query_result(
+        search_result,
         query_id,
         query,
         sql,
@@ -3059,6 +3179,7 @@ def insert_query_result(
         standard_answer_text,
         command_r_response,
         command_r_plus_response,
+        llama_3_3_70b_response,
         openai_gpt4o_response,
         openai_gpt4_response,
         azure_openai_gpt4o_response,
@@ -3068,6 +3189,7 @@ def insert_query_result(
         claude_3_haiku_response,
         command_r_evaluation,
         command_r_plus_evaluation,
+        llama_3_3_70b_evaluation,
         openai_gpt4o_evaluation,
         openai_gpt4_evaluation,
         azure_openai_gpt4o_evaluation,
@@ -3079,6 +3201,8 @@ def insert_query_result(
     print("in insert_query_result() start...")
     if not query:
         raise gr.Error("クエリを入力してください")
+    if search_result.empty or len(search_result) == 0:
+        return
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
             # 如果不存在记录，执行插入操作
@@ -3165,6 +3289,37 @@ def insert_query_result(
                         "cohere/command-r-plus",
                         command_r_plus_response,
                         command_r_plus_evaluation
+                    ]
+                )
+
+            if "meta/llama-3-3-70b" in llm_answer_checkbox_group:
+                llama_3_3_70b_response = llama_3_3_70b_response
+                if llm_evaluation_checkbox:
+                    llama_3_3_70b_evaluation = llama_3_3_70b_evaluation
+                else:
+                    llama_3_3_70b_evaluation = ""
+
+                insert_sql = """
+                                                INSERT INTO RAG_QA_FEEDBACK (
+                                                    query_id,
+                                                    llm_name,
+                                                    llm_answer,
+                                                    ragas_evaluation_result
+                                                ) VALUES (
+                                                    :1,
+                                                    :2,
+                                                    :3,
+                                                    :4
+                                                )
+                                            """
+                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.execute(
+                    insert_sql,
+                    [
+                        query_id,
+                        "meta/llama-3-3-70b",
+                        llama_3_3_70b_response,
+                        llama_3_3_70b_evaluation
                     ]
                 )
 
@@ -3624,6 +3779,7 @@ with gr.Blocks(css=custom_css) as app:
                             [
                                 "cohere/command-r",
                                 # "cohere/command-r-plus",
+                                "meta/llama-3-3-70b",
                                 "openai/gpt-4o",
                                 "openai/gpt-4",
                                 "azure_openai/gpt-4o",
@@ -3653,6 +3809,18 @@ with gr.Blocks(css=custom_css) as app:
                         open=True
                 ) as tab_chat_with_llm_command_r_plus_accordion:
                     tab_chat_with_command_r_plus_answer_text = gr.Textbox(
+                        label="LLM メッセージ", show_label=False,
+                        lines=2,
+                        autoscroll=True,
+                        interactive=False,
+                        show_copy_button=True
+                    )
+                with gr.Accordion(
+                        label="Llama 3.3 70b メッセージ",
+                        visible=False,
+                        open=True
+                ) as tab_chat_with_llm_llama_3_3_70b_accordion:
+                    tab_chat_with_llama_3_3_70b_answer_text = gr.Textbox(
                         label="LLM メッセージ", show_label=False,
                         lines=2,
                         autoscroll=True,
@@ -4006,6 +4174,7 @@ with gr.Blocks(css=custom_css) as app:
                             [
                                 "cohere/command-r",
                                 # "cohere/command-r-plus",
+                                "meta/llama-3-3-70b",
                                 "openai/gpt-4o",
                                 "openai/gpt-4",
                                 "azure_openai/gpt-4o",
@@ -4391,6 +4560,64 @@ with gr.Blocks(css=custom_css) as app:
                             open=True
                     ) as tab_chat_document_llm_command_r_plus_evaluation_accordion:
                         tab_chat_document_command_r_plus_evaluation_text = gr.Textbox(
+                            label="Ragas 評価結果",
+                            show_label=False,
+                            lines=2,
+                            autoscroll=True,
+                            interactive=False,
+                            show_copy_button=True
+                        )
+                with gr.Accordion(
+                        label="Llama 3.3 70b メッセージ",
+                        visible=False,
+                        open=True
+                ) as tab_chat_document_llm_llama_3_3_70b_accordion:
+                    tab_chat_document_llama_3_3_70b_answer_text = gr.Textbox(
+                        label="LLM メッセージ",
+                        show_label=False,
+                        lines=2,
+                        autoscroll=True,
+                        interactive=False,
+                        show_copy_button=True
+                    )
+                    with gr.Accordion(
+                            label="Human 評価",
+                            visible=True,
+                            open=True
+                    ) as tab_chat_document_llm_llama_3_3_70b_human_evaluation_accordion:
+                        with gr.Row():
+                            tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_radio = gr.Radio(
+                                show_label=False,
+                                choices=[
+                                    ("Good response", "good"),
+                                    ("Neutral response", "neutral"),
+                                    ("Bad response", "bad"),
+                                ],
+                                value="good",
+                                container=False,
+                                interactive=True,
+                            )
+                        with gr.Row():
+                            with gr.Column(scale=11):
+                                tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_text = gr.Textbox(
+                                    show_label=False,
+                                    container=False,
+                                    lines=2,
+                                    interactive=True,
+                                    autoscroll=True,
+                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                )
+                            with gr.Column(scale=1):
+                                tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_send_button = gr.Button(
+                                    value="送信",
+                                    variant="primary",
+                                )
+                    with gr.Accordion(
+                            label="Ragas 評価結果",
+                            visible=False,
+                            open=True
+                    ) as tab_chat_document_llm_llama_3_3_70b_evaluation_accordion:
+                        tab_chat_document_llama_3_3_70b_evaluation_text = gr.Textbox(
                             label="Ragas 評価結果",
                             show_label=False,
                             lines=2,
@@ -4908,6 +5135,7 @@ with gr.Blocks(css=custom_css) as app:
         outputs=[
             tab_chat_with_llm_command_r_accordion,
             tab_chat_with_llm_command_r_plus_accordion,
+            tab_chat_with_llm_llama_3_3_70b_accordion,
             tab_chat_with_llm_openai_gpt4o_accordion,
             tab_chat_with_llm_openai_gpt4_accordion,
             tab_chat_with_llm_azure_openai_gpt4o_accordion,
@@ -4923,6 +5151,7 @@ with gr.Blocks(css=custom_css) as app:
             tab_chat_with_llm_answer_checkbox_group,
             tab_chat_with_command_r_answer_text,
             tab_chat_with_command_r_plus_answer_text,
+            tab_chat_with_llama_3_3_70b_answer_text,
             tab_chat_with_openai_gpt4o_answer_text,
             tab_chat_with_openai_gpt4_answer_text,
             tab_chat_with_azure_openai_gpt4o_answer_text,
@@ -4942,6 +5171,7 @@ with gr.Blocks(css=custom_css) as app:
         outputs=[
             tab_chat_with_command_r_answer_text,
             tab_chat_with_command_r_plus_answer_text,
+            tab_chat_with_llama_3_3_70b_answer_text,
             tab_chat_with_openai_gpt4o_answer_text,
             tab_chat_with_openai_gpt4_answer_text,
             tab_chat_with_azure_openai_gpt4o_answer_text,
@@ -5081,6 +5311,7 @@ with gr.Blocks(css=custom_css) as app:
         outputs=[
             tab_chat_document_llm_command_r_accordion,
             tab_chat_document_llm_command_r_plus_accordion,
+            tab_chat_document_llm_llama_3_3_70b_accordion,
             tab_chat_document_llm_openai_gpt4o_accordion,
             tab_chat_document_llm_openai_gpt4_accordion,
             tab_chat_document_llm_azure_openai_gpt4o_accordion,
@@ -5111,6 +5342,7 @@ with gr.Blocks(css=custom_css) as app:
         outputs=[
             tab_chat_document_llm_command_r_evaluation_accordion,
             tab_chat_document_llm_command_r_plus_evaluation_accordion,
+            tab_chat_document_llm_llama_3_3_70b_evaluation_accordion,
             tab_chat_document_llm_openai_gpt4o_evaluation_accordion,
             tab_chat_document_llm_openai_gpt4_evaluation_accordion,
             tab_chat_document_llm_azure_openai_gpt4o_evaluation_accordion,
@@ -5146,6 +5378,9 @@ with gr.Blocks(css=custom_css) as app:
     #     outputs=[]
     # ).then(
     tab_chat_document_chat_document_button.click(
+        lambda: gr.DownloadButton(visible=False),
+        outputs=[tab_chat_document_download_output_button]
+    ).then(
         generate_query,
         inputs=[
             tab_chat_document_query_text,
@@ -5164,6 +5399,8 @@ with gr.Blocks(css=custom_css) as app:
             tab_chat_document_command_r_answer_human_eval_feedback_text,
             tab_chat_document_command_r_plus_answer_human_eval_feedback_radio,
             tab_chat_document_command_r_plus_answer_human_eval_feedback_text,
+            tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_radio,
+            tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_text,
             tab_chat_document_openai_gpt4o_answer_human_eval_feedback_radio,
             tab_chat_document_openai_gpt4o_answer_human_eval_feedback_text,
             tab_chat_document_openai_gpt4_answer_human_eval_feedback_radio,
@@ -5215,6 +5452,7 @@ with gr.Blocks(css=custom_css) as app:
         outputs=[
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
+            tab_chat_document_llama_3_3_70b_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
             tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
@@ -5226,12 +5464,14 @@ with gr.Blocks(css=custom_css) as app:
     ).then(
         eval_by_ragas,
         inputs=[
+            tab_chat_document_searched_result_dataframe,
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_llm_evaluation_checkbox,
             tab_chat_document_system_message_text,
             tab_chat_document_standard_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
+            tab_chat_document_llama_3_3_70b_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
             tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
@@ -5243,6 +5483,7 @@ with gr.Blocks(css=custom_css) as app:
         outputs=[
             tab_chat_document_command_r_evaluation_text,
             tab_chat_document_command_r_plus_evaluation_text,
+            tab_chat_document_llama_3_3_70b_evaluation_text,
             tab_chat_document_openai_gpt4o_evaluation_text,
             tab_chat_document_openai_gpt4_evaluation_text,
             tab_chat_document_azure_openai_gpt4o_evaluation_text,
@@ -5261,6 +5502,7 @@ with gr.Blocks(css=custom_css) as app:
             tab_chat_document_standard_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
+            tab_chat_document_llama_3_3_70b_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
             tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
@@ -5270,6 +5512,7 @@ with gr.Blocks(css=custom_css) as app:
             tab_chat_document_claude_3_haiku_answer_text,
             tab_chat_document_command_r_evaluation_text,
             tab_chat_document_command_r_plus_evaluation_text,
+            tab_chat_document_llama_3_3_70b_evaluation_text,
             tab_chat_document_openai_gpt4o_evaluation_text,
             tab_chat_document_openai_gpt4_evaluation_text,
             tab_chat_document_azure_openai_gpt4o_evaluation_text,
@@ -5290,6 +5533,7 @@ with gr.Blocks(css=custom_css) as app:
     ).then(
         insert_query_result,
         inputs=[
+            tab_chat_document_searched_result_dataframe,
             query_id_state,
             tab_chat_document_query_text,
             tab_chat_document_output_sql_text,
@@ -5298,6 +5542,7 @@ with gr.Blocks(css=custom_css) as app:
             tab_chat_document_standard_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
+            tab_chat_document_llama_3_3_70b_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
             tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
@@ -5307,6 +5552,7 @@ with gr.Blocks(css=custom_css) as app:
             tab_chat_document_claude_3_haiku_answer_text,
             tab_chat_document_command_r_evaluation_text,
             tab_chat_document_command_r_plus_evaluation_text,
+            tab_chat_document_llama_3_3_70b_evaluation_text,
             tab_chat_document_openai_gpt4o_evaluation_text,
             tab_chat_document_openai_gpt4_evaluation_text,
             tab_chat_document_azure_openai_gpt4o_evaluation_text,
@@ -5343,6 +5589,20 @@ with gr.Blocks(css=custom_css) as app:
         outputs=[
             tab_chat_document_command_r_plus_answer_human_eval_feedback_radio,
             tab_chat_document_command_r_plus_answer_human_eval_feedback_text,
+        ]
+    )
+
+    tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_send_button.click(
+        eval_by_human,
+        inputs=[
+            query_id_state,
+            gr.State(value="meta/llama-3-3-70b"),
+            tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_radio,
+            tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_text,
+        ],
+        outputs=[
+            tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_radio,
+            tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_text,
         ]
     )
 
