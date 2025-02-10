@@ -933,10 +933,28 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
 
 
 async def chat_stream(system_text, query_text, llm_answer_checkbox):
+    has_error = False
     if not llm_answer_checkbox or len(llm_answer_checkbox) == 0:
-        raise gr.Error("LLM モデルを選択してください")
+        has_error = True
+        gr.Warning("LLM モデルを選択してください")
     if not query_text:
-        raise gr.Error("ユーザー・メッセージを入力してください")
+        has_error = True
+        gr.Warning("ユーザー・メッセージを入力してください")
+
+    if has_error:
+        yield (
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+        )
+        return
     command_r_user_text = query_text
     command_r_plus_user_text = query_text
     llama_3_3_70b_user_text = query_text
@@ -1102,16 +1120,25 @@ def create_oci_cred(user_ocid, tenancy_ocid, fingerprint, private_key_file, regi
         processed_key = ''.join(line.strip() for line in lines if not line.startswith('--'))
         return processed_key
 
+    has_error = False
     if not user_ocid:
-        raise gr.Error("User OCIDを入力してください")
+        has_error = True
+        gr.Warning("User OCIDを入力してください")
     if not tenancy_ocid:
-        raise gr.Error("Tenancy OCIDを入力してください")
+        has_error = True
+        gr.Warning("Tenancy OCIDを入力してください")
     if not fingerprint:
-        raise gr.Error("Fingerprintを入力してください")
+        has_error = True
+        gr.Warning("Fingerprintを入力してください")
     if not private_key_file:
-        raise gr.Error("Private Keyを入力してください")
+        has_error = True
+        gr.Warning("Private Keyを入力してください")
     if not region:
-        raise gr.Error("Regionを選択してください")
+        has_error = True
+        gr.Warning("Regionを選択してください")
+
+    if has_error:
+        return gr.Accordion(), gr.Textbox()
 
     user_ocid = user_ocid.strip()
     tenancy_ocid = tenancy_ocid.strip()
@@ -1206,8 +1233,12 @@ END;
 
 
 def create_cohere_cred(cohere_cred_api_key):
+    has_error = False
     if not cohere_cred_api_key:
-        raise gr.Error("Cohere API Keyを入力してください")
+        has_error = True
+        gr.Warning("Cohere API Keyを入力してください")
+    if has_error:
+        return gr.Textbox()
     cohere_cred_api_key = cohere_cred_api_key.strip()
     env_path = find_dotenv()
     os.environ["COHERE_API_KEY"] = cohere_cred_api_key
@@ -1218,10 +1249,16 @@ def create_cohere_cred(cohere_cred_api_key):
 
 
 def create_openai_cred(openai_cred_base_url, openai_cred_api_key):
+    has_error = False
     if not openai_cred_base_url:
-        raise gr.Error("OpenAI Base URLを入力してください")
+        has_error = True
+        gr.Warning("OpenAI Base URLを入力してください")
     if not openai_cred_api_key:
-        raise gr.Error("OpenAI API Keyを入力してください")
+        has_error = True
+        gr.Warning("OpenAI API Keyを入力してください")
+    if has_error:
+        return gr.Textbox(), gr.Textbox()
+
     openai_cred_base_url = openai_cred_base_url.strip()
     openai_cred_api_key = openai_cred_api_key.strip()
     env_path = find_dotenv()
@@ -1239,17 +1276,22 @@ def create_azure_openai_cred(
         azure_openai_cred_endpoint_gpt_4o,
         azure_openai_cred_endpoint_gpt_4,
 ):
+    has_error = False
     if not azure_openai_cred_api_key:
-        raise gr.Error("Azure OpenAI API Keyを入力してください")
+        has_error = True
+        gr.Warning("Azure OpenAI API Keyを入力してください")
     if not azure_openai_cred_endpoint_gpt_4o:
-        raise gr.Error("Azure OpenAI GPT-4O Endpointを入力してください")
+        has_error = True
+        gr.Warning("Azure OpenAI GPT-4O Endpointを入力してください")
     if 'api-version=' not in azure_openai_cred_endpoint_gpt_4o:
-        raise gr.Error("Azure OpenAI GPT-4O Endpointにはapi-versionを入力してください")
+        has_error = True
+        gr.Warning("Azure OpenAI GPT-4O Endpointにはapi-versionを入力してください")
     if azure_openai_cred_endpoint_gpt_4 and 'api-version=' not in azure_openai_cred_endpoint_gpt_4:
-        raise gr.Error("Azure OpenAI GPT-4 Endpointにはapi-versionを入力してください")
+        has_error = True
+        gr.Warning("Azure OpenAI GPT-4 Endpointにはapi-versionを入力してください")
+    if has_error:
+        return gr.Textbox(), gr.Textbox(), gr.Textbox()
 
-    # if not azure_openai_cred_api_version_gpt_4o:
-    #     raise gr.Error("Azure OpenAI GPT-4O API Versionを入力してください")
     azure_openai_cred_api_key = azure_openai_cred_api_key.strip()
     azure_openai_cred_endpoint_gpt_4o = azure_openai_cred_endpoint_gpt_4o.strip() if azure_openai_cred_endpoint_gpt_4o else ""
     azure_openai_cred_api_version_gpt_4o = re.search(r"api-version=([^&]+)", azure_openai_cred_endpoint_gpt_4o).group(
@@ -1284,8 +1326,13 @@ def create_azure_openai_cred(
 
 
 def create_claude_cred(claude_cred_api_key):
+    has_error = False
     if not claude_cred_api_key:
-        raise gr.Error("Claude API Keyを入力してください")
+        has_error = True
+        gr.Warning("Claude API Keyを入力してください")
+    if has_error:
+        return gr.Textbox()
+
     claude_cred_api_key = claude_cred_api_key.strip()
     env_path = find_dotenv()
     os.environ["ANTHROPIC_API_KEY"] = claude_cred_api_key
@@ -1296,12 +1343,19 @@ def create_claude_cred(claude_cred_api_key):
 
 
 def create_langfuse_cred(langfuse_cred_secret_key, langfuse_cred_public_key, langfuse_cred_host):
+    has_error = False
     if not langfuse_cred_secret_key:
-        raise gr.Error("Langfuse Secret Keyを入力してください")
+        has_error = True
+        gr.Warning("Langfuse Secret Keyを入力してください")
     if not langfuse_cred_public_key:
-        raise gr.Error("Langfuse Public Keyを入力してください")
+        has_error = True
+        gr.Warning("Langfuse Public Keyを入力してください")
     if not langfuse_cred_host:
-        raise gr.Error("Langfuse Hostを入力してください")
+        has_error = True
+        gr.Warning("Langfuse Hostを入力してください")
+    if has_error:
+        return gr.Textbox(), gr.Textbox(), gr.Textbox()
+
     langfuse_cred_secret_key = langfuse_cred_secret_key.strip()
     langfuse_cred_public_key = langfuse_cred_public_key.strip()
     langfuse_cred_host = langfuse_cred_host.strip()
@@ -1314,8 +1368,11 @@ def create_langfuse_cred(langfuse_cred_secret_key, langfuse_cred_public_key, lan
     set_key(env_path, "LANGFUSE_HOST", langfuse_cred_host, quote_mode="never")
     load_dotenv(env_path)
     gr.Info("LangFuseの設定が完了しました")
-    return gr.Textbox(value=langfuse_cred_secret_key), gr.Textbox(value=langfuse_cred_public_key), gr.Textbox(
-        value=langfuse_cred_host)
+    return (
+        gr.Textbox(value=langfuse_cred_secret_key),
+        gr.Textbox(value=langfuse_cred_public_key),
+        gr.Textbox(value=langfuse_cred_host)
+    )
 
 
 def create_table():
@@ -1383,7 +1440,7 @@ CREATE TABLE IF NOT EXISTS RAG_QA_RESULT (
     id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     query_id VARCHAR2(100),
     query VARCHAR2(4000),
-    standard_answer VARCHAR2(4000),
+    standard_answer VARCHAR2(30000),
     sql CLOB,
     created_date TIMESTAMP DEFAULT TO_TIMESTAMP(TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS')
 )
@@ -1398,10 +1455,10 @@ CREATE TABLE IF NOT EXISTS RAG_QA_FEEDBACK (
     id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     query_id VARCHAR2(100),
     llm_name VARCHAR2(100),
-    llm_answer VARCHAR2(4000),
-    ragas_evaluation_result VARCHAR2(4000),
+    llm_answer VARCHAR2(30000),
+    ragas_evaluation_result VARCHAR2(30000),
     human_evaluation_result VARCHAR2(20),
-    user_comment VARCHAR2(4000),
+    user_comment VARCHAR2(30000),
     created_date TIMESTAMP DEFAULT TO_TIMESTAMP(TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS')
 )
 """
@@ -1516,8 +1573,13 @@ END; """
 
 
 def load_document(file_path, server_directory):
+    has_error = False
     if not file_path:
-        raise gr.Error("ファイルを選択してください")
+        has_error = True
+        gr.Warning("ファイルを選択してください")
+    if has_error:
+        return gr.Textbox(value=""), gr.Textbox(value=""), gr.Textbox(value=""), gr.Textbox(value="")
+
     if not os.path.exists(server_directory):
         os.makedirs(server_directory)
     doc_id = generate_unique_id("doc_")
@@ -1591,8 +1653,12 @@ VALUES (:id, to_blob(:data), :cmetadata) """
     #             result = cursor.fetchone()
     #             contents = result[0].read()
 
-    return gr.Textbox(value=output_sql_text.strip()), gr.Textbox(value=doc_id), gr.Textbox(
-        value=str(pages_count)), gr.Textbox(value=original_contents)
+    return (
+        gr.Textbox(value=output_sql_text.strip()),
+        gr.Textbox(value=doc_id),
+        gr.Textbox(value=str(pages_count)),
+        gr.Textbox(value=original_contents)
+    )
 
 
 def split_document_by_oracle(doc_id, chunks_by, chunks_max_size,
@@ -1667,8 +1733,16 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
                                    chunks_split_by, chunks_split_by_custom,
                                    chunks_language, chunks_normalize,
                                    chunks_normalize_options):
+    has_error = False
     if not doc_id:
-        raise gr.Error("ドキュメントを選択してください")
+        has_error = True
+        gr.Warning("ドキュメントを選択してください")
+    if has_error:
+        return (
+            gr.Textbox(value=""),
+            gr.Textbox(value=""),
+            gr.Dataframe(value=None, row_count=(1, "fixed"))
+        )
     # print(f"{chunks_normalize_options=}")
     output_sql = ""
     server_path = get_server_path(doc_id)
@@ -1763,8 +1837,17 @@ def embed_save_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
                                         chunks_split_by, chunks_split_by_custom,
                                         chunks_language, chunks_normalize,
                                         chunks_normalize_options):
+    has_error = False
     if not doc_id:
-        raise gr.Error("ドキュメントを選択してください")
+        has_error = True
+        gr.Warning("ドキュメントを選択してください")
+    if has_error:
+        return (
+            gr.Textbox(value=""),
+            gr.Textbox(value=""),
+            gr.Dataframe(value=None, row_count=(1, "fixed"))
+        )
+
     output_sql = ""
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
@@ -1804,23 +1887,14 @@ WHERE doc_id = :doc_id and embed_id = :embed_id
     )
 
 
-# def check_chat_document_input(
-#         llm_answer_checkbox_group,
-#         llm_evaluation_checkbox,
-#         eval_system_message_text,
-#         eval_standard_answer_text
-# ):
-#     if llm_evaluation_checkbox and (not llm_answer_checkbox_group or llm_answer_checkbox_group == [""]):
-#         raise gr.Error("Ragas 評価をオンにする場合、少なくとも1つのLLM モデルを選択してください")
-#     if llm_evaluation_checkbox and not eval_system_message_text:
-#         raise gr.Error("Ragas 評価のシステム・メッセージを入力してください")
-#     if llm_evaluation_checkbox and not eval_standard_answer_text:
-#         raise gr.Error("Ragas 評価の標準回答を入力してください")
-
-
 def generate_query(query_text, generate_query_radio):
+    has_error = False
     if not query_text:
-        raise gr.Error("クエリを入力してください")
+        has_error = True
+        gr.Warning("クエリを入力してください")
+    if has_error:
+        return gr.Textbox(value=""), gr.Textbox(value=""), gr.Textbox(value="")
+
     generate_query1 = ""
     generate_query2 = ""
     generate_query3 = ""
@@ -1991,7 +2065,11 @@ def generate_query(query_text, generate_query_radio):
             generate_query2 = multi_step_queries[1]
             generate_query3 = multi_step_queries[2]
 
-    return gr.Textbox(value=generate_query1), gr.Textbox(value=generate_query2), gr.Textbox(value=generate_query3)
+    return (
+        gr.Textbox(value=generate_query1),
+        gr.Textbox(value=generate_query2),
+        gr.Textbox(value=generate_query3)
+    )
 
 
 def search_document(
@@ -2017,8 +2095,25 @@ def search_document(
     Retrieve relevant splits for any question using similarity search.
     This is simply "top K" retrieval where we select documents based on embedding similarity to the query.
     """
+    has_error = False
+    if not query_text_input:
+        has_error = True
+        # gr.Warning("クエリを入力してください")
     if not doc_id_all_checkbox_input and (not doc_id_checkbox_group_input or doc_id_checkbox_group_input == [""]):
-        raise gr.Error("ドキュメントを選択してください")
+        has_error = True
+        gr.Warning("ドキュメントを選択してください")
+    if has_error:
+        return (
+            gr.Textbox(value=""),
+            gr.Markdown(
+                "**検索結果数**: 0   |   **検索キーワード**: (0)[]",
+                visible=True
+            ),
+            gr.Dataframe(
+                value=None,
+                row_count=(1, "fixed")
+            )
+        )
 
     def cut_lists(lists, limit=10):
         if not lists or len(lists) == 0:
@@ -2525,9 +2620,35 @@ ORDER
 
 async def chat_document(search_result,
                         llm_answer_checkbox,
-                        query_text):
-    if search_result.empty or len(search_result) == 0:
-        raise gr.Error("検索結果が見つかりませんでした。設定もしくはクエリを変更して再度ご確認ください。")
+                        include_citation_checkbox,
+                        query_text,
+                        doc_id_all_checkbox_input,
+                        doc_id_checkbox_group_input):
+    has_error = False
+    if not query_text:
+        has_error = True
+        # gr.Warning("クエリを入力してください")
+    if not doc_id_all_checkbox_input and (not doc_id_checkbox_group_input or doc_id_checkbox_group_input == [""]):
+        has_error = True
+        # gr.Warning("ドキュメントを選択してください")
+    if search_result.empty or (len(search_result) > 0 and search_result.iloc[0]['CONTENT'] == ''):
+        has_error = True
+        gr.Warning("検索結果が見つかりませんでした。設定もしくはクエリを変更して再度ご確認ください。")
+    if has_error:
+        yield (
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+        )
+        return
+
     query_text = query_text.strip()
 
     command_r_response = ""
@@ -2590,7 +2711,10 @@ async def chat_document(search_result,
 もし答えがわからない場合は、「わかりません」と言ってください。答えをでっち上げようとしないでください。  
 コンテキストの正確なテキストを使用し、**一切の修正、再構成、または脚色を加えずに**使用してください。  
 コンテキストにないことについては答えようとしないでください。  
+"""
 
+    if include_citation_checkbox:
+        system_text += f"""
 After providing the answer, include the 'EMBED_ID' and 'SOURCE' and 'CONTENT' of the 'CONTENT' used to formulate the answer in JSON format.
 The JSON array must strictly follow this structure:
 
@@ -2603,7 +2727,9 @@ The JSON array must strictly follow this structure:
 ]
 
 If multiple pieces of CONTENT are used, include all relevant EMBED_IDs and SOURCEs in the JSON array.
+"""
 
+    system_text += f"""
 コンテキスト:
 ```
 {context}
@@ -2676,6 +2802,9 @@ If multiple pieces of CONTENT are used, include all relevant EMBED_IDs and SOURC
 
 
 async def eval_by_ragas(
+        query_text,
+        doc_id_all_checkbox_input,
+        doc_id_checkbox_group_input,
         search_result,
         llm_answer_checkbox_group,
         llm_evaluation_checkbox,
@@ -2692,14 +2821,39 @@ async def eval_by_ragas(
         claude_3_sonnet_response,
         claude_3_haiku_response
 ):
-    if search_result.empty or len(search_result) == 0:
-        raise gr.Error("検索結果が見つかりませんでした。設定もしくはクエリを変更して再度ご確認ください。")
+    has_error = False
+    if not query_text:
+        has_error = True
+        # gr.Warning("クエリを入力してください")
+    if not doc_id_all_checkbox_input and (not doc_id_checkbox_group_input or doc_id_checkbox_group_input == [""]):
+        has_error = True
+        # gr.Warning("ドキュメントを選択してください")
+    if search_result.empty or (len(search_result) > 0 and search_result.iloc[0]['CONTENT'] == ''):
+        has_error = True
+        # gr.Warning("検索結果が見つかりませんでした。設定もしくはクエリを変更して再度ご確認ください。")
     if llm_evaluation_checkbox and (not llm_answer_checkbox_group or llm_answer_checkbox_group == [""]):
-        raise gr.Error("Ragas 評価をオンにする場合、少なくとも1つのLLM モデルを選択してください")
+        has_error = True
+        gr.Warning("Ragas 評価をオンにする場合、少なくとも1つのLLM モデルを選択してください")
     if llm_evaluation_checkbox and not system_text:
-        raise gr.Error("Ragas 評価のシステム・メッセージを入力してください")
+        has_error = True
+        gr.Warning("Ragas 評価をオンにする場合、Ragas 評価のシステム・メッセージを入力してください")
     if llm_evaluation_checkbox and not standard_answer_text:
-        raise gr.Error("Ragas 評価の標準回答を入力してください")
+        has_error = True
+        gr.Warning("Ragas 評価をオンにする場合、Ragas 評価の標準回答を入力してください")
+    if has_error:
+        yield (
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+        )
+        return
 
     def remove_last_line(text):
         if text:
@@ -2716,7 +2870,18 @@ async def eval_by_ragas(
         standard_answer_text = "入力されていません。"
     print(f"{llm_evaluation_checkbox=}")
     if not llm_evaluation_checkbox:
-        yield ("", "", "", "", "", "", "", "", "", "")
+        yield (
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+        )
     else:
         command_r_checkbox = False
         command_r_plus_checkbox = False
@@ -2913,6 +3078,8 @@ def generate_download_file(
         llm_answer_checkbox_group,
         llm_evaluation_checkbox,
         query_text,
+        doc_id_all_checkbox_input,
+        doc_id_checkbox_group_input,
         standard_answer_text,
         command_r_response,
         command_r_plus_response,
@@ -2935,8 +3102,12 @@ def generate_download_file(
         claude_3_sonnet_evaluation,
         claude_3_haiku_evaluation
 ):
-    if search_result.empty or len(search_result) == 0:
-        return gr.DownloadButton(visible=False)
+    if not query_text:
+        return gr.DownloadButton(value=None, visible=False)
+    if not doc_id_all_checkbox_input and (not doc_id_checkbox_group_input or doc_id_checkbox_group_input == [""]):
+        return gr.DownloadButton(value=None, visible=False)
+    if search_result.empty or (len(search_result) > 0 and search_result.iloc[0]['CONTENT'] == ''):
+        return gr.DownloadButton(value=None, visible=False)
     # 创建一些示例 DataFrame
     if llm_evaluation_checkbox:
         standard_answer_text = standard_answer_text
@@ -3173,6 +3344,8 @@ def insert_query_result(
         search_result,
         query_id,
         query,
+        doc_id_all_checkbox_input,
+        doc_id_checkbox_group_input,
         sql,
         llm_answer_checkbox_group,
         llm_evaluation_checkbox,
@@ -3200,8 +3373,10 @@ def insert_query_result(
 ):
     print("in insert_query_result() start...")
     if not query:
-        raise gr.Error("クエリを入力してください")
-    if search_result.empty or len(search_result) == 0:
+        return
+    if not doc_id_all_checkbox_input and (not doc_id_checkbox_group_input or doc_id_checkbox_group_input == [""]):
+        return
+    if search_result.empty or (len(search_result) > 0 and search_result.iloc[0]['CONTENT'] == ''):
         return
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
@@ -3544,11 +3719,21 @@ def insert_query_result(
 
 
 def delete_document(server_directory, doc_ids):
+    has_error = False
     if not server_directory:
-        raise gr.Error("サーバー・ディレクトリを入力してください")
+        has_error = True
+        gr.Warning("サーバー・ディレクトリを入力してください")
     print(f"{doc_ids=}")
     if not doc_ids or len(doc_ids) == 0 or (len(doc_ids) == 1 and doc_ids[0] == ''):
-        raise gr.Error("ドキュメントを選択してください")
+        has_error = True
+        gr.Warning("ドキュメントを選択してください")
+    if has_error:
+        return (
+            gr.Textbox(value=""),
+            gr.Radio(),
+            gr.CheckboxGroup(),
+            gr.CheckboxGroup()
+        )
 
     output_sql = ""
     with pool.acquire() as conn, conn.cursor() as cursor:
@@ -4293,6 +4478,15 @@ with gr.Blocks(css=custom_css) as app:
                                 value=6,
                                 info="Default value: 6。テキスト検索に使用できる単語数の制限。"
                             )
+                    with gr.Row():
+                        with gr.Column():
+                            tab_chat_document_include_citation_checkbox = gr.Checkbox(
+                                label="回答に引用を含める",
+                                value=False,
+                                info="回答には引用を含め、使用したコンテキストのみを引用として出力する。"
+                            )
+                        with gr.Column():
+                            pass
                 with gr.Row(visible=False):
                     tab_chat_document_accuracy_plan_radio = gr.Radio(
                         [
@@ -5447,7 +5641,10 @@ with gr.Blocks(css=custom_css) as app:
         inputs=[
             tab_chat_document_searched_result_dataframe,
             tab_chat_document_llm_answer_checkbox_group,
+            tab_chat_document_include_citation_checkbox,
             tab_chat_document_query_text,
+            tab_chat_document_doc_id_all_checkbox,
+            tab_chat_document_doc_id_checkbox_group,
         ],
         outputs=[
             tab_chat_document_command_r_answer_text,
@@ -5464,6 +5661,9 @@ with gr.Blocks(css=custom_css) as app:
     ).then(
         eval_by_ragas,
         inputs=[
+            tab_chat_document_query_text,
+            tab_chat_document_doc_id_all_checkbox,
+            tab_chat_document_doc_id_checkbox_group,
             tab_chat_document_searched_result_dataframe,
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_llm_evaluation_checkbox,
@@ -5499,6 +5699,8 @@ with gr.Blocks(css=custom_css) as app:
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_llm_evaluation_checkbox,
             tab_chat_document_query_text,
+            tab_chat_document_doc_id_all_checkbox,
+            tab_chat_document_doc_id_checkbox_group,
             tab_chat_document_standard_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
@@ -5536,6 +5738,8 @@ with gr.Blocks(css=custom_css) as app:
             tab_chat_document_searched_result_dataframe,
             query_id_state,
             tab_chat_document_query_text,
+            tab_chat_document_doc_id_all_checkbox,
+            tab_chat_document_doc_id_checkbox_group,
             tab_chat_document_output_sql_text,
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_llm_evaluation_checkbox,
