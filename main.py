@@ -25,10 +25,10 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langfuse.callback import CallbackHandler
 from oracledb import DatabaseError
-from unstructured.chunking.title import chunk_by_title
 from unstructured.partition.auto import partition
 
 from my_langchain_community.vectorstores import MyOracleVS
+from utils.chunk_util import RecursiveCharacterTextSplitter
 from utils.common_util import get_dict_value
 from utils.generator_util import generate_unique_id
 
@@ -433,14 +433,16 @@ def process_text_chunks(unstructured_chunks):
     start_offset = 1
 
     for chunk in unstructured_chunks:
-        chunk_length = len(chunk.text)
+        # chunk_length = len(chunk.text)
+        chunk_length = len(chunk)
         if chunk_length == 0:
             continue
         chunks.append({
             'CHUNK_ID': chunk_id,
             'CHUNK_OFFSET': start_offset,
             'CHUNK_LENGTH': chunk_length,
-            'CHUNK_DATA': chunk.text
+            # 'CHUNK_DATA': chunk.text
+            'CHUNK_DATA': chunk
         })
 
         # 更新 ID 和偏移量
@@ -1621,7 +1623,7 @@ def load_document(file_path, server_directory):
                          extract_image_block_to_payload=False,
                          # skip_infer_table_types=["pdf", "ppt", "pptx", "doc", "docx", "xls", "xlsx"])
                          skip_infer_table_types=["pdf", "jpg", "png", "heic", "doc", "docx"])
-    original_contents = "\n\n".join(el.text.replace('\x0b', '\n') for el in elements)
+    original_contents = " \n".join(el.text.replace('\x0b', '\n') for el in elements)
     print(f"{original_contents=}")
 
     collection_cmeta['file_name'] = file_name
@@ -1661,71 +1663,71 @@ VALUES (:id, to_blob(:data), :cmetadata) """
     )
 
 
-def split_document_by_oracle(doc_id, chunks_by, chunks_max_size,
-                             chunks_overlap_size,
-                             chunks_split_by, chunks_split_by_custom,
-                             chunks_language, chunks_normalize,
-                             chunks_normalize_options):
-    # print(f"{chunks_normalize_options=}")
-    with pool.acquire() as conn:
-        with conn.cursor() as cursor:
-            parameter_str = '{"by": "' + chunks_by + '","max": "' + str(
-                chunks_max_size) + '", "overlap": "' + str(
-                int(int(
-                    chunks_max_size) * chunks_overlap_size / 100)) + '", "split": "' + chunks_split_by + '", '
-            if chunks_split_by == "CUSTOM":
-                parameter_str += '"custom_list": [' + chunks_split_by_custom + '], '
-            parameter_str += '"language": "' + chunks_language + '", '
-            if chunks_normalize == "NONE" or chunks_normalize == "ALL":
-                parameter_str += '"normalize": "' + chunks_normalize + '"}'
-            else:
-                parameter_str += '"normalize": "' + chunks_normalize + '", "norm_options": [' + ", ".join(
-                    ['"' + s + '"' for s in chunks_normalize_options]) + ']}'
-
-            # print(f"{parameter_str}")
-            select_chunks_sql = f"""
--- Select chunks            
-SELECT
-    json_value(ct.column_value, '$.chunk_id')     AS chunk_id,
-    json_value(ct.column_value, '$.chunk_offset') AS chunk_offset,
-    json_value(ct.column_value, '$.chunk_length') AS chunk_length,
-    json_value(ct.column_value, '$.chunk_data')   AS chunk_data
-FROM
-    {DEFAULT_COLLECTION_NAME}_collection dt, 
-    dbms_vector_chain.utl_to_chunks(
-        dbms_vector_chain.utl_to_text(dt.data),
-        JSON(
-            :parameter_str
-        )
-    ) ct
-    CROSS JOIN
-        JSON_TABLE ( ct.column_value, '$[*]'
-            COLUMNS (
-                column_value VARCHAR2 ( 4000 ) PATH '$'
-            )
-        )
-WHERE
-    dt.id = :doc_id """
-            # cursor.setinputsizes(oracledb.DB_TYPE_VECTOR)
-            utl_to_chunks_sql_output = "\n" + select_chunks_sql.replace(':parameter_str',
-                                                                        "'" + parameter_str + "'").replace(
-                ':doc_id', "'" + str(doc_id) + "'") + ";"
-            # print(f"{utl_to_chunks_sql_output=}")
-            cursor.execute(select_chunks_sql,
-                           [parameter_str, doc_id])
-            chunks = []
-            for row in cursor:
-                chunks.append({'CHUNK_ID': row[0],
-                               'CHUNK_OFFSET': row[1], 'CHUNK_LENGTH': row[2], 'CHUNK_DATA': row[3]})
-
-            conn.commit()
-
-    chunks_dataframe = pd.DataFrame(chunks)
-    return (
-        gr.Textbox(utl_to_chunks_sql_output.strip()),
-        gr.Textbox(value=str(len(chunks_dataframe))),
-        gr.Dataframe(value=chunks_dataframe)
-    )
+# def split_document_by_oracle(doc_id, chunks_by, chunks_max_size,
+#                              chunks_overlap_size,
+#                              chunks_split_by, chunks_split_by_custom,
+#                              chunks_language, chunks_normalize,
+#                              chunks_normalize_options):
+#     # print(f"{chunks_normalize_options=}")
+#     with pool.acquire() as conn:
+#         with conn.cursor() as cursor:
+#             parameter_str = '{"by": "' + chunks_by + '","max": "' + str(
+#                 chunks_max_size) + '", "overlap": "' + str(
+#                 int(int(
+#                     chunks_max_size) * chunks_overlap_size / 100)) + '", "split": "' + chunks_split_by + '", '
+#             if chunks_split_by == "CUSTOM":
+#                 parameter_str += '"custom_list": [' + chunks_split_by_custom + '], '
+#             parameter_str += '"language": "' + chunks_language + '", '
+#             if chunks_normalize == "NONE" or chunks_normalize == "ALL":
+#                 parameter_str += '"normalize": "' + chunks_normalize + '"}'
+#             else:
+#                 parameter_str += '"normalize": "' + chunks_normalize + '", "norm_options": [' + ", ".join(
+#                     ['"' + s + '"' for s in chunks_normalize_options]) + ']}'
+#
+#             # print(f"{parameter_str}")
+#             select_chunks_sql = f"""
+# -- Select chunks
+# SELECT
+#     json_value(ct.column_value, '$.chunk_id')     AS chunk_id,
+#     json_value(ct.column_value, '$.chunk_offset') AS chunk_offset,
+#     json_value(ct.column_value, '$.chunk_length') AS chunk_length,
+#     json_value(ct.column_value, '$.chunk_data')   AS chunk_data
+# FROM
+#     {DEFAULT_COLLECTION_NAME}_collection dt,
+#     dbms_vector_chain.utl_to_chunks(
+#         dbms_vector_chain.utl_to_text(dt.data),
+#         JSON(
+#             :parameter_str
+#         )
+#     ) ct
+#     CROSS JOIN
+#         JSON_TABLE ( ct.column_value, '$[*]'
+#             COLUMNS (
+#                 column_value VARCHAR2 ( 4000 ) PATH '$'
+#             )
+#         )
+# WHERE
+#     dt.id = :doc_id """
+#             # cursor.setinputsizes(oracledb.DB_TYPE_VECTOR)
+#             utl_to_chunks_sql_output = "\n" + select_chunks_sql.replace(':parameter_str',
+#                                                                         "'" + parameter_str + "'").replace(
+#                 ':doc_id', "'" + str(doc_id) + "'") + ";"
+#             # print(f"{utl_to_chunks_sql_output=}")
+#             cursor.execute(select_chunks_sql,
+#                            [parameter_str, doc_id])
+#             chunks = []
+#             for row in cursor:
+#                 chunks.append({'CHUNK_ID': row[0],
+#                                'CHUNK_OFFSET': row[1], 'CHUNK_LENGTH': row[2], 'CHUNK_DATA': row[3]})
+#
+#             conn.commit()
+#
+#     chunks_dataframe = pd.DataFrame(chunks)
+#     return (
+#         gr.Textbox(utl_to_chunks_sql_output.strip()),
+#         gr.Textbox(value=str(len(chunks_dataframe))),
+#         gr.Dataframe(value=chunks_dataframe)
+#     )
 
 
 def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
@@ -1788,13 +1790,24 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
                         print(f"After: {el.text=}")
             table_idx += 1
 
+    chunks_overlap = int(float(chunks_max_size) * (float(chunks_overlap_size) / 100))
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunks_max_size - chunks_overlap,
+        chunk_overlap=chunks_overlap
+    )
+
     for element in elements:
         element.text = element.text.replace('\x0b', '\n')
-    unstructured_chunks = chunk_by_title(elements, include_orig_elements=True,
-                                         max_characters=int(chunks_max_size),
-                                         multipage_sections=True, new_after_n_chars=int(chunks_max_size),
-                                         overlap=int(float(chunks_max_size) * (float(chunks_overlap_size) / 100)),
-                                         overlap_all=True)
+    # unstructured_chunks = chunk_by_title(
+    #     elements,
+    #     include_orig_elements=True,
+    #     max_characters=int(chunks_max_size),
+    #     multipage_sections=True,
+    #     new_after_n_chars=int(chunks_max_size),
+    #     overlap=int(float(chunks_max_size) * (float(chunks_overlap_size) / 100)),
+    #     overlap_all=True
+    # )
+    unstructured_chunks = text_splitter.split_text(" \n".join([element.text for element in elements]))
 
     chunks = process_text_chunks(unstructured_chunks)
     chunks_dataframe = pd.DataFrame(chunks)
@@ -4267,7 +4280,7 @@ with gr.Blocks(css=custom_css) as app:
                                 minimum=0,
                                 maximum=20,
                                 step=5,
-                                value=10,
+                                value=0,
                                 info="",
                             )
                     with gr.Row():
