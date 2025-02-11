@@ -9,7 +9,7 @@ def _split_text_with_regex(
 ) -> List[str]:
     # Now that we have the separator, split the text
     if separator:
-        if separator == "<FIXED_SEP>":
+        if separator == "<FIXED_DELIMITER>":
             keep_separator = False
         if separator in ["\\\n\\\n", "\\\n", " ", ""]:
             keep_separator = False
@@ -32,7 +32,7 @@ def _split_text_with_regex(
             splits = re.split(separator, text)
     else:
         splits = list(text)
-    return [s for s in splits if s != ""]
+    return [s for s in splits if s != "" and s.strip() != ""]
 
 
 class RecursiveCharacterTextSplitter(TextSplitter):
@@ -51,8 +51,8 @@ class RecursiveCharacterTextSplitter(TextSplitter):
     ) -> None:
         """Create a new TextSplitter."""
         super().__init__(keep_separator=keep_separator, **kwargs)
-        # special fixed separator is <FIXED_SEP>
-        self._separators = separators or ["<FIXED_SEP>", "\n\n", "。", ". ", "\n", " ", ""]
+        # special fixed separator is <FIXED_DELIMITER>
+        self._separators = separators or ["<FIXED_DELIMITER>", "\n\n", "。", ". ", "\n", " ", ""]
         self._is_separator_regex = is_separator_regex
 
     def _split_text(self, text: str, separators: List[str]) -> List[str]:
@@ -78,7 +78,7 @@ class RecursiveCharacterTextSplitter(TextSplitter):
         _good_splits = []
         _separator = "" if self._keep_separator else separator
         for s in splits:
-            if separator == "<FIXED_SEP>":
+            if separator == "<FIXED_DELIMITER>":
                 final_chunks.append(s)
             else:
                 if self._length_function(s) < self._chunk_size:

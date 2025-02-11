@@ -5,6 +5,7 @@ import platform
 import re
 import shutil
 import time
+from datetime import datetime
 from itertools import combinations
 from typing import List, Tuple
 
@@ -15,6 +16,7 @@ import oracledb
 import pandas as pd
 import requests
 from dotenv import load_dotenv, find_dotenv, set_key, get_key
+from gradio.themes import GoogleFont
 from langchain_anthropic import ChatAnthropic
 from langchain_community.chat_models import ChatOCIGenAI
 from langchain_community.embeddings import OCIGenAIEmbeddings
@@ -32,7 +34,7 @@ from utils.chunk_util import RecursiveCharacterTextSplitter
 from utils.common_util import get_dict_value
 from utils.generator_util import generate_unique_id
 
-custom_css = """
+""" NOT USE
 @font-face {
   font-family: 'Noto Sans JP';
   src: url('fonts/NotoSansJP-Regular.otf') format('opentype');
@@ -75,7 +77,9 @@ custom_css = """
 html, body, div, table, tr, td, p, strong, button {
   font-family: var(--global-font-family) !important;
 }
+"""
 
+custom_css = """
 /* Hide sort buttons at gr.DataFrame */
 .sort-button {
     display: none !important;
@@ -1574,6 +1578,31 @@ END; """
     return gr.Textbox(value=test_query_vector)
 
 
+def convert_excel_document(file_path):
+    has_error = False
+    if not file_path:
+        has_error = True
+        gr.Warning("ファイルを選択してください")
+    if has_error:
+        return gr.File(value=None)
+
+    output_file_path = file_path.name + '.txt'
+    df = pd.read_excel(file_path.name)
+    data = df.to_dict('records')
+    with open(output_file_path, 'w', encoding='utf-8') as f:
+        for row in data:
+            # Process each row to convert Timestamps to strings
+            processed_row = {}
+            for key, value in row.items():
+                if isinstance(value, pd.Timestamp):
+                    processed_row[key] = str(value)
+                else:
+                    processed_row[key] = value
+            json_line = json.dumps(processed_row, ensure_ascii=False)
+            f.write(json_line + ' <FIXED_DELIMITER>\n')
+    return gr.File(value=output_file_path)
+
+
 def load_document(file_path, server_directory):
     has_error = False
     if not file_path:
@@ -1623,6 +1652,8 @@ def load_document(file_path, server_directory):
                          extract_image_block_to_payload=False,
                          # skip_infer_table_types=["pdf", "ppt", "pptx", "doc", "docx", "xls", "xlsx"])
                          skip_infer_table_types=["pdf", "jpg", "png", "heic", "doc", "docx"])
+    for el in elements:
+        print(f"{el=}")
     original_contents = " \n".join(el.text.replace('\x0b', '\n') for el in elements)
     print(f"{original_contents=}")
 
@@ -2633,7 +2664,8 @@ ORDER
 
 async def chat_document(search_result,
                         llm_answer_checkbox,
-                        include_citation_checkbox,
+                        include_citation,
+                        include_current_time,
                         query_text,
                         doc_id_all_checkbox_input,
                         doc_id_checkbox_group_input):
@@ -2726,7 +2758,7 @@ async def chat_document(search_result,
 コンテキストにないことについては答えようとしないでください。  
 """
 
-    if include_citation_checkbox:
+    if include_citation:
         system_text += f"""
 After providing the answer, include the 'EMBED_ID' and 'SOURCE' and 'CONTENT' of the 'CONTENT' used to formulate the answer in JSON format.
 The JSON array must strictly follow this structure:
@@ -2740,6 +2772,18 @@ The JSON array must strictly follow this structure:
 ]
 
 If multiple pieces of CONTENT are used, include all relevant EMBED_IDs and SOURCEs in the JSON array.
+"""
+
+    current_time = datetime.now()
+    formatted_time = current_time.strftime('%Y%m%d%H%M%S')
+
+    if include_current_time:
+        system_text += f"""
+The current time is {formatted_time} in format '%Y%m%d%H%M%S', When the Context contains multiple entries with dates, 
+please consider these dates carefully when answering the question:
+- If the question asks about the "latest" or "most recent" information, use data from the most recent date
+- If the question asks about a specific time period, use data from that corresponding time period
+- If comparing different time periods, clearly specify which date's data you are referencing
 """
 
     system_text += f"""
@@ -3780,7 +3824,9 @@ WHERE id = :doc_id """
     )
 
 
-with gr.Blocks(css=custom_css) as app:
+font = [GoogleFont(name="Noto Sans JP"), GoogleFont(name="Noto Sans SC"), GoogleFont(name="Roboto")]
+
+with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
     gr.Markdown(value="# RAG精度あげたろう", elem_classes="main_Header")
     gr.Markdown(value="### LLM&RAG精度検証ツール", elem_classes="sub_Header")
 
@@ -4146,6 +4192,29 @@ with gr.Blocks(css=custom_css) as app:
                     with gr.Column():
                         gr.Examples(examples=[], inputs=tab_chat_with_llm_query_text)
         with gr.TabItem(label="RAG評価", elem_classes="inner_tab") as tab_rag_evaluation:
+            with gr.TabItem(label="Step-0.前処理") as tab_convert_document:
+                with gr.Row():
+                    with gr.Column():
+                        tab_convert_document_before_file_text = gr.File(
+                            label="変換前のファイル*",
+                            file_types=[
+                                "csv", "xls", "xlsx"
+                            ],
+                            type="filepath",
+                            interactive=True,
+                        )
+                    with gr.Column():
+                        tab_convert_document_after_file_text = gr.File(
+                            label="変換後のファイル*",
+                            file_types=[
+                                "txt"
+                            ],
+                            type="filepath",
+                            interactive=False,
+                        )
+                with gr.Row():
+                    with gr.Column():
+                        tab_convert_document_convert_button = gr.Button(value="ExcelをJsonへ変換", variant="primary")
             with gr.TabItem(label="Step-1.読込み") as tab_load_document:
                 with gr.Accordion(label="使用されたSQL", open=False) as tab_load_document_sql_accordion:
                     tab_load_document_output_sql_text = gr.Textbox(
@@ -4231,7 +4300,7 @@ with gr.Blocks(css=custom_css) as app:
                         # doc_id_text = gr.Textbox(label="Doc ID*", lines=1)
                         tab_split_document_doc_id_radio = gr.Radio(
                             choices=get_doc_list(),
-                            label="ドキュメント*"
+                            label="ドキュメント*",
                         )
                 # with gr.Accordion("UTL_TO_CHUNKS 設定*"):
                 with gr.Accordion("CHUNKS 設定*"):
@@ -4261,7 +4330,7 @@ with gr.Blocks(css=custom_css) as app:
                                 info="Default value: BY WORDS。データ分割の方法を文字、単語、語彙トークンで指定。BY CHARACTERS: 文字数で計算して分割。BY WORDS: 単語数を計算して分割、単語ごとに空白文字が入る言語が対象、日本語、中国語、タイ語などの場合、各ネイティブ文字は単語（ユニグラム）としてみなされる。BY VOCABULARY: 語彙のトークン数を計算して分割、CREATE_VOCABULARYパッケージを使って、語彙登録が可能。",
                             )
                     with gr.Row():
-                        with gr.Column():
+                        with gr.Column(scale=1):
                             # tab_split_document_chunks_max_text = gr.Text(label="Max",
                             #                                              value="256",
                             #                                              lines=1,
@@ -4269,20 +4338,22 @@ with gr.Blocks(css=custom_css) as app:
                             #                                              )
                             tab_split_document_chunks_max_slider = gr.Slider(
                                 label="Max",
-                                value=256,
+                                value=320,
                                 minimum=64,
                                 maximum=512,
                                 step=1,
                             )
-                        with gr.Column():
+                        with gr.Column(scale=1):
                             tab_split_document_chunks_overlap_slider = gr.Slider(
                                 label="Overlap(Percentage of Max)",
                                 minimum=0,
                                 maximum=20,
                                 step=5,
                                 value=0,
-                                info="",
                             )
+                    gr.Markdown(
+                        "> \<FIXED_DELIMITER\>という分割符がドキュメントに含まれている場合、チャンクは\<FIXED_DELIMITER\>で分割され、MaxおよびOverlapの設定は無視されます。")
+
                     with gr.Row():
                         with gr.Column():
                             tab_split_document_chunks_split_by_radio = gr.Radio(
@@ -4360,7 +4431,7 @@ with gr.Blocks(css=custom_css) as app:
                         # doc_id_text = gr.Textbox(label="Doc ID*", lines=1)
                         tab_delete_document_doc_ids_checkbox_group = gr.CheckboxGroup(
                             choices=get_doc_list(),
-                            label="ドキュメント*"
+                            label="ドキュメント*",
                         )
                 with gr.Row():
                     with gr.Column():
@@ -4499,7 +4570,11 @@ with gr.Blocks(css=custom_css) as app:
                                 info="回答には引用を含め、使用したコンテキストのみを引用として出力する。"
                             )
                         with gr.Column():
-                            pass
+                            tab_chat_document_include_current_time_checkbox = gr.Checkbox(
+                                label="Promptに現在の時間を含める",
+                                value=False,
+                                info="Promptに回答時の現在の時間を含めます。"
+                            )
                 with gr.Row(visible=False):
                     tab_chat_document_accuracy_plan_radio = gr.Radio(
                         [
@@ -4576,7 +4651,7 @@ with gr.Blocks(css=custom_css) as app:
                                 choices=get_doc_list(),
                                 label="ドキュメント*",
                                 show_label=False,
-                                interactive=False
+                                interactive=False,
                             )
                 with gr.Row() as tab_chat_document_searched_query_row:
                     with gr.Column():
@@ -5388,6 +5463,7 @@ with gr.Blocks(css=custom_css) as app:
             tab_chat_with_claude_3_haiku_answer_text
         ]
     )
+
     tab_create_table_button.click(
         create_table,
         inputs=[],
@@ -5396,6 +5472,17 @@ with gr.Blocks(css=custom_css) as app:
             tab_create_table_sql_text
         ]
     )
+
+    tab_convert_document_convert_button.click(
+        convert_excel_document,
+        inputs=[
+            tab_convert_document_before_file_text,
+        ],
+        outputs=[
+            tab_convert_document_after_file_text,
+        ],
+    )
+
     tab_load_document_load_button.click(
         load_document,
         inputs=[
@@ -5655,6 +5742,7 @@ with gr.Blocks(css=custom_css) as app:
             tab_chat_document_searched_result_dataframe,
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_include_citation_checkbox,
+            tab_chat_document_include_current_time_checkbox,
             tab_chat_document_query_text,
             tab_chat_document_doc_id_all_checkbox,
             tab_chat_document_doc_id_checkbox_group,
