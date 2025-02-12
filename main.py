@@ -6,6 +6,7 @@ import re
 import shutil
 import time
 from datetime import datetime
+from functools import lru_cache
 from itertools import combinations
 from typing import List, Tuple
 
@@ -26,6 +27,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langfuse.callback import CallbackHandler
+from markitdown import MarkItDown
 from oracledb import DatabaseError
 from unstructured.partition.auto import partition
 
@@ -1578,7 +1580,7 @@ END; """
     return gr.Textbox(value=test_query_vector)
 
 
-def convert_excel_document(file_path):
+def convert_excel_to_text_document(file_path):
     has_error = False
     if not file_path:
         has_error = True
@@ -1600,7 +1602,30 @@ def convert_excel_document(file_path):
                     processed_row[key] = value
             json_line = json.dumps(processed_row, ensure_ascii=False)
             f.write(json_line + ' <FIXED_DELIMITER>\n')
-    return gr.File(value=output_file_path)
+    return (
+        gr.File(),
+        gr.File(value=output_file_path)
+    )
+
+
+@lru_cache(maxsize=32)
+def convert_to_markdown_document(file_path):
+    has_error = False
+    if not file_path:
+        has_error = True
+        gr.Warning("ファイルを選択してください")
+    if has_error:
+        return gr.File(value=None)
+
+    output_file_path = file_path.name + '.md'
+    md = MarkItDown()
+    result = md.convert(file_path.name)
+    with open(output_file_path, 'w', encoding='utf-8') as f:
+        f.write(result.text_content)
+    return (
+        gr.File(),
+        gr.File(value=output_file_path)
+    )
 
 
 def load_document(file_path, server_directory):
@@ -4193,28 +4218,38 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                         gr.Examples(examples=[], inputs=tab_chat_with_llm_query_text)
         with gr.TabItem(label="RAG評価", elem_classes="inner_tab") as tab_rag_evaluation:
             with gr.TabItem(label="Step-0.前処理") as tab_convert_document:
-                with gr.Row():
-                    with gr.Column():
-                        tab_convert_document_before_file_text = gr.File(
-                            label="変換前のファイル*",
-                            file_types=[
-                                "csv", "xls", "xlsx"
-                            ],
-                            type="filepath",
-                            interactive=True,
-                        )
-                    with gr.Column():
-                        tab_convert_document_after_file_text = gr.File(
-                            label="変換後のファイル*",
-                            file_types=[
-                                "txt"
-                            ],
-                            type="filepath",
-                            interactive=False,
-                        )
-                with gr.Row():
-                    with gr.Column():
-                        tab_convert_document_convert_button = gr.Button(value="ExcelをJsonへ変換", variant="primary")
+                with gr.TabItem(label="MarkItDown") as tab_convert_by_markitdown_document:
+                    with gr.Row():
+                        with gr.Column():
+                            tab_convert_document_convert_by_markitdown_file_text = gr.File(
+                                label="変換前のファイル*",
+                                file_types=[
+                                    "csv", "xls", "xlsx", "json", "xml", "ppt", "pptx", "doc", "docx", "pdf", "txt"
+                                ],
+                                type="filepath",
+                                interactive=True,
+                            )
+                    with gr.Row():
+                        with gr.Column():
+                            tab_convert_document_convert_by_markitdown_button = gr.Button(
+                                value="Markdownファイルへ変換",
+                                variant="primary")
+                with gr.TabItem(label="Excel2Text") as tab_convert_excel_to_text_document:
+                    with gr.Row():
+                        with gr.Column():
+                            tab_convert_document_convert_excel_to_text_file_text = gr.File(
+                                label="変換前のファイル*",
+                                file_types=[
+                                    "csv", "xls", "xlsx"
+                                ],
+                                type="filepath",
+                                interactive=True,
+                            )
+                    with gr.Row():
+                        with gr.Column():
+                            tab_convert_document_convert_button = gr.Button(
+                                value="ExcelをTextへ変換",
+                                variant="primary")
             with gr.TabItem(label="Step-1.読込み") as tab_load_document:
                 with gr.Accordion(label="使用されたSQL", open=False) as tab_load_document_sql_accordion:
                     tab_load_document_output_sql_text = gr.Textbox(
@@ -5473,13 +5508,25 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
         ]
     )
 
-    tab_convert_document_convert_button.click(
-        convert_excel_document,
+    tab_convert_document_convert_by_markitdown_button.click(
+        convert_to_markdown_document,
         inputs=[
-            tab_convert_document_before_file_text,
+            tab_convert_document_convert_by_markitdown_file_text,
         ],
         outputs=[
-            tab_convert_document_after_file_text,
+            tab_convert_document_convert_by_markitdown_file_text,
+            tab_load_document_file_text,
+        ],
+    )
+
+    tab_convert_document_convert_button.click(
+        convert_excel_to_text_document,
+        inputs=[
+            tab_convert_document_convert_excel_to_text_file_text,
+        ],
+        outputs=[
+            tab_convert_document_convert_excel_to_text_file_text,
+            tab_load_document_file_text,
         ],
     )
 
