@@ -34,306 +34,8 @@ from unstructured.partition.auto import partition
 from my_langchain_community.vectorstores import MyOracleVS
 from utils.chunk_util import RecursiveCharacterTextSplitter
 from utils.common_util import get_dict_value
+from utils.css import custom_css
 from utils.generator_util import generate_unique_id
-
-""" NOT USE
-@font-face {
-  font-family: 'Noto Sans JP';
-  src: url('fonts/NotoSansJP-Regular.otf') format('opentype');
-  font-weight: normal;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'Noto Sans SC';
-  src: url('fonts/NotoSansSC-Regular.otf') format('opentype');
-  font-weight: normal;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'Noto Sans TC';
-  src: url('fonts/NotoSansSC-Regular.otf') format('opentype');
-  font-weight: normal;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'Noto Sans HK';
-  src: url('fonts/NotoSansHK-Regular.otf') format('opentype');
-  font-weight: normal;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'Roboto';
-  src: url('fonts/Roboto-Regular.ttf') format('opentype');
-  font-weight: normal;
-  font-style: normal;
-}
-
-:root {
-  --global-font-family: "Noto Sans JP", "Noto Sans SC", "Noto Sans TC", "Noto Sans HK", "Roboto", Arial, sans-serif;
-}
-
-html, body, div, table, tr, td, p, strong, button {
-  font-family: var(--global-font-family) !important;
-}
-"""
-
-custom_css = """
-/* Hide sort buttons at gr.DataFrame */
-.sort-button {
-    display: none !important;
-} 
-
-body gradio-app .tabitem .block{
-    background: #fff !important;
-}
-
-.gradio-container{
-    background: #c4c4c440;
-}
-
-.tabitem .form{
-border-radius: 3px;
-}
-
-.main_Header>span>h1{
-    color: #fff;
-    text-align: center;
-    margin: 0 auto;
-    display: block;
-}
-
-.tab-nav{
-    # border-bottom: none !important;
-}
-
-.tab-nav button[role="tab"]{
-    color: rgb(96, 96, 96);
-    font-weight: 500;
-    background: rgb(255, 255, 255);
-    padding: 10px 20px;
-    border-radius: 4px 4px 0px 0px;
-    border: none;
-    border-right: 4px solid gray;
-    border-radius: 0px;
-    min-width: 150px;
-}
-
-.tabs .tabitem .tabs .tab-nav button[role="tab"]{
-    min-width: 90px;
-    padding: 5px;
-    border-right: 1px solid #186fb4;
-    border-top: 1px solid #186fb4;
-    border-bottom: 0.2px solid #fff;
-    margin-bottom: -2px;
-    z-index: 3;
-}
-
-
-.tabs .tabitem .tabs .tab-nav button[role="tab"]:first-child{
-    border-left: 1px solid #186fb4;
-        border-top-left-radius: 3px;
-}
-
-.tabs .tabitem .tabs .tab-nav button[role="tab"]:last-child{
-    border-right: 1px solid #186fb4;
-}
-
-.tab-nav button[role="tab"]:first-child{
-       border-top-left-radius: 3px;
-}
-
-.tab-nav button[role="tab"]:last-child{
-        border-top-right-radius: 3px;
-    border-right: none;
-}
-.tabitem{
-    background: #fff;
-    border-radius: 0px 3px 3px 3px !important;
-    box-shadow: rgba(50, 50, 93, 0.25) 0px 2px 5px -1px, rgba(0, 0, 0, 0.3) 0px 1px 3px -1px;
-}
-
-.tabitem .tabitem{
-    border: 1px solid #196fb4;
-    background: #fff;
-    border-radius: 0px 3px 3px 3px !important;
-}
-
-.tabitem textarea, div.tabitem div.container>.wrap{
-    background: #f4f8ffc4;
-}
-
-.tabitem .container .wrap {
-    border-radius: 3px;
-}
-
-.tab-nav button[role="tab"].selected{
-    color: #fff;
-    background: #196fb4;
-    border-bottom: none;
-}
-
-.tabitem .inner_tab button[role="tab"]{
-   border: 1px solid rgb(25, 111, 180);
-   border-bottom: none;
-}
-
-.app.gradio-container {
-  max-width: 1440px;
-}
-
-gradio-app{
-    background-image: url("https://objectstorage.ap-tokyo-1.oraclecloud.com/n/sehubjapacprod/b/km_newsletter/o/tmp%2Fmain_bg.png") !important;
-    background-size: 100vw 100vh !important;
-}
-
-input, textarea{
-    border-radius: 3px;
-}
-
-
-.container>input:focus, .container>textarea:focus, .block .wrap .wrap-inner:focus{
-    border-radius: 3px;
-    box-shadow: rgb(255 246 228 / 63%) 0px 0px 0px 3px, rgb(255 248 236 / 12%) 0px 2px 4px 0px inset !important;
-    border-color: rgb(249 169 125 / 87%) !important;
-}
-
-.tabitem div>button.primary{
-    border: none;
-    background: linear-gradient(to bottom right, #ffc679, #f38141);
-    color: #fff;
-    box-shadow: 2px 2px 2px #0000001f;
-    border-radius: 3px;
-}
-
-.tabitem div>button.primary:hover{
-    border: none;
-    background: #f38141;
-    color: #fff;
-    border-radius: 3px;
-    box-shadow: 2px 2px 2px #0000001f;
-}
-
-
-.tabitem div>button.secondary{
-    border: none;
-    background: linear-gradient(to right bottom, rgb(215 215 217), rgb(194 197 201));
-    color: rgb(107 106 106);
-    box-shadow: rgba(0, 0, 0, 0.12) 2px 2px 2px;
-    border-radius: 3px;
-}
-
-.tabitem div>button.secondary:hover{
-    border: none;
-    background: rgb(175 175 175);
-    color: rgb(255 255 255);
-    border-radius: 3px;
-    box-shadow: rgba(0, 0, 0, 0.12) 2px 2px 2px;
-}
-
-.cus_ele1_select .container .wrap:focus-within{
-    border-radius: 3px;
-    box-shadow: rgb(255 246 228 / 63%) 0px 0px 0px 3px, rgb(255 248 236 / 12%) 0px 2px 4px 0px inset !important;
-    border-color: rgb(249 169 125 / 87%) !important;
-}
-
-input[type="checkbox"]:checked, input[type="checkbox"]:checked:hover, input[type="checkbox"]:checked:focus {
-    border-color: #186fb4;
-    background-color: #186fb4;
-}
-
-#event_tbl{
-    border-radius:3px;
-}
-
-#event_tbl .table-wrap{
-    border-radius:3px;
-}
-
-#event_tbl table thead>tr>th{
-    background: #bfd1e0;
-        min-width: 90px;
-}
-
-#event_tbl table thead>tr>th:first-child{
-    border-radius:3px 0px 0px 0px;
-}
-#event_tbl table thead>tr>th:last-child{
-    border-radius:0px 3px 0px 0px;
-}
-
-
-#event_tbl table .cell-wrap span{
-    font-size: 0.8rem;
-}
-
-#event_tbl table{
-    overflow-y: auto;
-    overflow-x: auto;
-}
-
-#event_exp_tbl .table-wrap{
-     border-radius:3px;   
-}
-#event_exp_tbl table thead>tr>th{
-    background: #bfd1e0;
-}
-
-.count_t1_text .prose{
-    padding: 5px 0px 0px 6px;
-}
-
-.count_t1_text .prose>span{
-    padding: 0px;
-}
-
-.cus_ele1_select .container .wrap:focus-within{
-    border-radius: 3px;
-    box-shadow: rgb(255 246 228 / 63%) 0px 0px 0px 3px, rgb(255 248 236 / 12%) 0px 2px 4px 0px inset !important;
-    border-color: rgb(249 169 125 / 87%) !important;
-}
-
-.count_t1_text .prose>span{
-    font-size: 0.9rem;
-}
-
-
-footer{
-  display: none !important;
-}
-
-.sub_Header>span>h3,.sub_Header>span>h2,.sub_Header>span>h4{
-    color: #fff;
-    font-size: 0.8rem;
-    font-weight: normal;
-    text-align: center;
-    margin: 0 auto;
-    padding: 5px;
-}
-
-@media (min-width: 1280px) {
-    .app.svelte-wpkpf6.svelte-wpkpf6:not(.fill_width) {
-        max-width: 1400px;
-    }
-}
-.gap.svelte-vt1mxs{
-    gap: unset;
-}
-
-.tabitem .gap.svelte-vt1mxs{
-        gap: var(--layout-gap);
-}
-
-@media (min-width: 1280px) {
-    .app.svelte-wpkpf6.svelte-wpkpf6:not(.fill_width) {
-        max-width: 1400px;
-    }
-}
-
-"""
 
 # read local .env file
 load_dotenv(find_dotenv())
@@ -372,10 +74,11 @@ def get_region():
 def generate_embedding_response(inputs: List[str]):
     config = oci.config.from_file('/root/.oci/config', "DEFAULT")
     region = get_region()
-    generative_ai_inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(config=config,
-                                                                                             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
-                                                                                             retry_strategy=oci.retry.NoneRetryStrategy(),
-                                                                                             timeout=(10, 240))
+    generative_ai_inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(
+        config=config,
+        service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+        retry_strategy=oci.retry.NoneRetryStrategy(),
+        timeout=(10, 240))
     batch_size = 96
     all_embeddings = []
 
@@ -384,7 +87,8 @@ def generate_embedding_response(inputs: List[str]):
 
         embed_text_detail = oci.generative_ai_inference.models.EmbedTextDetails()
         embed_text_detail.serving_mode = oci.generative_ai_inference.models.OnDemandServingMode(
-            model_id=os.environ["OCI_COHERE_EMBED_MODEL"])
+            model_id=os.environ["OCI_COHERE_EMBED_MODEL"]
+        )
         embed_text_detail.inputs = batch
         embed_text_detail.truncate = "NONE"
         embed_text_detail.compartment_id = os.environ["OCI_COMPARTMENT_OCID"]
@@ -396,6 +100,69 @@ def generate_embedding_response(inputs: List[str]):
         all_embeddings.extend(embed_text_response.data.embeddings)
 
     return all_embeddings
+
+
+def rerank_documents_response(input_text, inputs: List[str], rerank_model):
+    all_document_ranks = []
+    batch_size = 900
+
+    if rerank_model in ["cohere/rerank-multilingual-v3.1", "cohere/rerank-english-v3.1"]:
+        rerank_model = rerank_model.replace("/", ".")
+        config = oci.config.from_file('/root/.oci/config', "DEFAULT")
+        region = get_region()
+        rerank_generative_ai_inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(
+            config=config,
+            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+            retry_strategy=oci.retry.NoneRetryStrategy(),
+            timeout=(10, 240))
+
+        for i in range(0, len(inputs), batch_size):
+            batch = inputs[i:i + batch_size]
+
+            rerank_text_detail = oci.generative_ai_inference.models.RerankTextDetails()
+            rerank_text_detail.input = input_text
+            rerank_text_detail.documents = batch
+            rerank_text_detail.serving_mode = oci.generative_ai_inference.models.OnDemandServingMode(
+                serving_type="ON_DEMAND",
+                model_id=rerank_model
+            )
+            rerank_text_detail.compartment_id = os.environ["OCI_COMPARTMENT_OCID"]
+            rerank_response = rerank_generative_ai_inference_client.rerank_text(rerank_text_detail)
+            print(f"Processed batch {i // batch_size + 1} of {(len(inputs) - 1) // batch_size + 1}")
+            adjusted_results = []
+            for rank in rerank_response.data.document_ranks:
+                adjusted_result = {
+                    "document": rank.document,
+                    "index": i + rank.index,
+                    "relevance_score": rank.relevance_score
+                }
+                adjusted_results.append(adjusted_result)
+            all_document_ranks.extend(adjusted_results)
+    else:
+        print(f"{os.environ['COHERE_API_KEY']=}")
+        cohere_reranker = rerank_model.split('/')[1]
+        cohere_client = cohere.Client(api_key=os.environ["COHERE_API_KEY"])
+        for i in range(0, len(inputs), batch_size):
+            batch = inputs[i:i + batch_size]
+
+            rerank_response = cohere_client.rerank(
+                query=input_text,
+                documents=batch,
+                top_n=len(batch),
+                model=cohere_reranker
+            )
+            print(f"{rerank_response=}")
+            adjusted_results = []
+            for rank in rerank_response.results:
+                adjusted_result = {
+                    "document": rank.document,
+                    "index": i + rank.index,
+                    "relevance_score": rank.relevance_score
+                }
+                adjusted_results.append(adjusted_result)
+            all_document_ranks.extend(adjusted_results)
+
+    return all_document_ranks
 
 
 def get_doc_list() -> List[Tuple[str, str]]:
@@ -465,7 +232,7 @@ async def command_r_task(system_text, query_text, command_r_checkbox):
             model_id="cohere.command-r-08-2024",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "max_tokens": 2048},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600},
         )
         messages = [
             SystemMessage(content=system_text),
@@ -496,10 +263,10 @@ async def command_r_plus_task(system_text, query_text, command_r_plus_checkbox):
     region = get_region()
     if command_r_plus_checkbox:
         command_r_plus = ChatOCIGenAI(
-            model_id="cohere.command-r-plus",
+            model_id="cohere.command-r-plus-08-2024",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "max_tokens": 2048},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600},
         )
         messages = [
             SystemMessage(content=system_text),
@@ -533,7 +300,7 @@ async def llama_3_3_70b_task(system_text, query_text, llama_3_3_70b_checkbox):
             model_id="meta.llama-3.3-70b-instruct",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "max_tokens": 2048},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600},
         )
         messages = [
             SystemMessage(content=system_text),
@@ -1978,7 +1745,7 @@ def generate_query(query_text, generate_query_radio):
         model_id="cohere.command-r-08-2024",
         service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
         compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-        model_kwargs={"temperature": 0.0, "max_tokens": 2048},
+        model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600},
     )
 
     # RAG-Fusion
@@ -2240,15 +2007,6 @@ def search_document(
     sub_query1_text_input = sub_query1_text_input.strip()
     sub_query2_text_input = sub_query2_text_input.strip()
     sub_query3_text_input = sub_query3_text_input.strip()
-    # command_r_result = "Not queried"
-    # command_r_plus_result = "Not queried."
-    # gpt4o_result = "Not queried."
-    # gpt4_result = "Not queried."
-    # azure_gpt4o_result = "Not queried."
-    # azure_gpt4_result = "Not queried."
-    # opus_result = "Not queried."
-    # sonnet_result = "Not queried."
-    # haiku_result = "Not queried."
 
     # Use OracleAIVector
     unranked_docs = []
@@ -2530,45 +2288,26 @@ def search_document(
                         column_widths=["4%", "68%", "6%", "8%", "6%", "8%"],
                         row_count=(1, "fixed"),
                     ),
-                    # gr.Textbox(command_r_result),
-                    # gr.Textbox(command_r_plus_result),
-                    # gr.Textbox(gpt4o_result),
-                    # gr.Textbox(gpt4_result),
-                    # gr.Textbox(azure_gpt4o_result),
-                    # gr.Textbox(azure_gpt4_result),
-                    # gr.Textbox(opus_result),
-                    # gr.Textbox(sonnet_result),
-                    # gr.Textbox(haiku_result),
-                    # gr.Textbox(sub_query1_text_input),
-                    # gr.Textbox(sub_query2_text_input),
-                    # gr.Textbox(sub_query3_text_input)
                 )
 
             # ToDo: In case of error
-            if len(unranked_docs) > 999:
-                unranked_docs = unranked_docs[:1000]
             if 'cohere/rerank' in reranker_model_radio_input:
                 unranked = []
                 for doc in unranked_docs:
                     unranked.append(doc[2])
-                cohere_reranker = reranker_model_radio_input.split('/')[1]
-                print(f"{os.environ['COHERE_API_KEY']=}")
-                cohere_client = cohere.Client(api_key=os.environ["COHERE_API_KEY"])
-                ranked_results = cohere_client.rerank(query=query_text_input,
-                                                      documents=unranked,
-                                                      top_n=len(unranked),
-                                                      model=cohere_reranker)
+                ranked_results = rerank_documents_response(query_text_input, unranked, reranker_model_radio_input)
                 ranked_scores = [0.0] * len(unranked_docs)
-                for result in ranked_results.results:
-                    ranked_scores[result.index] = result.relevance_score
+                for result in ranked_results:
+                    ranked_scores[result['index']] = result['relevance_score']
                 docs_data = [{'CONTENT': doc[2],
                               'EMBED_ID': doc[1],
                               'SOURCE': str(doc[3]) + ":" + doc[0],
                               'DISTANCE': '-' if str(doc[4]) == '999999.0' else str(doc[4]),
                               'SCORE': ce_score} for doc, ce_score in zip(unranked_docs, ranked_scores)]
                 docs_dataframe = pd.DataFrame(docs_data)
-                docs_dataframe = docs_dataframe[docs_dataframe['SCORE'] >= float(reranker_threshold_slider_input)
-                                                ].sort_values(by='SCORE', ascending=False).head(
+                docs_dataframe = docs_dataframe[
+                    docs_dataframe['SCORE'] >= float(reranker_threshold_slider_input)
+                    ].sort_values(by='SCORE', ascending=False).head(
                     reranker_top_k_slider_input)
             else:
                 docs_data = [{'CONTENT': doc[2],
@@ -2687,13 +2426,82 @@ ORDER
             )
 
 
-async def chat_document(search_result,
-                        llm_answer_checkbox,
-                        include_citation,
-                        include_current_time,
-                        query_text,
-                        doc_id_all_checkbox_input,
-                        doc_id_checkbox_group_input):
+def extract_and_format(input_str, search_result_df):
+    json_arrays = re.findall(r'\[\n.*?\{.*?}\n.*?]', input_str, flags=re.DOTALL)
+    if not json_arrays:
+        return (
+                input_str +
+                f"\n"
+                f"---回答内で参照されているコンテキスト---"
+                f"\n"
+                f"回答にコンテキストが存在しないか、コンテキストのフォーマットが正しくありません。"
+        )
+
+    extracted = []
+    for json_str in json_arrays:
+        input_str = input_str.replace(json_str, '')
+        json_str = json_str.replace('\n', '').replace('\r', '')
+        data = json.loads(json_str)
+
+        for item in data:
+            print(f"{item=}")
+            if isinstance(item, dict):
+                if "EMBED_ID" in item and "SOURCE" in item:
+                    extracted.append({
+                        "EMBED_ID": item["EMBED_ID"],
+                        "SOURCE": item["SOURCE"]
+                    })
+
+    formatted = (
+            input_str +
+            f"\n"
+            f"---回答内で参照されているコンテキスト---"
+            f"\n"
+    )
+    formatted += "[\n"
+    for item in extracted:
+        content = search_result_df.loc[search_result_df["EMBED_ID"] == item["EMBED_ID"], "CONTENT"].values
+        if len(content) > 0:
+            content = content[0]
+            content = content.replace('"', '\'')
+            content = content.replace('\n', ' ').replace('\r', ' ')
+        else:
+            content = "N/A"
+        formatted += (
+            '    {{\n'
+            '        "EMBED_ID": {},\n'
+            '        "SOURCE": "{}",\n'
+            '        "CONTENT": "{}"\n'
+            '    }},\n'
+        ).format(item["EMBED_ID"], item["SOURCE"], content)
+    if extracted:
+        formatted = formatted.rstrip(",\n") + "\n"
+    formatted += "]"
+
+    return formatted
+
+
+def extract_citation(input_str):
+    # 匹配兩部分內容
+    pattern = '^(.*?)\n---回答内で参照されているコンテキスト---\n(.*?)$'
+    match = re.search(pattern, input_str, re.DOTALL)
+    if match:
+        part1 = match.group(1).strip()
+        part2 = match.group(2).strip()
+        return part1, part2
+    else:
+        return None, None
+
+
+async def chat_document(
+        search_result,
+        llm_answer_checkbox,
+        include_citation,
+        include_current_time,
+        query_text,
+        doc_id_all_checkbox_input,
+        doc_id_checkbox_group_input
+):
     has_error = False
     if not query_text:
         has_error = True
@@ -2777,26 +2585,29 @@ async def chat_document(search_result,
     #         ```
     #         """
     system_text = f"""
+---目標：--- 
 次のコンテキストを使用して、最後にある質問に答えてください。  
-もし答えがわからない場合は、「わかりません」と言ってください。答えをでっち上げようとしないでください。  
-コンテキストの正確なテキストを使用し、**一切の修正、再構成、または脚色を加えずに**使用してください。  
 コンテキストにないことについては答えようとしないでください。  
+もし答えがわからない場合は、「申し訳ありませんが、コンテキストから適切な回答を見つけることができませんでした。別の LLM モデルをお試しいただくか、クエリの内容や設定を少し調整していただくことで解決できるかもしれません。」と言ってください。
+答えをでっち上げようとしないでください。  
+コンテキストの正確なテキストを使用し、**一切の修正、再構成、または脚色を加えずに**使用してください。  
+\n
 """
 
     if include_citation:
         system_text += f"""
-After providing the answer, include the 'EMBED_ID' and 'SOURCE' and 'CONTENT' of the 'CONTENT' used to formulate the answer in JSON format.
-The JSON array must strictly follow this structure:
+After providing the answer, **include the 'EMBED_ID' and 'SOURCE' of the 'CONTENT' used to formulate the answer in JSON format**.
+The JSON array must strictly follow this structure without '```json' and '```' around it:
 
 [
     {{
         "EMBED_ID": <A unique identifier for the content piece.>,
-        "SOURCE": "<A string indicating the origin of the content.>",
-        "CONTENT": "<The exact original text from the source, with no modifications, summarizations, or paraphrasing.>"
+        "SOURCE": "<A string indicating the origin of the content.>"
     }}
 ]
 
 If multiple pieces of CONTENT are used, include all relevant EMBED_IDs and SOURCEs in the JSON array.
+\n
 """
 
     current_time = datetime.now()
@@ -2809,21 +2620,21 @@ please consider these dates carefully when answering the question:
 - If the question asks about the "latest" or "most recent" information, use data from the most recent date
 - If the question asks about a specific time period, use data from that corresponding time period
 - If comparing different time periods, clearly specify which date's data you are referencing
+\n
 """
 
     system_text += f"""
-コンテキスト:
-```
-{context}
-``` \n"""
+---コンテキスト：--- \n
+{context} 
+\n
+"""
 
     user_text = f"""
-            質問: 
-            ```
-            {query_text}
-            ```
-            役に立つ回答: \n
-    """
+---質問：--- \n
+{query_text} 
+\n
+---役に立つ回答：--- \n
+"""
 
     command_r_user_text = user_text
     command_r_plus_user_text = user_text
@@ -2881,6 +2692,100 @@ please consider these dates carefully when answering the question:
             claude_3_sonnet_response,
             claude_3_haiku_response
         )
+
+
+async def append_citation(
+        search_result,
+        llm_answer_checkbox,
+        include_citation,
+        query_text,
+        doc_id_all_checkbox_input,
+        doc_id_checkbox_group_input,
+        command_r_answer_text,
+        command_r_plus_answer_text,
+        llama_3_3_70b_answer_text,
+        openai_gpt4o_answer_text,
+        openai_gpt4_answer_text,
+        azure_openai_gpt4o_answer_text,
+        azure_openai_gpt4_answer_text,
+        claude_3_opus_answer_text,
+        claude_3_sonnet_answer_text,
+        claude_3_haiku_answer_text
+):
+    has_error = False
+    if not query_text:
+        has_error = True
+        # gr.Warning("クエリを入力してください")
+    if not doc_id_all_checkbox_input and (not doc_id_checkbox_group_input or doc_id_checkbox_group_input == [""]):
+        has_error = True
+        # gr.Warning("ドキュメントを選択してください")
+    if search_result.empty or (len(search_result) > 0 and search_result.iloc[0]['CONTENT'] == ''):
+        has_error = True
+        gr.Warning("検索結果が見つかりませんでした。設定もしくはクエリを変更して再度ご確認ください。")
+    if has_error:
+        yield (
+            command_r_answer_text,
+            command_r_plus_answer_text,
+            llama_3_3_70b_answer_text,
+            openai_gpt4o_answer_text,
+            openai_gpt4_answer_text,
+            azure_openai_gpt4o_answer_text,
+            azure_openai_gpt4_answer_text,
+            claude_3_opus_answer_text,
+            claude_3_sonnet_answer_text,
+            claude_3_haiku_answer_text
+        )
+        return
+
+    if not include_citation:
+        yield (
+            command_r_answer_text,
+            command_r_plus_answer_text,
+            llama_3_3_70b_answer_text,
+            openai_gpt4o_answer_text,
+            openai_gpt4_answer_text,
+            azure_openai_gpt4o_answer_text,
+            azure_openai_gpt4_answer_text,
+            claude_3_opus_answer_text,
+            claude_3_sonnet_answer_text,
+            claude_3_haiku_answer_text
+        )
+        return
+
+    if "cohere/command-r" in llm_answer_checkbox:
+        command_r_answer_text = extract_and_format(command_r_answer_text, search_result)
+    if "cohere/command-r-plus" in llm_answer_checkbox:
+        command_r_plus_answer_text = extract_and_format(command_r_plus_answer_text, search_result)
+    if "meta/llama-3-3-70b" in llm_answer_checkbox:
+        llama_3_3_70b_answer_text = extract_and_format(llama_3_3_70b_answer_text, search_result)
+    if "openai/gpt-4o" in llm_answer_checkbox:
+        openai_gpt4o_answer_text = extract_and_format(openai_gpt4o_answer_text, search_result)
+    if "openai/gpt-4" in llm_answer_checkbox:
+        openai_gpt4_answer_text = extract_and_format(openai_gpt4_answer_text, search_result)
+    if "azure_openai/gpt-4o" in llm_answer_checkbox:
+        azure_openai_gpt4o_answer_text = extract_and_format(azure_openai_gpt4o_answer_text, search_result)
+    if "azure_openai/gpt-4" in llm_answer_checkbox:
+        azure_openai_gpt4_answer_text = extract_and_format(azure_openai_gpt4_answer_text, search_result)
+    if "claude/opus" in llm_answer_checkbox:
+        claude_3_opus_answer_text = extract_and_format(claude_3_opus_answer_text, search_result)
+    if "claude/sonnet" in llm_answer_checkbox:
+        claude_3_sonnet_answer_text = extract_and_format(claude_3_sonnet_answer_text, search_result)
+    if "claude/haiku" in llm_answer_checkbox:
+        claude_3_haiku_answer_text = extract_and_format(claude_3_haiku_answer_text, search_result)
+
+    yield (
+        command_r_answer_text,
+        command_r_plus_answer_text,
+        llama_3_3_70b_answer_text,
+        openai_gpt4o_answer_text,
+        openai_gpt4_answer_text,
+        azure_openai_gpt4o_answer_text,
+        azure_openai_gpt4_answer_text,
+        claude_3_opus_answer_text,
+        claude_3_sonnet_answer_text,
+        claude_3_haiku_answer_text
+    )
+    return
 
 
 async def eval_by_ragas(
@@ -3201,6 +3106,7 @@ def generate_download_file(
 
     if "cohere/command-r" in llm_answer_checkbox_group:
         command_r_response = command_r_response
+        command_r_response, command_r_referenced_contexts = extract_citation(command_r_response)
         if llm_evaluation_checkbox:
             command_r_evaluation = command_r_evaluation
         else:
@@ -3208,8 +3114,11 @@ def generate_download_file(
     else:
         command_r_response = ""
         command_r_evaluation = ""
+        command_r_referenced_contexts = ""
+
     if "cohere/command-r-plus" in llm_answer_checkbox_group:
         command_r_plus_response = command_r_plus_response
+        command_r_plus_response, command_r_plus_referenced_contexts = extract_citation(command_r_plus_response)
         if llm_evaluation_checkbox:
             command_r_plus_evaluation = command_r_plus_evaluation
         else:
@@ -3217,8 +3126,11 @@ def generate_download_file(
     else:
         command_r_plus_response = ""
         command_r_plus_evaluation = ""
+        command_r_plus_referenced_contexts = ""
+
     if "meta/llama-3-3-70b" in llm_answer_checkbox_group:
         llama_3_3_70b_response = llama_3_3_70b_response
+        llama_3_3_70b_response, llama_3_3_70b_referenced_contexts = extract_citation(llama_3_3_70b_response)
         if llm_evaluation_checkbox:
             llama_3_3_70b_evaluation = llama_3_3_70b_evaluation
         else:
@@ -3226,8 +3138,11 @@ def generate_download_file(
     else:
         llama_3_3_70b_response = ""
         llama_3_3_70b_evaluation = ""
+        llama_3_3_70b_referenced_contexts = ""
+
     if "openai/gpt-4o" in llm_answer_checkbox_group:
         openai_gpt4o_response = openai_gpt4o_response
+        openai_gpt4o_response, openai_gpt4o_referenced_contexts = extract_citation(openai_gpt4o_response)
         if llm_evaluation_checkbox:
             openai_gpt4o_evaluation = openai_gpt4o_evaluation
         else:
@@ -3235,8 +3150,11 @@ def generate_download_file(
     else:
         openai_gpt4o_response = ""
         openai_gpt4o_evaluation = ""
+        openai_gpt4o_referenced_contexts = ""
+
     if "openai/gpt-4" in llm_answer_checkbox_group:
         openai_gpt4_response = openai_gpt4_response
+        openai_gpt4_response, openai_gpt4_referenced_contexts = extract_citation(openai_gpt4_response)
         if llm_evaluation_checkbox:
             openai_gpt4_evaluation = openai_gpt4_evaluation
         else:
@@ -3244,8 +3162,12 @@ def generate_download_file(
     else:
         openai_gpt4_response = ""
         openai_gpt4_evaluation = ""
+        openai_gpt4_referenced_contexts = ""
+
     if "azure_openai/gpt-4o" in llm_answer_checkbox_group:
         azure_openai_gpt4o_response = azure_openai_gpt4o_response
+        azure_openai_gpt4o_response, azure_openai_gpt4o_referenced_contexts = extract_citation(
+            azure_openai_gpt4o_response)
         if llm_evaluation_checkbox:
             azure_openai_gpt4o_evaluation = azure_openai_gpt4o_evaluation
         else:
@@ -3253,8 +3175,11 @@ def generate_download_file(
     else:
         azure_openai_gpt4o_response = ""
         azure_openai_gpt4o_evaluation = ""
+        azure_openai_gpt4o_referenced_contexts = ""
+
     if "azure_openai/gpt-4" in llm_answer_checkbox_group:
         azure_openai_gpt4_response = azure_openai_gpt4_response
+        azure_openai_gpt4_response, azure_openai_gpt4_referenced_contexts = extract_citation(azure_openai_gpt4_response)
         if llm_evaluation_checkbox:
             azure_openai_gpt4_evaluation = azure_openai_gpt4_evaluation
         else:
@@ -3262,8 +3187,11 @@ def generate_download_file(
     else:
         azure_openai_gpt4_response = ""
         azure_openai_gpt4_evaluation = ""
+        azure_openai_gpt4_referenced_contexts = ""
+
     if "claude/opus" in llm_answer_checkbox_group:
         claude_3_opus_response = claude_3_opus_response
+        claude_3_opus_response, claude_3_opus_referenced_contexts = extract_citation(claude_3_opus_response)
         if llm_evaluation_checkbox:
             claude_3_opus_evaluation = claude_3_opus_evaluation
         else:
@@ -3271,8 +3199,11 @@ def generate_download_file(
     else:
         claude_3_opus_response = ""
         claude_3_opus_evaluation = ""
+        claude_3_opus_referenced_contexts = ""
+
     if "claude/sonnet" in llm_answer_checkbox_group:
         claude_3_sonnet_response = claude_3_sonnet_response
+        claude_3_sonnet_response, claude_3_sonnet_referenced_contexts = extract_citation(claude_3_sonnet_response)
         if llm_evaluation_checkbox:
             claude_3_sonnet_evaluation = claude_3_sonnet_evaluation
         else:
@@ -3280,8 +3211,11 @@ def generate_download_file(
     else:
         claude_3_sonnet_response = ""
         claude_3_sonnet_evaluation = ""
+        claude_3_sonnet_referenced_contexts = ""
+
     if "claude/haiku" in llm_answer_checkbox_group:
         claude_3_haiku_response = claude_3_haiku_response
+        claude_3_haiku_response, claude_3_haiku_referenced_contexts = extract_citation(claude_3_haiku_response)
         if llm_evaluation_checkbox:
             claude_3_haiku_evaluation = claude_3_haiku_evaluation
         else:
@@ -3289,6 +3223,7 @@ def generate_download_file(
     else:
         claude_3_haiku_response = ""
         claude_3_haiku_evaluation = ""
+        claude_3_haiku_referenced_contexts = ""
 
     df3 = pd.DataFrame(
         {
@@ -3316,6 +3251,18 @@ def generate_download_file(
                 claude_3_opus_response,
                 claude_3_sonnet_response,
                 claude_3_haiku_response
+            ],
+            '引用 Contexts': [
+                command_r_referenced_contexts,
+                # command_r_plus_referenced_contexts,
+                llama_3_3_70b_referenced_contexts,
+                openai_gpt4o_referenced_contexts,
+                openai_gpt4_referenced_contexts,
+                azure_openai_gpt4o_referenced_contexts,
+                azure_openai_gpt4_referenced_contexts,
+                claude_3_opus_referenced_contexts,
+                claude_3_sonnet_referenced_contexts,
+                claude_3_haiku_referenced_contexts
             ],
             'Ragas 評価結果': [
                 command_r_evaluation,
@@ -3418,8 +3365,7 @@ def generate_eval_result_file():
 
 def set_query_id_state():
     print("in set_query_id_state() start...")
-    query_id_state = generate_unique_id("query_")
-    return query_id_state
+    return generate_unique_id("query_")
 
 
 def insert_query_result(
@@ -3853,7 +3799,8 @@ font = [GoogleFont(name="Noto Sans JP"), GoogleFont(name="Noto Sans SC"), Google
 
 with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
     gr.Markdown(value="# RAG精度あげたろう", elem_classes="main_Header")
-    gr.Markdown(value="### LLM&RAG精度検証ツール", elem_classes="sub_Header")
+    gr.Markdown(value="### LLM＆RAG精度評価ツール（※このツール自体はRAGの評価対象ではありません）",
+                elem_classes="sub_Header")
 
     query_id_state = gr.State()
 
@@ -4232,7 +4179,7 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                     with gr.Row():
                         with gr.Column():
                             tab_convert_document_convert_by_markitdown_button = gr.Button(
-                                value="Markdownファイルへ変換",
+                                value="Markdownへ変換",
                                 variant="primary")
                 with gr.TabItem(label="Excel2Text") as tab_convert_excel_to_text_document:
                     with gr.Row():
@@ -4500,9 +4447,13 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                         )
                     with gr.Column():
                         tab_chat_document_reranker_model_radio = gr.Radio(
-                            ["None", "cohere/rerank-multilingual-v3.0",
-                             "cohere/rerank-english-v3.0"
-                             ],
+                            [
+                                "None",
+                                "cohere/rerank-multilingual-v3.1",
+                                "cohere/rerank-english-v3.1",
+                                "cohere/rerank-multilingual-v3.0",
+                                "cohere/rerank-english-v3.0",
+                            ],
                             label="Rerank モデル*", value="None")
                 with gr.Row():
                     with gr.Column():
@@ -4511,9 +4462,9 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                             minimum=1,
                             maximum=100,
                             step=1,
-                            info="Default value: 25。類似度距離の低い順（=類似度の高い順）で上位K件のみを抽出する。",
+                            info="Default value: 20。類似度距離の低い順（=類似度の高い順）で上位K件のみを抽出する。",
                             interactive=True,
-                            value=25
+                            value=20
                         )
                     with gr.Column():
                         tab_chat_document_threshold_value_slider = gr.Slider(
@@ -4539,10 +4490,10 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                         tab_chat_document_reranker_threshold_slider = gr.Slider(
                             label="Rerank Score 閾値*",
                             minimum=0.0,
-                            info="Default value: 0.4。Rerank Scoreが閾値以上のデータのみを抽出する。",
+                            info="Default value: 0.1。Rerank Scoreが閾値以上のデータのみを抽出する。",
                             maximum=0.99,
                             step=0.001,
-                            value=0.40,
+                            value=0.1,
                             interactive=True
                         )
                 with gr.Accordion("Advanced Settings", open=False):
@@ -5804,7 +5755,39 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
             tab_chat_document_azure_openai_gpt4_answer_text,
             tab_chat_document_claude_3_opus_answer_text,
             tab_chat_document_claude_3_sonnet_answer_text,
-            tab_chat_document_claude_3_haiku_answer_text
+            tab_chat_document_claude_3_haiku_answer_text,
+        ]
+    ).then(
+        append_citation,
+        inputs=[
+            tab_chat_document_searched_result_dataframe,
+            tab_chat_document_llm_answer_checkbox_group,
+            tab_chat_document_include_citation_checkbox,
+            tab_chat_document_query_text,
+            tab_chat_document_doc_id_all_checkbox,
+            tab_chat_document_doc_id_checkbox_group,
+            tab_chat_document_command_r_answer_text,
+            tab_chat_document_command_r_plus_answer_text,
+            tab_chat_document_llama_3_3_70b_answer_text,
+            tab_chat_document_openai_gpt4o_answer_text,
+            tab_chat_document_openai_gpt4_answer_text,
+            tab_chat_document_azure_openai_gpt4o_answer_text,
+            tab_chat_document_azure_openai_gpt4_answer_text,
+            tab_chat_document_claude_3_opus_answer_text,
+            tab_chat_document_claude_3_sonnet_answer_text,
+            tab_chat_document_claude_3_haiku_answer_text,
+        ],
+        outputs=[
+            tab_chat_document_command_r_answer_text,
+            tab_chat_document_command_r_plus_answer_text,
+            tab_chat_document_llama_3_3_70b_answer_text,
+            tab_chat_document_openai_gpt4o_answer_text,
+            tab_chat_document_openai_gpt4_answer_text,
+            tab_chat_document_azure_openai_gpt4o_answer_text,
+            tab_chat_document_azure_openai_gpt4_answer_text,
+            tab_chat_document_claude_3_opus_answer_text,
+            tab_chat_document_claude_3_sonnet_answer_text,
+            tab_chat_document_claude_3_haiku_answer_text,
         ]
     ).then(
         eval_by_ragas,
@@ -6075,5 +6058,5 @@ if __name__ == "__main__":
         server_port=args.port,
         max_threads=200,
         show_api=False,
-        auth=do_auth,
+        # auth=do_auth,
     )
