@@ -233,7 +233,7 @@ async def command_r_task(system_text, query_text, command_r_checkbox):
             provider="cohere",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": None},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
         )
         messages = [
             SystemMessage(content=system_text),
@@ -268,7 +268,7 @@ async def command_r_plus_task(system_text, query_text, command_r_plus_checkbox):
             provider="cohere",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": None},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
         )
         messages = [
             SystemMessage(content=system_text),
@@ -303,7 +303,7 @@ async def llama_3_3_70b_task(system_text, query_text, llama_3_3_70b_checkbox):
             provider="meta",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": None},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
         )
         messages = [
             SystemMessage(content=system_text),
@@ -338,7 +338,7 @@ async def llama_3_2_90b_vision_task(system_text, query_text, llama_3_2_90b_visio
             provider="meta",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": None},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
         )
         messages = [
             SystemMessage(content=system_text),
@@ -352,8 +352,8 @@ async def llama_3_2_90b_vision_task(system_text, query_text, llama_3_2_90b_visio
             host=os.environ["LANGFUSE_HOST"],
         )
         async for chunk in llama_3_2_90b_vision.astream(messages, config={"callbacks": [langfuse_handler],
-                                                                   "metadata": {
-                                                                       "ls_model_name": "meta.llama-3.2-90b-vision-instruct"}}):
+                                                                          "metadata": {
+                                                                              "ls_model_name": "meta.llama-3.2-90b-vision-instruct"}}):
             yield chunk.content
         end_time = time.time()
         print(f"{end_time=}")
@@ -363,6 +363,7 @@ async def llama_3_2_90b_vision_task(system_text, query_text, llama_3_2_90b_visio
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
+
 
 async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
     if openai_gpt4o_checkbox:
@@ -374,7 +375,8 @@ async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
             timeout=None,
             max_retries=2,
             api_key=os.environ["OPENAI_API_KEY"],
-            base_url=os.environ["OPENAI_BASE_URL"]
+            base_url=os.environ["OPENAI_BASE_URL"],
+            model_kwargs={"top_p": 0.75, "seed": 42},
         )
         messages = [
             SystemMessage(content=system_text),
@@ -409,7 +411,8 @@ async def openai_gpt4_task(system_text, query_text, openai_gpt4_checkbox):
             timeout=None,
             max_retries=2,
             api_key=os.environ["OPENAI_API_KEY"],
-            base_url=os.environ["OPENAI_BASE_URL"]
+            base_url=os.environ["OPENAI_BASE_URL"],
+            model_kwargs={"top_p": 0.75, "seed": 42},
         )
         messages = [
             SystemMessage(content=system_text),
@@ -445,7 +448,8 @@ async def azure_openai_gpt4o_task(system_text, query_text, azure_openai_gpt4o_ch
             max_retries=2,
             azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT_GPT_4O"],
             openai_api_key=os.environ["AZURE_OPENAI_API_KEY"],
-            openai_api_version=os.environ["AZURE_OPENAI_API_VERSION_GPT_4O"]
+            openai_api_version=os.environ["AZURE_OPENAI_API_VERSION_GPT_4O"],
+            model_kwargs={"top_p": 0.75, "seed": 42},
         )
         messages = [
             SystemMessage(content=system_text),
@@ -481,7 +485,8 @@ async def azure_openai_gpt4_task(system_text, query_text, azure_openai_gpt4_chec
             max_retries=2,
             azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT_GPT_4"],
             openai_api_key=os.environ["AZURE_OPENAI_API_KEY"],
-            openai_api_version=os.environ["AZURE_OPENAI_API_VERSION_GPT_4"]
+            openai_api_version=os.environ["AZURE_OPENAI_API_VERSION_GPT_4"],
+            model_kwargs={"top_p": 0.75, "seed": 42},
         )
         messages = [
             SystemMessage(content=system_text),
@@ -633,7 +638,8 @@ async def chat(
     command_r_gen = command_r_task(system_text, command_r_user_text, command_r_checkbox)
     command_r_plus_gen = command_r_plus_task(system_text, command_r_plus_user_text, command_r_plus_checkbox)
     llama_3_3_70b_gen = llama_3_3_70b_task(system_text, llama_3_3_70b_user_text, llama_3_3_70b_checkbox)
-    llama_3_2_90b_vision_gen = llama_3_2_90b_vision_task(system_text, llama_3_2_90b_vision_user_text, llama_3_2_90b_vision_checkbox)
+    llama_3_2_90b_vision_gen = llama_3_2_90b_vision_task(system_text, llama_3_2_90b_vision_user_text,
+                                                         llama_3_2_90b_vision_checkbox)
     openai_gpt4o_gen = openai_gpt4o_task(system_text, openai_gpt4o_user_text, openai_gpt4o_gen_checkbox)
     openai_gpt4_gen = openai_gpt4_task(system_text, openai_gpt4_user_text, openai_gpt4_gen_checkbox)
     azure_openai_gpt4o_gen = azure_openai_gpt4o_task(system_text, azure_openai_gpt4o_user_text,
@@ -1807,15 +1813,13 @@ def generate_query(query_text, generate_query_radio):
     if generate_query_radio == "None":
         return gr.Textbox(value=generate_query1), gr.Textbox(value=generate_query2), gr.Textbox(value=generate_query3)
 
-    # chat_llm = ChatOpenAI(api_key=os.environ["OPENAI_API_KEY"], base_url=os.environ["OPENAI_BASE_URL"],
-    #                       model=os.environ["OPENAI_MODEL_NAME"], temperature=0)
     region = get_region()
     chat_llm = ChatOCIGenAI(
         model_id="cohere.command-r-08-2024",
         provider="cohere",
         service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
         compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-        model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": None},
+        model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
     )
 
     # RAG-Fusion
@@ -3280,12 +3284,12 @@ def generate_download_file(
         llama_3_3_70b_evaluation = ""
         llama_3_3_70b_referenced_contexts = ""
 
-
     if "meta/llama-3-2-90b-vision" in llm_answer_checkbox_group:
         llama_3_2_90b_vision_response = llama_3_2_90b_vision_response
         llama_3_2_90b_vision_referenced_contexts = ""
         if include_citation:
-            llama_3_2_90b_vision_response, llama_3_2_90b_vision_referenced_contexts = extract_citation(llama_3_2_90b_vision_response)
+            llama_3_2_90b_vision_response, llama_3_2_90b_vision_referenced_contexts = extract_citation(
+                llama_3_2_90b_vision_response)
         if llm_evaluation_checkbox:
             llama_3_2_90b_vision_evaluation = llama_3_2_90b_vision_evaluation
         else:
