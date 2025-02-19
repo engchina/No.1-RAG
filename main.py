@@ -3063,6 +3063,7 @@ async def eval_by_ragas(
 def generate_download_file(
         search_result,
         llm_answer_checkbox_group,
+        include_citation,
         llm_evaluation_checkbox,
         query_text,
         doc_id_all_checkbox_input,
@@ -3106,11 +3107,12 @@ def generate_download_file(
 
     if "cohere/command-r" in llm_answer_checkbox_group:
         command_r_response = command_r_response
-        command_r_response, command_r_referenced_contexts = extract_citation(command_r_response)
+        command_r_referenced_contexts = ""
+        command_r_evaluation = ""
+        if include_citation:
+            command_r_response, command_r_referenced_contexts = extract_citation(command_r_response)
         if llm_evaluation_checkbox:
             command_r_evaluation = command_r_evaluation
-        else:
-            command_r_evaluation = ""
     else:
         command_r_response = ""
         command_r_evaluation = ""
@@ -3118,11 +3120,12 @@ def generate_download_file(
 
     if "cohere/command-r-plus" in llm_answer_checkbox_group:
         command_r_plus_response = command_r_plus_response
-        command_r_plus_response, command_r_plus_referenced_contexts = extract_citation(command_r_plus_response)
+        command_r_plus_referenced_contexts = ""
+        command_r_plus_evaluation = ""
+        if include_citation:
+            command_r_plus_response, command_r_plus_referenced_contexts = extract_citation(command_r_plus_response)
         if llm_evaluation_checkbox:
             command_r_plus_evaluation = command_r_plus_evaluation
-        else:
-            command_r_plus_evaluation = ""
     else:
         command_r_plus_response = ""
         command_r_plus_evaluation = ""
@@ -3130,11 +3133,12 @@ def generate_download_file(
 
     if "meta/llama-3-3-70b" in llm_answer_checkbox_group:
         llama_3_3_70b_response = llama_3_3_70b_response
-        llama_3_3_70b_response, llama_3_3_70b_referenced_contexts = extract_citation(llama_3_3_70b_response)
+        llama_3_3_70b_referenced_contexts = ""
+        llama_3_3_70b_evaluation = ""
+        if include_citation:
+            llama_3_3_70b_response, llama_3_3_70b_referenced_contexts = extract_citation(llama_3_3_70b_response)
         if llm_evaluation_checkbox:
             llama_3_3_70b_evaluation = llama_3_3_70b_evaluation
-        else:
-            llama_3_3_70b_evaluation = ""
     else:
         llama_3_3_70b_response = ""
         llama_3_3_70b_evaluation = ""
@@ -3154,11 +3158,12 @@ def generate_download_file(
 
     if "openai/gpt-4" in llm_answer_checkbox_group:
         openai_gpt4_response = openai_gpt4_response
-        openai_gpt4_response, openai_gpt4_referenced_contexts = extract_citation(openai_gpt4_response)
+        openai_gpt4_evaluation = ""
+        openai_gpt4_referenced_contexts = ""
+        if include_citation:
+            openai_gpt4_response, openai_gpt4_referenced_contexts = extract_citation(openai_gpt4_response)
         if llm_evaluation_checkbox:
             openai_gpt4_evaluation = openai_gpt4_evaluation
-        else:
-            openai_gpt4_evaluation = ""
     else:
         openai_gpt4_response = ""
         openai_gpt4_evaluation = ""
@@ -3166,12 +3171,13 @@ def generate_download_file(
 
     if "azure_openai/gpt-4o" in llm_answer_checkbox_group:
         azure_openai_gpt4o_response = azure_openai_gpt4o_response
-        azure_openai_gpt4o_response, azure_openai_gpt4o_referenced_contexts = extract_citation(
-            azure_openai_gpt4o_response)
+        azure_openai_gpt4o_referenced_contexts = ""
+        azure_openai_gpt4o_evaluation = ""
+        if include_citation:
+            azure_openai_gpt4o_response, azure_openai_gpt4o_referenced_contexts = extract_citation(
+                azure_openai_gpt4o_response)
         if llm_evaluation_checkbox:
             azure_openai_gpt4o_evaluation = azure_openai_gpt4o_evaluation
-        else:
-            azure_openai_gpt4o_evaluation = ""
     else:
         azure_openai_gpt4o_response = ""
         azure_openai_gpt4o_evaluation = ""
@@ -3179,11 +3185,13 @@ def generate_download_file(
 
     if "azure_openai/gpt-4" in llm_answer_checkbox_group:
         azure_openai_gpt4_response = azure_openai_gpt4_response
-        azure_openai_gpt4_response, azure_openai_gpt4_referenced_contexts = extract_citation(azure_openai_gpt4_response)
+        azure_openai_gpt4_referenced_contexts = ""
+        azure_openai_gpt4_evaluation = ""
+        if include_citation:
+            azure_openai_gpt4_response, azure_openai_gpt4_referenced_contexts = extract_citation(
+                azure_openai_gpt4_response)
         if llm_evaluation_checkbox:
             azure_openai_gpt4_evaluation = azure_openai_gpt4_evaluation
-        else:
-            azure_openai_gpt4_evaluation = ""
     else:
         azure_openai_gpt4_response = ""
         azure_openai_gpt4_evaluation = ""
@@ -3191,11 +3199,12 @@ def generate_download_file(
 
     if "claude/opus" in llm_answer_checkbox_group:
         claude_3_opus_response = claude_3_opus_response
-        claude_3_opus_response, claude_3_opus_referenced_contexts = extract_citation(claude_3_opus_response)
+        claude_3_opus_referenced_contexts = ""
+        claude_3_opus_evaluation = ""
+        if include_citation:
+            claude_3_opus_response, claude_3_opus_referenced_contexts = extract_citation(claude_3_opus_response)
         if llm_evaluation_checkbox:
             claude_3_opus_evaluation = claude_3_opus_evaluation
-        else:
-            claude_3_opus_evaluation = ""
     else:
         claude_3_opus_response = ""
         claude_3_opus_evaluation = ""
@@ -3203,11 +3212,12 @@ def generate_download_file(
 
     if "claude/sonnet" in llm_answer_checkbox_group:
         claude_3_sonnet_response = claude_3_sonnet_response
-        claude_3_sonnet_response, claude_3_sonnet_referenced_contexts = extract_citation(claude_3_sonnet_response)
+        claude_3_sonnet_referenced_contexts = ""
+        claude_3_sonnet_evaluation = ""
+        if include_citation:
+            claude_3_sonnet_response, claude_3_sonnet_referenced_contexts = extract_citation(claude_3_sonnet_response)
         if llm_evaluation_checkbox:
             claude_3_sonnet_evaluation = claude_3_sonnet_evaluation
-        else:
-            claude_3_sonnet_evaluation = ""
     else:
         claude_3_sonnet_response = ""
         claude_3_sonnet_evaluation = ""
@@ -3215,11 +3225,12 @@ def generate_download_file(
 
     if "claude/haiku" in llm_answer_checkbox_group:
         claude_3_haiku_response = claude_3_haiku_response
-        claude_3_haiku_response, claude_3_haiku_referenced_contexts = extract_citation(claude_3_haiku_response)
+        claude_3_haiku_referenced_contexts = ""
+        claude_3_haiku_evaluation = ""
+        if include_citation:
+            claude_3_haiku_response, claude_3_haiku_referenced_contexts = extract_citation(claude_3_haiku_response)
         if llm_evaluation_checkbox:
             claude_3_haiku_evaluation = claude_3_haiku_evaluation
-        else:
-            claude_3_haiku_evaluation = ""
     else:
         claude_3_haiku_response = ""
         claude_3_haiku_evaluation = ""
@@ -5828,6 +5839,7 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
         inputs=[
             tab_chat_document_searched_result_dataframe,
             tab_chat_document_llm_answer_checkbox_group,
+            tab_chat_document_include_citation_checkbox,
             tab_chat_document_llm_evaluation_checkbox,
             tab_chat_document_query_text,
             tab_chat_document_doc_id_all_checkbox,
