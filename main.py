@@ -104,7 +104,7 @@ def generate_embedding_response(inputs: List[str]):
 
 def rerank_documents_response(input_text, inputs: List[str], rerank_model):
     all_document_ranks = []
-    batch_size = 900
+    batch_size = 200
 
     if rerank_model in ["cohere/rerank-multilingual-v3.1", "cohere/rerank-english-v3.1"]:
         rerank_model = rerank_model.replace("/", ".")
@@ -1395,11 +1395,24 @@ def convert_to_markdown_document(file_path):
     )
 
 
-def load_document(file_path, server_directory):
+def load_document(file_path, server_directory, document_metadata):
     has_error = False
     if not file_path:
         has_error = True
         gr.Warning("ファイルを選択してください")
+    if document_metadata:
+        document_metadata = document_metadata.strip()
+        if "=" not in document_metadata or '"' in document_metadata or "'" in document_metadata or '\\' in document_metadata:
+            has_error = True
+            gr.Warning("メタデータの形式が正しくありません。key1=value1,key2=value2,... の形式で入力してください。")
+        else:
+            metadatas = document_metadata.split(",")
+            for metadata in metadatas:
+                if "=" not in metadata:
+                    has_error = True
+                    gr.Warning(
+                        "メタデータの形式が正しくありません。key1=value1,key2=value2,... の形式で入力してください。")
+                    break
     if has_error:
         return gr.Textbox(value=""), gr.Textbox(value=""), gr.Textbox(value=""), gr.Textbox(value="")
 
@@ -1452,6 +1465,10 @@ def load_document(file_path, server_directory):
     collection_cmeta['file_name'] = file_name
     collection_cmeta['source'] = server_path
     collection_cmeta['server_path'] = server_path
+    metadatas = document_metadata.split(",")
+    for metadata in metadatas:
+        key, value = metadata.split("=")
+        collection_cmeta[key] = value
 
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
@@ -1469,14 +1486,6 @@ VALUES (:id, to_blob(:data), :cmetadata) """
                 'cmetadata': json.dumps(collection_cmeta)
             })
             conn.commit()
-
-    #             select_contents_sql = f"""
-    # -- Select data from table {DEFAULT_COLLECTION_NAME}_collection
-    # SELECT dbms_vector_chain.utl_to_text(dt.data) from {DEFAULT_COLLECTION_NAME}_collection dt WHERE dt.id = :doc_id """
-    #             output_sql_text += "\n" + select_contents_sql.replace(":doc_id", "'" + str(doc_id) + "'") + ";"
-    #             cursor.execute(select_contents_sql, {'doc_id': doc_id})
-    #             result = cursor.fetchone()
-    #             contents = result[0].read()
 
     return (
         gr.Textbox(value=output_sql_text.strip()),
@@ -1852,10 +1861,10 @@ def generate_query(query_text, generate_query_radio):
     elif generate_query_radio == "Customized-Multi-Step-Query":
         region = get_region()
         select_multi_step_query_sql = f"""
-                SELECT json_value(dt.cmetadata, '$.file_name') name, dc.embed_id embed_id, dc.embed_data embed_data, dc.doc_id doc_id
-                FROM {DEFAULT_COLLECTION_NAME}_embedding dc, {DEFAULT_COLLECTION_NAME}_collection dt
-                WHERE dc.doc_id = dt.id
-                ORDER BY vector_distance(dc.embed_vector , (
+                SELECT json_value(dc.cmetadata, '$.file_name') name, de.embed_id embed_id, de.embed_data embed_data, de.doc_id doc_id
+                FROM {DEFAULT_COLLECTION_NAME}_embedding dc, {DEFAULT_COLLECTION_NAME}_collection dc
+                WHERE de.doc_id = dc.id
+                ORDER BY vector_distance(de.embed_vector , (
                         SELECT to_vector(et.embed_vector) embed_vector
                         FROM
                             dbms_vector_chain.utl_to_embeddings(:query_text, JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
@@ -1918,6 +1927,7 @@ def search_document(
         doc_id_checkbox_group_input,
         text_search_checkbox_input,
         text_search_k_slider_input,
+        document_metadata_text_input,
         query_text_input,
         sub_query1_text_input,
         sub_query2_text_input,
@@ -1938,6 +1948,19 @@ def search_document(
     if not doc_id_all_checkbox_input and (not doc_id_checkbox_group_input or doc_id_checkbox_group_input == [""]):
         has_error = True
         gr.Warning("ドキュメントを選択してください")
+    if document_metadata_text_input:
+        document_metadata_text_input = document_metadata_text_input.strip()
+        if "=" not in document_metadata_text_input or '"' in document_metadata_text_input or "'" in document_metadata_text_input or '\\' in document_metadata_text_input:
+            has_error = True
+            gr.Warning("メタデータの形式が正しくありません。key1=value1,key2=value2,... の形式で入力してください。")
+        else:
+            metadatas = document_metadata_text_input.split(",")
+            for metadata in metadatas:
+                if "=" not in metadata:
+                    has_error = True
+                    gr.Warning(
+                        "メタデータの形式が正しくありません。key1=value1,key2=value2,... の形式で入力してください。")
+                    break
     if has_error:
         return (
             gr.Textbox(value=""),
@@ -1982,11 +2005,11 @@ def search_document(
         contains_sql_list = []
         for lst in lists:
             if isinstance(lst, str):
-                contains_sql_list.append(f"contains(dc.embed_data, '{lst}') > 0")
+                contains_sql_list.append(f"contains(de.embed_data, '{lst}') > 0")
             else:
                 temp = " and ".join(str(item) for item in lst)
                 if temp and temp not in contains_sql_list:
-                    contains_sql_list.append(f"contains(dc.embed_data, '{temp}') > 0")
+                    contains_sql_list.append(f"contains(de.embed_data, '{temp}') > 0")
         return ' OR '.join(contains_sql_list)
 
     def format_keywords(x):
@@ -2002,6 +2025,8 @@ def search_document(
             return replace_newlines(text)
         else:
             return text
+
+    region = get_region()
 
     query_text_input = query_text_input.strip()
     sub_query1_text_input = sub_query1_text_input.strip()
@@ -2025,10 +2050,25 @@ def search_document(
     ( 
     """
     where_sql = """
-                    WHERE 1 = 1 """
-    region = get_region()
+                    WHERE 1 = 1 
+                    AND de.doc_id = dc.id """
+    where_metadata_sql = ""
+    if document_metadata_text_input:
+        metadata_conditions = []
+        metadatas = document_metadata_text_input.split(",")
+        for i, metadata in enumerate(metadatas):
+            if "=" not in metadata:
+                continue
+            key, value = metadata.split("=", 1)
+            # 使用正确的JSON路径语法和参数绑定
+            metadata_conditions.append(f"json_value(dc.cmetadata, '$.\"{key}\"') = '{value}'")
+
+        if metadata_conditions:
+            where_metadata_sql = " AND (" + " AND ".join(metadata_conditions) + ") "
+        print(f"{where_metadata_sql=}")
+
     where_threshold_sql = f"""
-                    AND vector_distance(dc.embed_vector, (
+                    AND vector_distance(de.embed_vector, (
                             SELECT to_vector(et.embed_vector) embed_vector
                             FROM
                                 dbms_vector_chain.utl_to_embeddings(
@@ -2044,14 +2084,8 @@ def search_document(
                                 et), COSINE
                             ) <= :threshold_value """
     if not doc_id_all_checkbox_input:
-        # where_sql += """
-        #         AND dc.doc_id IN (
-        #             SELECT CAST(REGEXP_SUBSTR(:doc_ids, '([^,]+)', 1, LEVEL) AS NUMBER)
-        #             FROM DUAL
-        #             CONNECT BY LEVEL <= LENGTH(:doc_ids) - LENGTH(REPLACE(:doc_ids, ',', '')) + 1
-        #         ) """
         where_sql += """
-                    AND dc.doc_id IN (
+                    AND de.doc_id IN (
                         SELECT TRIM(BOTH '''' FROM REGEXP_SUBSTR(:doc_ids, '''[^'']+''', 1, LEVEL)) AS doc_id
                         FROM DUAL
                         CONNECT BY REGEXP_SUBSTR(:doc_ids, '''[^'']+''', 1, LEVEL) IS NOT NULL
@@ -2059,7 +2093,7 @@ def search_document(
     # v4
     region = get_region()
     base_sql = f"""
-                    SELECT dc.doc_id doc_id, dc.embed_id embed_id, vector_distance(dc.embed_vector, (
+                    SELECT de.doc_id doc_id, de.embed_id embed_id, vector_distance(de.embed_vector, (
                             SELECT to_vector(et.embed_vector) embed_vector
                             FROM
                                 dbms_vector_chain.utl_to_embeddings(
@@ -2074,7 +2108,7 @@ def search_document(
                                     )
                                 et), COSINE
                             ) vector_distance
-                    FROM {DEFAULT_COLLECTION_NAME}_embedding dc """ + where_sql + where_threshold_sql + """
+                    FROM {DEFAULT_COLLECTION_NAME}_embedding de, {DEFAULT_COLLECTION_NAME}_collection dc """ + where_sql + where_metadata_sql + where_threshold_sql + """
                     ORDER BY vector_distance """
     base_sql += """
                     FETCH FIRST :partition_by PARTITIONS BY doc_id, :top_k ROWS ONLY 
@@ -2098,11 +2132,11 @@ def search_document(
     ),
     aggregated_results AS
     (
-            SELECT json_value(dt.cmetadata, '$.file_name') name, dc.embed_id embed_id, dc.embed_data embed_data, dc.doc_id doc_id, MIN(s.vector_distance) vector_distance
-            FROM selected_results s, {DEFAULT_COLLECTION_NAME}_embedding dc, {DEFAULT_COLLECTION_NAME}_collection dt
-            WHERE s.adjusted_embed_id = dc.embed_id AND s.doc_id = dt.id and dc.doc_id = dt.id  
-            GROUP BY dc.doc_id, name, dc.embed_id, dc.embed_data
-            ORDER BY vector_distance, dc.doc_id, dc.embed_id
+            SELECT json_value(dc.cmetadata, '$.file_name') name, de.embed_id embed_id, de.embed_data embed_data, de.doc_id doc_id, MIN(s.vector_distance) vector_distance
+            FROM selected_results s, {DEFAULT_COLLECTION_NAME}_embedding de, {DEFAULT_COLLECTION_NAME}_collection dc
+            WHERE s.adjusted_embed_id = de.embed_id AND s.doc_id = dc.id and de.doc_id = dc.id  
+            GROUP BY de.doc_id, name, de.embed_id, de.embed_data
+            ORDER BY vector_distance, de.doc_id, de.embed_id
     ),
     ranked_data AS (
         SELECT
@@ -2164,7 +2198,6 @@ def search_document(
     ORDER BY
         ad.min_vector_distance
     """
-    #         ORDER BY dc.doc_id, dc.embed_id
 
     query_texts = [":query_text"]
     if sub_query1_text_input:
@@ -2192,7 +2225,7 @@ def search_document(
                         AND (""" + search_text + """) """
             region = get_region()
             full_text_search_sql = f"""
-                        SELECT dc.doc_id doc_id, dc.embed_id embed_id, vector_distance(dc.embed_vector, (
+                        SELECT de.doc_id doc_id, de.embed_id embed_id, vector_distance(de.embed_vector, (
                                 SELECT to_vector(et.embed_vector) embed_vector
                                 FROM
                                     dbms_vector_chain.utl_to_embeddings(
@@ -2207,7 +2240,7 @@ def search_document(
                                         )
                                     et), COSINE
                                 ) vector_distance
-                        FROM {DEFAULT_COLLECTION_NAME}_embedding dc """ + where_sql
+                        FROM {DEFAULT_COLLECTION_NAME}_embedding de, {DEFAULT_COLLECTION_NAME}_collection dc """ + where_sql + where_metadata_sql
             complete_sql = (with_sql + """ 
                 UNION 
         """.join(
@@ -2323,21 +2356,21 @@ def search_document(
                 print(f"{filtered_doc_ids=}")
                 select_extend_first_chunk_sql = f"""
 SELECT 
-        json_value(dt.cmetadata, '$.file_name') name,
-        MIN(dc.embed_id) embed_id,
-        RTRIM(XMLCAST(XMLAGG(XMLELEMENT(e, dc.embed_data || ',') ORDER BY dc.embed_id) AS CLOB), ',') AS embed_data,
-        dc.doc_id doc_id,
+        json_value(dc.cmetadata, '$.file_name') name,
+        MIN(de.embed_id) embed_id,
+        RTRIM(XMLCAST(XMLAGG(XMLELEMENT(e, de.embed_data || ',') ORDER BY de.embed_id) AS CLOB), ',') AS embed_data,
+        de.doc_id doc_id,
         '999999.0' vector_distance
 FROM 
-        {DEFAULT_COLLECTION_NAME}_embedding dc, {DEFAULT_COLLECTION_NAME}_collection dt
+        {DEFAULT_COLLECTION_NAME}_embedding dc, {DEFAULT_COLLECTION_NAME}_collection dc
 WHERE 
-        dc.doc_id = dt.id AND 
-        dc.doc_id IN (:filtered_doc_ids) AND 
-        dc.embed_id <= :extend_first_chunk_size
+        de.doc_id = dc.id AND 
+        de.doc_id IN (:filtered_doc_ids) AND 
+        de.embed_id <= :extend_first_chunk_size
 GROUP BY
-        dc.doc_id, name         
+        de.doc_id, name         
 ORDER 
-        BY dc.doc_id
+        BY de.doc_id
             """
                 select_extend_first_chunk_sql = (select_extend_first_chunk_sql
                                                  .replace(':filtered_doc_ids', filtered_doc_ids)
@@ -2434,7 +2467,7 @@ def extract_and_format(input_str, search_result_df):
                 f"\n"
                 f"---回答内で参照されているコンテキスト---"
                 f"\n"
-                f"回答にコンテキストが存在しないか、コンテキストのフォーマットが正しくありません。"
+                f"回答にコンテキストが存在しないか、コンテキストの形式が正しくありません。"
         )
 
     extracted = []
@@ -2721,7 +2754,7 @@ async def append_citation(
         # gr.Warning("ドキュメントを選択してください")
     if search_result.empty or (len(search_result) > 0 and search_result.iloc[0]['CONTENT'] == ''):
         has_error = True
-        gr.Warning("検索結果が見つかりませんでした。設定もしくはクエリを変更して再度ご確認ください。")
+        # gr.Warning("検索結果が見つかりませんでした。設定もしくはクエリを変更して再度ご確認ください。")
     if has_error:
         yield (
             command_r_answer_text,
@@ -4257,12 +4290,17 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                             label="サーバー・ディレクトリ*",
                             value="/u01/data/no1rag/"
                         )
-                with gr.Row(visible=False):
+                with gr.Row():
                     with gr.Column():
-                        gr.Examples(
-                            examples=[],
-                            label="サンプル・ファイル",
-                            inputs=tab_load_document_file_text
+                        tab_load_document_metadata_text = gr.Textbox(
+                            label="メタデータ(オプション)",
+                            lines=1,
+                            max_lines=1,
+                            autoscroll=True,
+                            show_copy_button=False,
+                            interactive=True,
+                            info="key1=value1,key2=value2,... の形式で入力する。\"'などの記号はサポートしていません。",
+                            placeholder="key1=value1,key2=value2,..."
                         )
                 with gr.Row():
                     with gr.Column():
@@ -4572,6 +4610,20 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                                 value=False,
                                 info="Promptに回答時の現在の時間を含めます。"
                             )
+                    with gr.Row():
+                        with gr.Column():
+                            with gr.Row():
+                                with gr.Column():
+                                    tab_chat_document_document_metadata_text = gr.Textbox(
+                                        label="メタデータ",
+                                        lines=1,
+                                        max_lines=1,
+                                        autoscroll=True,
+                                        show_copy_button=False,
+                                        interactive=True,
+                                        info="key1=value1,key2=value2,... の形式で入力する。",
+                                        placeholder="key1=value1,key2=value2,..."
+                                    )
                 with gr.Row(visible=False):
                     tab_chat_document_accuracy_plan_radio = gr.Radio(
                         [
@@ -5496,7 +5548,8 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
         load_document,
         inputs=[
             tab_load_document_file_text,
-            tab_load_document_server_directory_text
+            tab_load_document_server_directory_text,
+            tab_load_document_metadata_text,
         ],
         outputs=[
             tab_load_document_output_sql_text,
@@ -5731,6 +5784,7 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
             tab_chat_document_doc_id_checkbox_group,
             tab_chat_document_text_search_checkbox,
             tab_chat_document_text_search_k_slider,
+            tab_chat_document_document_metadata_text,
             tab_chat_document_query_text,
             tab_chat_document_sub_query1_text,
             tab_chat_document_sub_query2_text,
