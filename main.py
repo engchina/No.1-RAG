@@ -1,4 +1,5 @@
 import argparse
+import base64
 import json
 import os
 import platform
@@ -27,10 +28,10 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langfuse.callback import CallbackHandler
-from markitdown import MarkItDown
 from oracledb import DatabaseError
 from unstructured.partition.auto import partition
 
+from markitdown import MarkItDown
 from my_langchain_community.vectorstores import MyOracleVS
 from utils.chunk_util import RecursiveCharacterTextSplitter
 from utils.common_util import get_dict_value
@@ -98,6 +99,7 @@ def generate_embedding_response(inputs: List[str]):
         print(f"Processed batch {i // batch_size + 1} of {(len(inputs) - 1) // batch_size + 1}")
 
         all_embeddings.extend(embed_text_response.data.embeddings)
+        time.sleep(1)
 
     return all_embeddings
 
@@ -330,7 +332,11 @@ async def llama_3_3_70b_task(system_text, query_text, llama_3_3_70b_checkbox):
         yield "TASK_DONE"
 
 
-async def llama_3_2_90b_vision_task(system_text, query_text, llama_3_2_90b_vision_checkbox):
+async def llama_3_2_90b_vision_task(system_text, query_image, query_text, llama_3_2_90b_vision_checkbox):
+    def encode_image(image_path):
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+
     region = get_region()
     if llama_3_2_90b_vision_checkbox:
         llama_3_2_90b_vision = ChatOCIGenAI(
@@ -340,9 +346,21 @@ async def llama_3_2_90b_vision_task(system_text, query_text, llama_3_2_90b_visio
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
             model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
         )
+        if query_image:
+            base64_image = encode_image(query_image)
+            human_message = HumanMessage(content=[
+                {"type": "text", "text": query_text},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                },
+            ], )
+        else:
+            human_message = HumanMessage(content=query_text)
+
         messages = [
             SystemMessage(content=system_text),
-            HumanMessage(content=query_text),
+            human_message,
         ]
         start_time = time.time()
         print(f"{start_time=}")
@@ -615,6 +633,7 @@ async def chat(
         command_r_user_text,
         command_r_plus_user_text,
         llama_3_3_70b_user_text,
+        llama_3_2_90b_vision_user_image,
         llama_3_2_90b_vision_user_text,
         openai_gpt4o_user_text,
         openai_gpt4_user_text,
@@ -638,7 +657,8 @@ async def chat(
     command_r_gen = command_r_task(system_text, command_r_user_text, command_r_checkbox)
     command_r_plus_gen = command_r_plus_task(system_text, command_r_plus_user_text, command_r_plus_checkbox)
     llama_3_3_70b_gen = llama_3_3_70b_task(system_text, llama_3_3_70b_user_text, llama_3_3_70b_checkbox)
-    llama_3_2_90b_vision_gen = llama_3_2_90b_vision_task(system_text, llama_3_2_90b_vision_user_text,
+    llama_3_2_90b_vision_gen = llama_3_2_90b_vision_task(system_text, llama_3_2_90b_vision_user_image,
+                                                         llama_3_2_90b_vision_user_text,
                                                          llama_3_2_90b_vision_checkbox)
     openai_gpt4o_gen = openai_gpt4o_task(system_text, openai_gpt4o_user_text, openai_gpt4o_gen_checkbox)
     openai_gpt4_gen = openai_gpt4_task(system_text, openai_gpt4_user_text, openai_gpt4_gen_checkbox)
@@ -761,7 +781,7 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
             gr.Accordion(visible=claude_3_haiku_evaluation_visible))
 
 
-async def chat_stream(system_text, query_text, llm_answer_checkbox):
+async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox):
     has_error = False
     if not llm_answer_checkbox or len(llm_answer_checkbox) == 0:
         has_error = True
@@ -788,6 +808,7 @@ async def chat_stream(system_text, query_text, llm_answer_checkbox):
     command_r_user_text = query_text
     command_r_plus_user_text = query_text
     llama_3_3_70b_user_text = query_text
+    llama_3_2_90b_vision_user_image = query_image
     llama_3_2_90b_vision_user_text = query_text
     openai_gpt4o_user_text = query_text
     openai_gpt4_user_text = query_text
@@ -847,6 +868,7 @@ async def chat_stream(system_text, query_text, llm_answer_checkbox):
             command_r_user_text,
             command_r_plus_user_text,
             llama_3_3_70b_user_text,
+            llama_3_2_90b_vision_user_image,
             llama_3_2_90b_vision_user_text,
             openai_gpt4o_user_text,
             openai_gpt4_user_text,
@@ -1442,7 +1464,7 @@ def convert_excel_to_text_document(file_path):
 
 
 @lru_cache(maxsize=32)
-def convert_to_markdown_document(file_path):
+def convert_to_markdown_document(file_path, use_llm, llm_prompt):
     has_error = False
     if not file_path:
         has_error = True
@@ -1452,7 +1474,26 @@ def convert_to_markdown_document(file_path):
 
     output_file_path = file_path.name + '.md'
     md = MarkItDown()
-    result = md.convert(file_path.name)
+
+    file_extension = os.path.splitext(file_path.name)[-1].lower()
+    if file_extension in ['.jpg', '.jpeg', '.png', '.ppt', '.pptx'] and use_llm:
+        region = get_region()
+        client = ChatOCIGenAI(
+            model_id="meta.llama-3.2-90b-vision-instruct",
+            provider="meta",
+            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+        )
+        md = MarkItDown(llm_client=client, llm_model="meta.llama-3.2-90b-vision-instruct")
+        result = md.convert(
+            file_path.name,
+            llm_prompt=llm_prompt,
+        )
+    else:
+        result = md.convert(
+            file_path.name,
+        )
     with open(output_file_path, 'w', encoding='utf-8') as f:
         f.write(result.text_content)
     return (
@@ -1531,10 +1572,11 @@ def load_document(file_path, server_directory, document_metadata):
     collection_cmeta['file_name'] = file_name
     collection_cmeta['source'] = server_path
     collection_cmeta['server_path'] = server_path
-    metadatas = document_metadata.split(",")
-    for metadata in metadatas:
-        key, value = metadata.split("=")
-        collection_cmeta[key] = value
+    if document_metadata:
+        metadatas = document_metadata.split(",")
+        for metadata in metadatas:
+            key, value = metadata.split("=")
+            collection_cmeta[key] = value
 
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
@@ -2364,7 +2406,29 @@ def search_document(
 
     with (pool.acquire() as conn):
         with conn.cursor() as cursor:
-            cursor.execute(complete_sql, params)
+            max_retries = 3
+            retries = 0
+            while retries < max_retries:
+                try:
+                    cursor.execute(complete_sql, params)
+                    break
+                except Exception as e:
+                    retries += 1
+                    print(f"Error executing SQL query: {e}. Retrying ({retries}/{max_retries})...")
+                    time.sleep(10 * retries)
+                    if retries == max_retries:
+                        gr.Warning("データベース処理中にエラーが発生しました。しばらくしてから再度お試しください。")
+                        return (
+                            gr.Textbox(value=""),
+                            gr.Markdown(
+                                "**検索結果数**: 0   |   **検索キーワード**: (0)[]",
+                                visible=True
+                            ),
+                            gr.Dataframe(
+                                value=None,
+                                row_count=(1, "fixed")
+                            )
+                        )
             for row in cursor:
                 print(f"row: {row}")
                 unranked_docs.append([row[0], row[1], row[2].read(), row[3], row[4]])
@@ -2756,6 +2820,7 @@ please consider these dates carefully when answering the question:
             command_r_user_text,
             command_r_plus_user_text,
             llama_3_3_70b_user_text,
+            None,
             llama_3_2_90b_vision_user_text,
             openai_gpt4o_user_text,
             openai_gpt4_user_text,
@@ -3149,6 +3214,7 @@ async def eval_by_ragas(
                 command_r_user_text,
                 command_r_plus_user_text,
                 llama_3_3_70b_user_text,
+                None,
                 llama_3_2_90b_vision_user_text,
                 openai_gpt4o_user_text,
                 openai_gpt4_user_text,
@@ -4372,6 +4438,15 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
 私のメッセージと同じ言語で返答してください。
 もし私が言語を切り替えた場合は、それに応じて返答の言語も切り替えてください。"""
                     )
+                with gr.Accordion(open=False,
+                                  label="画像ファイル(オプション) - Llama-3.2-90B-Visionモデルを利用する場合に限り、この画像入力が適用されます。"):
+                    tab_chat_with_llm_query_image = gr.Image(
+                        label="",
+                        interactive=True,
+                        type="filepath",
+                        height=300,
+                        show_label=False,
+                    )
                 with gr.Row():
                     with gr.Column():
                         tab_chat_with_llm_query_text = gr.Textbox(
@@ -4384,9 +4459,6 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                         tab_chat_with_llm_clear_button = gr.ClearButton(value="クリア")
                     with gr.Column():
                         tab_chat_with_llm_chat_button = gr.Button(value="送信", variant="primary")
-                with gr.Row(visible=False):
-                    with gr.Column():
-                        gr.Examples(examples=[], inputs=tab_chat_with_llm_query_text)
         with gr.TabItem(label="RAG評価", elem_classes="inner_tab") as tab_rag_evaluation:
             with gr.TabItem(label="Step-0.前処理") as tab_convert_document:
                 with gr.TabItem(label="MarkItDown") as tab_convert_by_markitdown_document:
@@ -4395,11 +4467,32 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                             tab_convert_document_convert_by_markitdown_file_text = gr.File(
                                 label="変換前のファイル*",
                                 file_types=[
-                                    "csv", "xls", "xlsx", "json", "xml", "ppt", "pptx", "doc", "docx", "pdf", "txt"
+                                    "csv", "xls", "xlsx", "json", "xml", "ppt", "pptx", "doc", "docx", "pdf", "txt",
+                                    "png", "jpg", "jpeg"
                                 ],
                                 type="filepath",
                                 interactive=True,
                             )
+                    with gr.Accordion("Advanced Settings", open=False):
+                        with gr.Row():
+                            with gr.Column():
+                                tab_convert_document_convert_by_markitdown_use_llm_checkbox = gr.Checkbox(
+                                    label="LLMによる処理を有効にする",
+                                    value=True,
+                                    info=(
+                                        f"OCI Generative AI Visionモデルが利用されます。['.jpg','.jpeg','.png','.ppt','.pptx']に対応しています。"
+                                    ),
+                                    interactive=True,
+                                )
+                        with gr.Row():
+                            with gr.Column():
+                                tab_convert_document_convert_by_markitdown_llm_prompt_text = gr.Textbox(
+                                    label="LLM ユーザー・メッセージ",
+                                    value="この画像にふさわしい详细なキャプションを作成してください。",
+                                    interactive=True,
+                                    lines=2,
+                                    max_lines=5,
+                                )
                     with gr.Row():
                         with gr.Column():
                             tab_convert_document_convert_by_markitdown_button = gr.Button(
@@ -5718,6 +5811,7 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
     )
     tab_chat_with_llm_clear_button.add(
         [
+            tab_chat_with_llm_query_image,
             tab_chat_with_llm_query_text,
             tab_chat_with_llm_answer_checkbox_group,
             tab_chat_with_command_r_answer_text,
@@ -5737,6 +5831,7 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
         chat_stream,
         inputs=[
             tab_chat_with_llm_system_text,
+            tab_chat_with_llm_query_image,
             tab_chat_with_llm_query_text,
             tab_chat_with_llm_answer_checkbox_group
         ],
@@ -5768,6 +5863,8 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
         convert_to_markdown_document,
         inputs=[
             tab_convert_document_convert_by_markitdown_file_text,
+            tab_convert_document_convert_by_markitdown_use_llm_checkbox,
+            tab_convert_document_convert_by_markitdown_llm_prompt_text,
         ],
         outputs=[
             tab_convert_document_convert_by_markitdown_file_text,
