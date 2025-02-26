@@ -7,7 +7,6 @@ import re
 import shutil
 import time
 from datetime import datetime
-from functools import lru_cache
 from itertools import combinations
 from typing import List, Tuple
 
@@ -35,7 +34,7 @@ from markitdown import MarkItDown
 from my_langchain_community.vectorstores import MyOracleVS
 from utils.chunk_util import RecursiveCharacterTextSplitter
 from utils.common_util import get_dict_value
-from utils.css import custom_css
+from utils.css_gradio import custom_css
 from utils.generator_util import generate_unique_id
 
 # read local .env file
@@ -186,9 +185,9 @@ ORDER BY name """)
 def refresh_doc_list():
     doc_list = get_doc_list()
     return (
-        gr.Radio(choices=doc_list, value=""),
-        gr.CheckboxGroup(choices=doc_list, value=""),
-        gr.CheckboxGroup(choices=doc_list, value="")
+        gr.Radio(choices=doc_list, value=None),
+        gr.CheckboxGroup(choices=doc_list, value=[]),
+        gr.CheckboxGroup(choices=doc_list, value=[])
     )
 
 
@@ -1463,7 +1462,6 @@ def convert_excel_to_text_document(file_path):
     )
 
 
-@lru_cache(maxsize=32)
 def convert_to_markdown_document(file_path, use_llm, llm_prompt):
     has_error = False
     if not file_path:
@@ -1490,6 +1488,7 @@ def convert_to_markdown_document(file_path, use_llm, llm_prompt):
             file_path.name,
             llm_prompt=llm_prompt,
         )
+        print(f"{result.text_content=}")
     else:
         result = md.convert(
             file_path.name,
@@ -1503,6 +1502,7 @@ def convert_to_markdown_document(file_path, use_llm, llm_prompt):
 
 
 def load_document(file_path, server_directory, document_metadata):
+    print("in load_document() start...")
     has_error = False
     if not file_path:
         has_error = True
@@ -4036,7 +4036,6 @@ def delete_document(server_directory, doc_ids):
         return (
             gr.Textbox(value=""),
             gr.Radio(),
-            gr.CheckboxGroup(),
             gr.CheckboxGroup()
         )
 
@@ -4067,14 +4066,18 @@ WHERE id = :doc_id """
     return (
         gr.Textbox(value=output_sql),
         gr.Radio(doc_list),
-        gr.CheckboxGroup(choices=doc_list, value=""),
+        gr.CheckboxGroup(choices=doc_list, value=[]),
         gr.CheckboxGroup(choices=doc_list)
     )
 
 
-font = [GoogleFont(name="Noto Sans JP"), GoogleFont(name="Noto Sans SC"), GoogleFont(name="Roboto")]
+theme = gr.themes.Default(
+    spacing_size="sm",
+    font=[GoogleFont(name="Noto Sans JP"), GoogleFont(name="Noto Sans SC"), GoogleFont(name="Roboto")]
+).set(
+)
 
-with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
+with gr.Blocks(css=custom_css, theme=theme) as app:
     gr.Markdown(value="# RAG精度あげたろう", elem_classes="main_Header")
     gr.Markdown(value="### LLM＆RAG精度評価ツール（※このツール自体はRAGの評価対象ではありません）",
                 elem_classes="sub_Header")
@@ -4467,8 +4470,8 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                             tab_convert_document_convert_by_markitdown_file_text = gr.File(
                                 label="変換前のファイル*",
                                 file_types=[
-                                    "csv", "xls", "xlsx", "json", "xml", "ppt", "pptx", "doc", "docx", "pdf", "txt",
-                                    "png", "jpg", "jpeg"
+                                    ".csv", ".xls", ".xlsx", ".json", ".xml", ".ppt", ".pptx", ".doc", ".docx", ".pdf",
+                                    ".txt", ".png", ".jpg", ".jpeg"
                                 ],
                                 type="filepath",
                                 interactive=True,
@@ -4488,7 +4491,7 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                             with gr.Column():
                                 tab_convert_document_convert_by_markitdown_llm_prompt_text = gr.Textbox(
                                     label="LLM ユーザー・メッセージ",
-                                    value="この画像にふさわしい详细なキャプションを作成してください。",
+                                    value="画像にふさわしい詳細な代替キャプションを書いてください。",
                                     interactive=True,
                                     lines=2,
                                     max_lines=5,
@@ -4552,10 +4555,10 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                         tab_load_document_file_text = gr.File(
                             label="ファイル*",
                             file_types=[
-                                "txt", "csv", "doc", "docx", "epub", "image",
-                                "md", "msg", "odt", "org", "pdf", "ppt",
-                                "pptx",
-                                "rtf", "rst", "tsv", "xls", "xlsx"
+                                ".txt", ".csv", ".doc", ".docx", ".epub", ".image",
+                                ".md", ".msg", ".odt", ".org", ".pdf", ".ppt",
+                                ".pptx",
+                                ".rtf", ".rst", ".tsv", ".xls", ".xlsx"
                             ],
                             type="filepath")
                     with gr.Column():
@@ -4656,7 +4659,8 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                                 value=0,
                             )
                     gr.Markdown(
-                        "> \<FIXED_DELIMITER\>という分割符がドキュメントに含まれている場合、チャンクは\<FIXED_DELIMITER\>で分割され、MaxおよびOverlapの設定は無視されます。")
+                        r"> \<FIXED_DELIMITER\>という分割符がドキュメントに含まれている場合、チャンクは\<FIXED_DELIMITER\>で分割され、MaxおよびOverlapの設定は無視されます。"
+                    )
 
                     with gr.Row():
                         with gr.Column():
@@ -4736,6 +4740,8 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                         tab_delete_document_doc_ids_checkbox_group = gr.CheckboxGroup(
                             choices=get_doc_list(),
                             label="ドキュメント*",
+                            type="value",
+                            value=[],
                         )
                 with gr.Row():
                     with gr.Column():
@@ -4758,7 +4764,7 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                                 "claude/haiku"
                             ],
                             label="LLM モデル",
-                            value=[""]
+                            value=[]
                         )
                 with gr.Row():
                     with gr.Column():
@@ -4886,18 +4892,16 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                             )
                     with gr.Row():
                         with gr.Column():
-                            with gr.Row():
-                                with gr.Column():
-                                    tab_chat_document_document_metadata_text = gr.Textbox(
-                                        label="メタデータ",
-                                        lines=1,
-                                        max_lines=1,
-                                        autoscroll=True,
-                                        show_copy_button=False,
-                                        interactive=True,
-                                        info="key1=value1,key2=value2,... の形式で入力する。",
-                                        placeholder="key1=value1,key2=value2,..."
-                                    )
+                            tab_chat_document_document_metadata_text = gr.Textbox(
+                                label="メタデータ",
+                                lines=1,
+                                max_lines=1,
+                                autoscroll=True,
+                                show_copy_button=False,
+                                interactive=True,
+                                info="key1=value1,key2=value2,... の形式で入力する。",
+                                placeholder="key1=value1,key2=value2,..."
+                            )
                 with gr.Row(visible=False):
                     tab_chat_document_accuracy_plan_radio = gr.Radio(
                         [
@@ -5050,7 +5054,7 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
                             headers=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "SCORE", "KEY_WORDS"],
                             datatype=["str", "str", "str", "str", "str", "str", "str"],
                             row_count=(1, "fixed"),
-                            height=400,
+                            max_height=400,
                             col_count=(7, "fixed"),
                             wrap=True,
                             column_widths=["4%", "62%", "6%", "8%", "6%", "6%", "8%"],
@@ -5993,8 +5997,8 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Default(font=font)) as app:
         ]
     )
     tab_chat_document_doc_id_all_checkbox.change(
-        lambda x: gr.CheckboxGroup(interactive=False, value="") if x else
-        gr.CheckboxGroup(interactive=True, value=""),
+        lambda x: gr.CheckboxGroup(interactive=False, value=[]) if x else
+        gr.CheckboxGroup(interactive=True, value=[]),
         tab_chat_document_doc_id_all_checkbox,
         tab_chat_document_doc_id_checkbox_group
     )
