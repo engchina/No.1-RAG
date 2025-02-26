@@ -14,7 +14,9 @@ conda activate no.1-rag
 
 ```
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-# pip list --format=freeze > requirements.txt
+pip install gradio==5.18.0
+pip install aiofiles==24.1.0
+# pip list --format=freeze | grep -iv gradio > requirements.txt
 ```
 
 ```angular2html
@@ -49,6 +51,19 @@ echo <your_secret> | openssl rand -base64 32
 echo <your_salt> | openssl rand -base64 32
 ```
 
+## Use Deploy key
+
+wget https://sehubjapacprod.objectstorage.ap-osaka-1.oci.customer-oci.com/n/sehubjapacprod/b/oci-bucket/o/graphrag_deploy.key
+mv graphrag_deploy.key /root/.ssh/id_rsa && chmod 0600 /root/.ssh/id_rsa
+sh-keyscan github.com >> /root/.ssh/known_hosts && chmod 600 /root/.ssh/known_hosts
+git clone git@github.com:engchina/No.1-GraphRAG.git && rm -rf /root/.ssh/id_rsa
+
 ## Change Region Image ID
 
 [https://docs.oracle.com/en-us/iaas/images/image/50cf60da-4374-44e2-ab38-70185991f833/index.htm](https://docs.oracle.com/en-us/iaas/images/image/50cf60da-4374-44e2-ab38-70185991f833/index.htm)
+
+
+
+## License
+
+markdown package is released under the [MIT license](https://github.com/microsoft/markitdown).

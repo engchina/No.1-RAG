@@ -43,10 +43,14 @@ custom_css = """
     "Roboto", 
     Arial, 
     sans-serif;
-  --primary-color: #196fb4;
-  --secondary-color: #f38141;
-  --text-light: #fff;
-  --shadow-sm: 0 2px 5px -1px rgba(50, 50, 93, 0.25), 0 1px 3px -1px rgba(0, 0, 0, 0.3);
+    --primary-color: #196fb4;
+    --secondary-color: #f38141;
+    --color-accent: #2563eb;
+    --checkbox-background-color-selected: #2563eb;
+    --checkbox-border-color-selected: #2563eb;
+    --checkbox-border-color-focus: #2563eb;
+    --text-light: #fff;
+    --shadow-sm: 0 2px 5px -1px rgba(50, 50, 93, 0.25), 0 1px 3px -1px rgba(0, 0, 0, 0.3);
 }
 
 /* ======= Base Styles ======= */
@@ -100,27 +104,36 @@ textarea {
   gap: unset;
 }
 
+.tab-wrapper {
+  padding-bottom: 0;
+}
+
 .tab-container {
   button[role="tab"] {
     color: #606060;
     font-weight: 500;
     background: var(--text-light);
     padding: 10px 20px;
-    border: none;
-    border-right: 4px solid gray;
+    border-top: 1px solid #e7e7ea;
+    border-right: 4px solid #485C69;
+    border-color: #485C69;
     min-width: 150px;
-    
+
     &.selected {
       color: var(--text-light);
       background: var(--primary-color);
       border-bottom: none;
     }
     
+    &.selected:after {
+      height: 0;
+    }
+
     &:last-child {
-      border-right: none;
+      border-right: 4px solid #485C69;
       border-top-right-radius: 3px;
     }
-    
+
     &:first-child {
       border-top-left-radius: 3px;
     }
@@ -132,21 +145,28 @@ textarea {
   .table-wrap {
     border-radius: 3px;
   }
-  
+
   thead > tr > th {
     background: #bfd1e0;
     min-width: 90px;
-    
+
     &:first-child { border-radius: 3px 0 0 0; }
     &:last-child { border-radius: 0 3px 0 0; }
   }
-  
+
   .cell-wrap span {
     font-size: 0.8rem;
   }
 }
 
 /* Button Styles */
+button.primary{
+    border: none;
+    background: linear-gradient(to right bottom, rgb(255, 198, 121), rgb(243, 129, 65));
+    color: rgb(255, 255, 255);
+    box-shadow: rgba(0, 0, 0, 0.12) 2px 2px 2px;
+    border-radius: 3px;
+}
 
 /* Form Elements */
 .container {
@@ -159,6 +179,19 @@ textarea {
       rgb(255 246 228 / 63%) 0 0 0 3px,
       rgb(255 248 236 / 12%) 0 2px 4px 0 inset !important;
   }
+}
+
+input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    accent-color: var(--slider-color);
+    height: 4px;
+    background: var(--neutral-200);
+    border-radius: 5px;
+    background-image: var(--checkbox-border-color-selected);
+    background-size: 0% 100%;
+    background-repeat: no-repeat;
 }
 
 /* Responsive Styles */

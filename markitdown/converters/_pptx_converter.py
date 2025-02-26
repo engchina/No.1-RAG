@@ -113,7 +113,8 @@ class PptxConverter(HtmlConverter):
                     # A placeholder name
                     filename = re.sub(r"\W", "", shape.name) + ".jpg"
                     md_content += (
-                            "\n!["
+                            # "\n!["
+                            "\n["
                             + (llm_description or alt_text or shape.name)
                             + "]("
                             + filename

@@ -2447,7 +2447,7 @@ def search_document(
                         value=docs_dataframe,
                         wrap=True,
                         headers=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "SCORE", "KEY_WORDS"],
-                        column_widths=["4%", "68%", "6%", "8%", "6%", "8%"],
+                        column_widths=["4%", "50%", "6%", "8%", "6%", "8%"],
                         row_count=(1, "fixed"),
                     ),
                 )
@@ -2582,7 +2582,7 @@ ORDER
                     value=docs_dataframe,
                     wrap=True,
                     headers=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "SCORE", "KEY_WORDS"],
-                    column_widths=["4%", "62%", "6%", "8%", "6%", "6%", "8%"],
+                    column_widths=["4%", "50%", "6%", "8%", "6%", "6%", "8%"],
                     row_count=(len(docs_dataframe) if len(docs_dataframe) > 0 else 1, "fixed")
                 )
             )
@@ -4507,7 +4507,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             tab_convert_document_convert_excel_to_text_file_text = gr.File(
                                 label="変換前のファイル*",
                                 file_types=[
-                                    "csv", "xls", "xlsx"
+                                    ".csv", ".xls", ".xlsx"
                                 ],
                                 type="filepath",
                                 interactive=True,
@@ -5053,11 +5053,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         tab_chat_document_searched_result_dataframe = gr.Dataframe(
                             headers=["NO", "CONTENT", "EMBED_ID", "SOURCE", "DISTANCE", "SCORE", "KEY_WORDS"],
                             datatype=["str", "str", "str", "str", "str", "str", "str"],
-                            row_count=(1, "fixed"),
+                            row_count=(5, "fixed"),
                             max_height=400,
                             col_count=(7, "fixed"),
                             wrap=True,
-                            column_widths=["4%", "62%", "6%", "8%", "6%", "6%", "8%"],
+                            column_widths=["4%", "50%", "6%", "8%", "6%", "6%", "8%"],
                             interactive=False,
                         )
                 with gr.Accordion(
