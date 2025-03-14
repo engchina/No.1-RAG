@@ -15,7 +15,10 @@ conda activate no.1-rag
 ```
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 pip install gradio==5.18.0
+# unstructured-client 0.30.4 requires aiofiles>=24.1.0, but you have aiofiles 23.2.1 which is incompatible.
 pip install aiofiles==24.1.0
+# gradio 5.18.0 requires aiofiles<24.0,>=22.0, but you have aiofiles 24.1.0 which is incompatible.
+pip install defusedxml==0.7.1 markitdown==0.0.2 pathvalidate==3.2.3 speechrecognition==3.14.1 youtube-transcript-api==1.0.1
 # pip list --format=freeze | grep -iv gradio > requirements.txt
 ```
 
