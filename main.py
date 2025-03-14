@@ -93,11 +93,24 @@ def generate_embedding_response(inputs: List[str]):
         embed_text_detail.truncate = "NONE"
         embed_text_detail.compartment_id = os.environ["OCI_COMPARTMENT_OCID"]
 
-        embed_text_response = generative_ai_inference_client.embed_text(embed_text_detail)
+        max_retries = 3
+        retry_count = 0
+        while retry_count < max_retries:
+            try:
+                embed_text_response = generative_ai_inference_client.embed_text(embed_text_detail)
+                print(f"Processed batch {i // batch_size + 1} of {(len(inputs) - 1) // batch_size + 1}")
+                all_embeddings.extend(embed_text_response.data.embeddings)
+                break
+            except Exception as e:
+                print(f"Exception: {e}")
+                retry_count += 1
+                print(f"Error embedding text: {e}. Retrying ({retry_count}/{max_retries})...")
+                time.sleep(10 * retry_count)
+                if retry_count == max_retries:
+                    gr.Warning("保存中にエラーが発生しました。しばらくしてから再度お試しください。")
+                    all_embeddings = []
+                    return all_embeddings
 
-        print(f"Processed batch {i // batch_size + 1} of {(len(inputs) - 1) // batch_size + 1}")
-
-        all_embeddings.extend(embed_text_response.data.embeddings)
         time.sleep(1)
 
     return all_embeddings
@@ -1670,6 +1683,19 @@ VALUES (:id, to_blob(:data), :cmetadata) """
 #     )
 
 
+def reset_document_chunks_result_dataframe():
+    return (
+        gr.Dataframe(value=None, row_count=(1, "fixed"))
+    )
+
+
+def reset_document_chunks_result_detail():
+    return (
+        gr.Textbox(value=""),
+        gr.Textbox(value="")
+    )
+
+
 def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
                                    chunks_overlap_size,
                                    chunks_split_by, chunks_split_by_custom,
@@ -1782,6 +1808,63 @@ VALUES (:doc_id, :embed_id, :embed_data) """
         gr.Textbox(value=output_sql),
         gr.Textbox(value=str(len(chunks_dataframe))),
         gr.Dataframe(value=chunks_dataframe, row_count=(len(chunks_dataframe), "fixed"))
+    )
+
+
+def on_select_split_document_chunks_result(evt: gr.SelectData, df: pd.DataFrame):
+    print("on_select_split_document_chunks_result() start...")
+    selected_index = evt.index[0]  # 获取选中行的索引
+    selected_row = df.iloc[selected_index]  # 获取选中行的所有数据
+    return selected_row['CHUNK_ID'], \
+        selected_row['CHUNK_DATA']
+
+
+def update_document_chunks_result_detail(doc_id, df: pd.DataFrame, chunk_id, chunk_data):
+    print("in update_document_chunks_result_detail() start...")
+    has_error = False
+    if not doc_id:
+        has_error = True
+        gr.Warning("ドキュメントを選択してください")
+    if not chunk_data or chunk_data.strip() == "":
+        has_error = True
+        gr.Warning("CHUNK_DATAを入力してください")
+    if has_error:
+        return (
+            gr.Dataframe(),
+            gr.Textbox(),
+            gr.Textbox(),
+        )
+
+    chunk_data = chunk_data.strip()
+
+    with pool.acquire() as conn:
+        with conn.cursor() as cursor:
+            update_sql = f"""
+UPDATE {DEFAULT_COLLECTION_NAME}_embedding 
+SET embed_data = :embed_data, embed_vector = :embed_vector
+WHERE doc_id = :doc_id and embed_id = :embed_id
+"""
+            embed_vector = generate_embedding_response([chunk_data])[0]
+            cursor.setinputsizes(embed_vector=oracledb.DB_TYPE_VECTOR)
+            cursor.execute(update_sql,
+                           {'doc_id': doc_id, 'embed_id': chunk_id, 'embed_data': chunk_data,
+                            'embed_vector': embed_vector})
+            conn.commit()
+
+    print(f"{chunk_id=}")
+    print(f"{chunk_data=}")
+
+    updated_df = df.copy()
+    mask = updated_df['CHUNK_ID'] == int(chunk_id)
+    updated_df.loc[mask, 'CHUNK_DATA'] = chunk_data
+    updated_df.loc[mask, 'CHUNK_LENGTH'] = len(chunk_data)
+    # print(f"{mask.sum()} rows updated")
+    print(f"{updated_df=}")
+
+    return (
+        gr.Dataframe(value=updated_df),
+        gr.Textbox(),
+        gr.Textbox(value=chunk_data),
     )
 
 
@@ -2413,6 +2496,7 @@ def search_document(
                     cursor.execute(complete_sql, params)
                     break
                 except Exception as e:
+                    print(f"Exception: {e}")
                     retries += 1
                     print(f"Error executing SQL query: {e}. Retrying ({retries}/{max_retries})...")
                     time.sleep(10 * retries)
@@ -4582,35 +4666,9 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     with gr.Column():
                         tab_load_document_load_button = gr.Button(value="読込み", variant="primary")
             with gr.TabItem(label="Step-2.分割・ベクトル化・保存") as tab_split_document:
-                with gr.Accordion(label="使用されたSQL", open=False) as tab_split_document_sql_accordion:
-                    tab_split_document_output_sql_text = gr.Textbox(
-                        label="使用されたSQL",
-                        show_label=False,
-                        lines=10,
-                        autoscroll=False,
-                        show_copy_button=True
-                    )
-                with gr.Row():
-                    tab_split_document_chunks_count = gr.Textbox(label="チャンク数", lines=1)
-                with gr.Row():
-                    tab_split_document_chunks_result_dataframe = gr.Dataframe(
-                        label="チャンク結果",
-                        headers=["CHUNK_ID", "CHUNK_OFFSET", "CHUNK_LENGTH", "CHUNK_DATA"],
-                        datatype=["str", "str", "str", "str"],
-                        row_count=(1, "fixed"),
-                        col_count=(4, "fixed"),
-                        wrap=True,
-                        column_widths=["10%", "10%", "10%", "70%"]
-                    )
-                with gr.Row():
-                    with gr.Column():
-                        # doc_id_text = gr.Textbox(label="Doc ID*", lines=1)
-                        tab_split_document_doc_id_radio = gr.Radio(
-                            choices=get_doc_list(),
-                            label="ドキュメント*",
-                        )
                 # with gr.Accordion("UTL_TO_CHUNKS 設定*"):
-                with gr.Accordion("CHUNKS 設定*"):
+                with gr.Accordion(
+                        "CHUNKS 設定*(<FIXED_DELIMITER>という分割符がドキュメントに含まれている場合、チャンクは<FIXED_DELIMITER>分割され、MaxおよびOverlapの設定は無視されます。)"):
                     with gr.Row():
                         with gr.Column():
                             tab_split_document_chunks_language_radio = gr.Radio(
@@ -4658,10 +4716,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 step=5,
                                 value=0,
                             )
-                    gr.Markdown(
-                        r"> \<FIXED_DELIMITER\>という分割符がドキュメントに含まれている場合、チャンクは\<FIXED_DELIMITER\>で分割され、MaxおよびOverlapの設定は無視されます。"
-                    )
-
                     with gr.Row():
                         with gr.Column():
                             tab_split_document_chunks_split_by_radio = gr.Radio(
@@ -4710,12 +4764,65 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
 
                 with gr.Row():
                     with gr.Column():
+                        # doc_id_text = gr.Textbox(label="Doc ID*", lines=1)
+                        tab_split_document_doc_id_radio = gr.Radio(
+                            choices=get_doc_list(),
+                            label="ドキュメント*",
+                        )
+
+                with gr.Row():
+                    with gr.Column():
                         tab_split_document_split_button = gr.Button(value="分割", variant="primary")
                     with gr.Column():
                         tab_split_document_embed_save_button = gr.Button(
                             value="ベクトル化して保存（データ量が多いと時間がかかる）",
                             variant="primary"
                         )
+
+                with gr.Accordion(label="使用されたSQL", open=False) as tab_split_document_sql_accordion:
+                    tab_split_document_output_sql_text = gr.Textbox(
+                        label="使用されたSQL",
+                        show_label=False,
+                        lines=10,
+                        autoscroll=False,
+                        show_copy_button=True
+                    )
+                with gr.Row():
+                    tab_split_document_chunks_count = gr.Textbox(label="チャンク数", lines=1)
+                with gr.Row():
+                    tab_split_document_chunks_result_dataframe = gr.Dataframe(
+                        label="チャンク結果",
+                        headers=["CHUNK_ID", "CHUNK_OFFSET", "CHUNK_LENGTH", "CHUNK_DATA"],
+                        datatype=["str", "str", "str", "str"],
+                        row_count=(1, "fixed"),
+                        col_count=(4, "fixed"),
+                        wrap=True,
+                        column_widths=["10%", "10%", "10%", "70%"]
+                    )
+                with gr.Accordion(label="チャンク詳細",
+                                  open=True) as tab_split_document_chunks_result_detail:
+                    with gr.Row():
+                        with gr.Column():
+                            tab_split_document_chunks_result_detail_chunk_id = gr.Textbox(
+                                label="CHUNK_ID",
+                                interactive=False,
+                                lines=1
+                            )
+                    with gr.Row():
+                        with gr.Column():
+                            tab_split_document_chunks_result_detail_chunk_data = gr.Textbox(
+                                label="CHUNK_DATA",
+                                interactive=True,
+                                lines=5,
+                                max_lines=5,
+                            )
+                    with gr.Row():
+                        with gr.Column():
+                            tab_split_document_chunks_result_detail_update_button = gr.Button(
+                                value="更新",
+                                variant="primary"
+                            )
+
             with gr.TabItem(label="Step-3.削除(オプション)") as tab_delete_document:
                 with gr.Accordion(
                         label="使用されたSQL",
@@ -5909,7 +6016,21 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_delete_document_doc_ids_checkbox_group,
             tab_chat_document_doc_id_checkbox_group
         ]
+    ).then(
+        reset_document_chunks_result_dataframe,
+        inputs=[],
+        outputs=[
+            tab_split_document_chunks_result_dataframe,
+        ]
+    ).then(
+        reset_document_chunks_result_detail,
+        inputs=[],
+        outputs=[
+            tab_split_document_chunks_result_detail_chunk_id,
+            tab_split_document_chunks_result_detail_chunk_data,
+        ]
     )
+
     tab_split_document_split_button.click(
         split_document_by_unstructured,
         inputs=[
@@ -5927,27 +6048,62 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_split_document_output_sql_text,
             tab_split_document_chunks_count,
             tab_split_document_chunks_result_dataframe
-        ],
+        ]
+    ).then(
+        reset_document_chunks_result_detail,
+        inputs=[],
+        outputs=[
+            tab_split_document_chunks_result_detail_chunk_id,
+            tab_split_document_chunks_result_detail_chunk_data,
+        ]
     )
-    tab_split_document_embed_save_button.click(
-        split_document_by_unstructured,
+
+    tab_split_document_chunks_result_dataframe.select(
+        on_select_split_document_chunks_result,
         inputs=[
-            tab_split_document_doc_id_radio,
-            tab_split_document_chunks_by_radio,
-            tab_split_document_chunks_max_slider,
-            tab_split_document_chunks_overlap_slider,
-            tab_split_document_chunks_split_by_radio,
-            tab_split_document_chunks_split_by_custom_text,
-            tab_split_document_chunks_language_radio,
-            tab_split_document_chunks_normalize_radio,
-            tab_split_document_chunks_normalize_options_checkbox_group
+            tab_split_document_chunks_result_dataframe,
         ],
         outputs=[
-            tab_split_document_output_sql_text,
-            tab_split_document_chunks_count,
-            tab_split_document_chunks_result_dataframe
+            tab_split_document_chunks_result_detail_chunk_id,
+            tab_split_document_chunks_result_detail_chunk_data,
+        ]
+    )
+
+    tab_split_document_chunks_result_detail_update_button.click(
+        update_document_chunks_result_detail,
+        inputs=[
+            tab_split_document_doc_id_radio,
+            tab_split_document_chunks_result_dataframe,
+            tab_split_document_chunks_result_detail_chunk_id,
+            tab_split_document_chunks_result_detail_chunk_data,
         ],
-    ).then(
+        outputs=[
+            tab_split_document_chunks_result_dataframe,
+            tab_split_document_chunks_result_detail_chunk_id,
+            tab_split_document_chunks_result_detail_chunk_data,
+        ]
+    )
+
+    # tab_split_document_embed_save_button.click(
+    #     split_document_by_unstructured,
+    #     inputs=[
+    #         tab_split_document_doc_id_radio,
+    #         tab_split_document_chunks_by_radio,
+    #         tab_split_document_chunks_max_slider,
+    #         tab_split_document_chunks_overlap_slider,
+    #         tab_split_document_chunks_split_by_radio,
+    #         tab_split_document_chunks_split_by_custom_text,
+    #         tab_split_document_chunks_language_radio,
+    #         tab_split_document_chunks_normalize_radio,
+    #         tab_split_document_chunks_normalize_options_checkbox_group
+    #     ],
+    #     outputs=[
+    #         tab_split_document_output_sql_text,
+    #         tab_split_document_chunks_count,
+    #         tab_split_document_chunks_result_dataframe
+    #     ],
+    # ).then(
+    tab_split_document_embed_save_button.click(
         embed_save_document_by_unstructured,
         inputs=[
             tab_split_document_doc_id_radio,
@@ -5966,6 +6122,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_split_document_chunks_result_dataframe
         ],
     )
+
     tab_delete_document.select(
         refresh_doc_list,
         inputs=[],
@@ -6487,7 +6644,7 @@ app.queue()
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", type=str, default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--port", type=int, default=8081)
     args = parser.parse_args()
     app.launch(
         server_name=args.host,
