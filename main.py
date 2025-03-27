@@ -2742,92 +2742,92 @@ def extract_citation(input_str):
     else:
         return None, None
 
-
-def generate_langgpt_prompt_ja(context, query_text, include_citation=False, include_current_time=False):
-    # 固定するエラーメッセージ
-    error_message = "申し訳ありませんが、コンテキストから適切な回答を見つけることができませんでした。別の LLM モデルをお試しいただくか、クエリの内容や設定を少し調整していただくことで解決できるかもしれません。"
-
-    # LangGPTテンプレートの基本構造
-    prompt = f"""
-# Role: 厳格コンテキストQA
-
-## Profile
-
-- Author: User
-- Version: 0.2
-- Language: 日本語
-- Description: 厳密なコンテキストベースの質問応答システム。提供された文脈データのみを使用し、一切の改変を加えずに回答します。
-
-### Core Skills
-1. コンテキストの完全一致検索
-2. 文脈改変の完全排除
-3. 回答不能時の定型通知
-4. マルチフォーマット出力対応
-
-## Rules
-1. {error_message}
-2. 回答は<context>の内容に100%依存
-3. 部分一致や推測を一切行わない
-4. 日付情報がある場合の時系列処理（最新情報優先）
-5. 引用情報の厳密なフォーマット保持
-
-## Workflow
-1. コンテキスト解析フェーズ
-   - UTF-8エンコーディングで厳密解析
-   - メタデータ（EMBED_ID/SOURCE）の抽出
-2. クエリマッチングフェーズ
-   - 完全文字列マッチングアルゴリズム適用
-   - 複数候補がある場合は最新日付を優先
-3. 回答生成フェーズ
-   - マッチデータの直接引用
-   - 引用情報の構造化出力（要求時）
-4. エラーハンドリング
-   - マッチなし → 定型エラーメッセージ
-   - 矛盾データ → 事実関係を列挙
-
-## Initialization
-As a/an <Role>, you must follow the <Rules> in <Language>.
-コンテキストQAシステムが起動しました。以下の要素を提供ください：
-
-<context>
-{context}
-</context>
-
-<query>
-{query_text}
-</query>
-"""
-
-    # 引用情報の条件付き追加
-    if include_citation:
-        prompt += """
-### 引用フォーマット規約
-- 出力直後にJSON配列を追加
-- 厳密な構造保持（```json不使用）：
-[
-    {
-        "EMBED_ID": <一意な識別子>,
-        "SOURCE": "<情報の出典>",
-        "EXTRACT_TEXT": "<引用部分の原文>"
-    }
-]
-"""
-
-    # 時間処理の条件付き追加
-    if include_current_time:
-        current_time = datetime.now().strftime('%Y%m%d%H%M%S')
-        prompt += f"""
-### 時系列処理規則
-- 基準時刻: {current_time}
-- 最新情報判定アルゴリズム：
-  1. 日付データの正規化（YYYYMMDDHHMMSS）
-  2. 時刻近接順にソート
-  3. 同一情報のバージョン管理
-- 期間指定クエリ対応：
-  /period:start=YYYYMMDD,end=YYYYMMDD
-"""
-
-    return prompt.strip()
+#
+# def generate_langgpt_prompt_ja(context, query_text, include_citation=False, include_current_time=False):
+#     # 固定するエラーメッセージ
+#     error_message = "申し訳ありませんが、コンテキストから適切な回答を見つけることができませんでした。別の LLM モデルをお試しいただくか、クエリの内容や設定を少し調整していただくことで解決できるかもしれません。"
+#
+#     # LangGPTテンプレートの基本構造
+#     prompt = f"""
+# # Role: 厳格コンテキストQA
+#
+# ## Profile
+#
+# - Author: User
+# - Version: 0.2
+# - Language: 日本語
+# - Description: 厳密なコンテキストベースの質問応答システム。提供された文脈データのみを使用し、一切の改変を加えずに回答します。
+#
+# ### Core Skills
+# 1. コンテキストの完全一致検索
+# 2. 文脈改変の完全排除
+# 3. 回答不能時の定型通知
+# 4. マルチフォーマット出力対応
+#
+# ## Rules
+# 1. {error_message}
+# 2. 回答は<context>の内容に100%依存
+# 3. 部分一致や推測を一切行わない
+# 4. 日付情報がある場合の時系列処理（最新情報優先）
+# 5. 引用情報の厳密なフォーマット保持
+#
+# ## Workflow
+# 1. コンテキスト解析フェーズ
+#    - UTF-8エンコーディングで厳密解析
+#    - メタデータ（EMBED_ID/SOURCE）の抽出
+# 2. クエリマッチングフェーズ
+#    - 完全文字列マッチングアルゴリズム適用
+#    - 複数候補がある場合は最新日付を優先
+# 3. 回答生成フェーズ
+#    - マッチデータの直接引用
+#    - 引用情報の構造化出力（要求時）
+# 4. エラーハンドリング
+#    - マッチなし → 定型エラーメッセージ
+#    - 矛盾データ → 事実関係を列挙
+#
+# ## Initialization
+# As a/an <Role>, you must follow the <Rules> in <Language>.
+# コンテキストQAシステムが起動しました。以下の要素を提供ください：
+#
+# <context>
+# {context}
+# </context>
+#
+# <query>
+# {query_text}
+# </query>
+# """
+#
+#     # 引用情報の条件付き追加
+#     if include_citation:
+#         prompt += """
+# ### 引用フォーマット規約
+# - 出力直後にJSON配列を追加
+# - 厳密な構造保持（```json不使用）：
+# [
+#     {
+#         "EMBED_ID": <一意な識別子>,
+#         "SOURCE": "<情報の出典>",
+#         "EXTRACT_TEXT": "<引用部分の原文>"
+#     }
+# ]
+# """
+#
+#     # 時間処理の条件付き追加
+#     if include_current_time:
+#         current_time = datetime.now().strftime('%Y%m%d%H%M%S')
+#         prompt += f"""
+# ### 時系列処理規則
+# - 基準時刻: {current_time}
+# - 最新情報判定アルゴリズム：
+#   1. 日付データの正規化（YYYYMMDDHHMMSS）
+#   2. 時刻近接順にソート
+#   3. 同一情報のバージョン管理
+# - 期間指定クエリ対応：
+#   /period:start=YYYYMMDD,end=YYYYMMDD
+# """
+#
+#     return prompt.strip()
 
 
 def generate_langgpt_prompt(context, query_text, include_citation=False, include_current_time=False):
