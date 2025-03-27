@@ -53,16 +53,18 @@ nohup ./langfuse/main.sh &
 
 # Run ginza-api
 conda create -n ginza-api python=3.11 -y
-conda run -n ginza-api pip install -r ./ginza-api/requirements.txt
+conda activate ginza-api
+pip install -r ./ginza-api/requirements.txt
 chmod +x ./ginza-api/main.sh
 nohup ./ginza-api/main.sh &
 
 # Run application
 conda create -n no.1-rag python=3.11 -y
-conda run -n no.1-rag pip install -r requirements.txt
-conda run -n no.1-rag pip install gradio==5.18.0
-conda run -n no.1-rag pip install aiofiles==24.1.0
-conda run -n no.1-rag pip install defusedxml==0.7.1 markitdown==0.0.2 pathvalidate==3.2.3 speechrecognition==3.14.1 youtube-transcript-api==1.0.1
+conda activate no.1-rag
+pip install -r requirements.txt
+pip install gradio==5.18.0
+pip install aiofiles==24.1.0
+pip install defusedxml==0.7.1 markitdown==0.0.2 pathvalidate==3.2.3 speechrecognition==3.14.1 youtube-transcript-api==1.0.1
 python -m nltk.downloader -u https://pastebin.com/raw/D3TBY4Mj punkt averaged_perceptron_tagger
 
 chmod +x main.sh
