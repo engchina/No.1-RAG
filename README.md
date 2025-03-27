@@ -3,7 +3,7 @@
 ## Deploy
 
 - v1.0.3: 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
-Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.0.3/v1.0.3.zip)
+  Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.0.3/v1.0.3.zip)
 
 ## Setup
 
@@ -54,18 +54,9 @@ echo <your_secret> | openssl rand -base64 32
 echo <your_salt> | openssl rand -base64 32
 ```
 
-## Use Deploy key
-
-wget https://sehubjapacprod.objectstorage.ap-osaka-1.oci.customer-oci.com/n/sehubjapacprod/b/oci-bucket/o/graphrag_deploy.key
-mv graphrag_deploy.key /root/.ssh/id_rsa && chmod 0600 /root/.ssh/id_rsa
-sh-keyscan github.com >> /root/.ssh/known_hosts && chmod 600 /root/.ssh/known_hosts
-git clone git@github.com:engchina/No.1-GraphRAG.git && rm -rf /root/.ssh/id_rsa
-
 ## Change Region Image ID
 
 [https://docs.oracle.com/en-us/iaas/images/image/50cf60da-4374-44e2-ab38-70185991f833/index.htm](https://docs.oracle.com/en-us/iaas/images/image/50cf60da-4374-44e2-ab38-70185991f833/index.htm)
-
-
 
 ## License
 
