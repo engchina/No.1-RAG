@@ -250,7 +250,7 @@ async def command_r_task(system_text, query_text, command_r_checkbox):
             model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
         )
         messages = [
-            SystemMessage(content=system_text),
+            # SystemMessage(content=system_text),
             HumanMessage(content=query_text),
         ]
         start_time = time.time()
@@ -285,7 +285,7 @@ async def command_r_plus_task(system_text, query_text, command_r_plus_checkbox):
             model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
         )
         messages = [
-            SystemMessage(content=system_text),
+            # SystemMessage(content=system_text),
             HumanMessage(content=query_text),
         ]
         start_time = time.time()
@@ -320,7 +320,7 @@ async def llama_3_3_70b_task(system_text, query_text, llama_3_3_70b_checkbox):
             model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
         )
         messages = [
-            SystemMessage(content=system_text),
+            # SystemMessage(content=system_text),
             HumanMessage(content=query_text),
         ]
         start_time = time.time()
@@ -371,7 +371,7 @@ async def llama_3_2_90b_vision_task(system_text, query_image, query_text, llama_
             human_message = HumanMessage(content=query_text)
 
         messages = [
-            SystemMessage(content=system_text),
+            # SystemMessage(content=system_text),
             human_message,
         ]
         start_time = time.time()
@@ -409,7 +409,7 @@ async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
             model_kwargs={"top_p": 0.75, "seed": 42},
         )
         messages = [
-            SystemMessage(content=system_text),
+            # SystemMessage(content=system_text),
             HumanMessage(content=query_text),
         ]
         start_time = time.time()
@@ -445,7 +445,7 @@ async def openai_gpt4_task(system_text, query_text, openai_gpt4_checkbox):
             model_kwargs={"top_p": 0.75, "seed": 42},
         )
         messages = [
-            SystemMessage(content=system_text),
+            # SystemMessage(content=system_text),
             HumanMessage(content=query_text),
         ]
         start_time = time.time()
@@ -482,7 +482,7 @@ async def azure_openai_gpt4o_task(system_text, query_text, azure_openai_gpt4o_ch
             model_kwargs={"top_p": 0.75, "seed": 42},
         )
         messages = [
-            SystemMessage(content=system_text),
+            # SystemMessage(content=system_text),
             HumanMessage(content=query_text),
         ]
         start_time = time.time()
@@ -519,7 +519,7 @@ async def azure_openai_gpt4_task(system_text, query_text, azure_openai_gpt4_chec
             model_kwargs={"top_p": 0.75, "seed": 42},
         )
         messages = [
-            SystemMessage(content=system_text),
+            # SystemMessage(content=system_text),
             HumanMessage(content=query_text),
         ]
         start_time = time.time()
@@ -552,7 +552,7 @@ async def claude_3_opus_task(system_text, query_text, claude_3_opus_checkbox):
             max_retries=2,
         )
         messages = [
-            SystemMessage(content=system_text),
+            # SystemMessage(content=system_text),
             HumanMessage(content=query_text),
         ]
         start_time = time.time()
@@ -585,7 +585,7 @@ async def claude_3_sonnet_task(system_text, query_text, claude_3_sonnet_checkbox
             max_retries=2,
         )
         messages = [
-            SystemMessage(content=system_text),
+            # SystemMessage(content=system_text),
             HumanMessage(content=query_text),
         ]
         start_time = time.time()
@@ -618,7 +618,7 @@ async def claude_3_haiku_task(system_text, query_text, claude_3_haiku_checkbox):
             max_retries=2,
         )
         messages = [
-            SystemMessage(content=system_text),
+            # SystemMessage(content=system_text),
             HumanMessage(content=query_text),
         ]
         start_time = time.time()
@@ -2706,13 +2706,17 @@ def extract_and_format(input_str, search_result_df):
     )
     formatted += "[\n"
     for item in extracted:
-        content = search_result_df.loc[search_result_df["EMBED_ID"] == item["EMBED_ID"], "CONTENT"].values
-        if len(content) > 0:
-            content = content[0]
-            content = content.replace('"', '\'')
-            content = content.replace('\n', ' ').replace('\r', ' ')
-        else:
-            content = "N/A"
+        content = "N/A"
+        if item["EMBED_ID"] and item["SOURCE"]:
+            content = search_result_df.loc[
+                (search_result_df["EMBED_ID"].astype(int) == int(item["EMBED_ID"])) &
+                (search_result_df["SOURCE"] == item["SOURCE"]),
+                "CONTENT"
+            ].values
+            if len(content) > 0:
+                content = content[0]
+                content = content.replace('"', '\'')
+                content = content.replace('\n', ' ').replace('\r', ' ')
         formatted += (
             '    {{\n'
             '        "EMBED_ID": {},\n'
@@ -2737,6 +2741,180 @@ def extract_citation(input_str):
         return part1, part2
     else:
         return None, None
+
+
+def generate_langgpt_prompt_ja(context, query_text, include_citation=False, include_current_time=False):
+    # 固定するエラーメッセージ
+    error_message = "申し訳ありませんが、コンテキストから適切な回答を見つけることができませんでした。別の LLM モデルをお試しいただくか、クエリの内容や設定を少し調整していただくことで解決できるかもしれません。"
+
+    # LangGPTテンプレートの基本構造
+    prompt = f"""
+# Role: 厳格コンテキストQA
+
+## Profile
+
+- Author: User
+- Version: 0.2
+- Language: 日本語
+- Description: 厳密なコンテキストベースの質問応答システム。提供された文脈データのみを使用し、一切の改変を加えずに回答します。
+
+### Core Skills
+1. コンテキストの完全一致検索
+2. 文脈改変の完全排除
+3. 回答不能時の定型通知
+4. マルチフォーマット出力対応
+
+## Rules
+1. {error_message}
+2. 回答は<context>の内容に100%依存
+3. 部分一致や推測を一切行わない
+4. 日付情報がある場合の時系列処理（最新情報優先）
+5. 引用情報の厳密なフォーマット保持
+
+## Workflow
+1. コンテキスト解析フェーズ
+   - UTF-8エンコーディングで厳密解析
+   - メタデータ（EMBED_ID/SOURCE）の抽出
+2. クエリマッチングフェーズ
+   - 完全文字列マッチングアルゴリズム適用
+   - 複数候補がある場合は最新日付を優先
+3. 回答生成フェーズ
+   - マッチデータの直接引用
+   - 引用情報の構造化出力（要求時）
+4. エラーハンドリング
+   - マッチなし → 定型エラーメッセージ
+   - 矛盾データ → 事実関係を列挙
+
+## Initialization
+As a/an <Role>, you must follow the <Rules> in <Language>.
+コンテキストQAシステムが起動しました。以下の要素を提供ください：
+
+<context>
+{context}
+</context>
+
+<query>
+{query_text}
+</query>
+"""
+
+    # 引用情報の条件付き追加
+    if include_citation:
+        prompt += """
+### 引用フォーマット規約
+- 出力直後にJSON配列を追加
+- 厳密な構造保持（```json不使用）：
+[
+    {
+        "EMBED_ID": <一意な識別子>,
+        "SOURCE": "<情報の出典>",
+        "EXTRACT_TEXT": "<引用部分の原文>"
+    }
+]
+"""
+
+    # 時間処理の条件付き追加
+    if include_current_time:
+        current_time = datetime.now().strftime('%Y%m%d%H%M%S')
+        prompt += f"""
+### 時系列処理規則
+- 基準時刻: {current_time}
+- 最新情報判定アルゴリズム：
+  1. 日付データの正規化（YYYYMMDDHHMMSS）
+  2. 時刻近接順にソート
+  3. 同一情報のバージョン管理
+- 期間指定クエリ対応：
+  /period:start=YYYYMMDD,end=YYYYMMDD
+"""
+
+    return prompt.strip()
+
+
+def generate_langgpt_prompt(context, query_text, include_citation=False, include_current_time=False):
+    # Fixed error message (kept in Japanese)
+    # error_message = "申し訳ありませんが、コンテキストから適切な回答を見つけることができませんでした。別の LLM モデルをお試しいただくか、クエリの内容や設定を少し調整していただくことで解決できるかもしれません。"
+
+    # LangGPT template structure (translated to English)
+    prompt = f"""
+## Role: Strict Context QA
+
+## Profile
+
+- Author: User
+- Version: 0.2
+- Language: Japanese
+- Description: Strict context-based Q&A system. Answers using only provided context data without any modification.
+
+## Core Skills
+1. Exact match search in context
+2. Complete prohibition of context modification
+3. Standardized notification for unanswerable questions
+4. Multi-format output support
+
+## Rules
+1. Answers must 100% rely on <context> content
+2. No partial matches or speculation allowed
+3. Time-series processing for date information (prioritize latest)
+4. Strict format preservation for citations
+
+## Workflow
+1. Context Analysis Phase
+   - Strict parsing with UTF-8 encoding
+   - Metadata extraction (EMBED_ID/SOURCE)
+2. Query Matching Phase
+   - Apply exact string matching algorithm
+   - Prioritize latest dates for multiple candidates
+3. Answer Generation Phase
+   - Direct quotation of matched data
+   - Structured citation output (when requested)
+4. Error Handling
+   - No matches → Standard error message
+   - Conflicting data → Enumerate factual relationships
+
+## Initialization
+As a/an <Role>, you must follow the <Rules> in <Language>.
+Context QA system initialized. Please provide the following elements:
+
+## Context
+<context>
+{context}
+</context>
+
+## Query
+<query>
+{query_text}
+</query>
+"""
+
+    # Conditional citation addition
+    if include_citation:
+        prompt += """
+## Citation Format Specifications
+- Append JSON array immediately after output
+- Strict structure preservation (without ```json):
+[
+    {{
+        "EMBED_ID": <unique identifier>,
+        "SOURCE": "<information origin>"
+    }}
+]
+"""
+
+    # Conditional time processing addition
+    if include_current_time:
+        current_time = datetime.now().strftime('%Y%m%d%H%M%S')
+        prompt += f"""
+## Time Series Processing Rules
+- Reference time: {current_time}
+- Latest information determination algorithm:
+  1. Date normalization (YYYYMMDDHHMMSS)
+  2. Sort by temporal proximity
+  3. Version control for identical information
+- Period-specific query support:
+  /period:start=YYYYMMDD,end=YYYYMMDD
+"""
+
+    return prompt.strip()
 
 
 async def chat_document(
@@ -2824,68 +3002,75 @@ async def chat_document(
 
     # context = '\n'.join(search_result['CONTENT'].astype(str).values)
     context = search_result[['EMBED_ID', 'SOURCE', 'CONTENT']].to_dict('records')
-    print(f"{context=}")
-    # system_text = f"""
-    #         Use the following pieces of Context to answer the question at the end.
-    #         If you don't know the answer, just say that you don't know, don't try to make up an answer.
-    #         Use the EXACT TEXT from the Context WITHOUT ANY MODIFICATIONS, REORGANIZATION or EMBELLISHMENT.
-    #         Don't try to answer anything that isn't in Context.
-    #         Context:
-    #         ```
-    #         {context}
-    #         ```
-    #         """
-    system_text = f"""
----目標：--- 
-次のコンテキストを使用して、最後にある質問に答えてください。  
-コンテキストにないことについては答えようとしないでください。  
-もし答えがわからない場合は、「申し訳ありませんが、コンテキストから適切な回答を見つけることができませんでした。別の LLM モデルをお試しいただくか、クエリの内容や設定を少し調整していただくことで解決できるかもしれません。」と言ってください。
-答えをでっち上げようとしないでください。  
-コンテキストの正確なテキストを使用し、**一切の修正、再構成、または脚色を加えずに**使用してください。  
-\n
-"""
+    #     print(f"{context=}")
+    #     # system_text = f"""
+    #     #         Use the following pieces of Context to answer the question at the end.
+    #     #         If you don't know the answer, just say that you don't know, don't try to make up an answer.
+    #     #         Use the EXACT TEXT from the Context WITHOUT ANY MODIFICATIONS, REORGANIZATION or EMBELLISHMENT.
+    #     #         Don't try to answer anything that isn't in Context.
+    #     #         Context:
+    #     #         ```
+    #     #         {context}
+    #     #         ```
+    #     #         """
+    #     system_text = f"""
+    # ---目標：---
+    # 次のコンテキストを使用して、最後にある質問に答えてください。
+    # コンテキストにないことについては答えようとしないでください。
+    # もし答えがわからない場合は、「申し訳ありませんが、コンテキストから適切な回答を見つけることができませんでした。別の LLM モデルをお試しいただくか、クエリの内容や設定を少し調整していただくことで解決できるかもしれません。」と言ってください。
+    # 答えをでっち上げようとしないでください。
+    # コンテキストの正確なテキストを使用し、**一切の修正、再構成、または脚色を加えずに**使用してください。
+    # \n
+    # """
+    #
+    #     if include_citation:
+    #         system_text += f"""
+    # After providing the answer, **include the 'EMBED_ID' and 'SOURCE' of the 'CONTENT' used to formulate the answer in JSON format**.
+    # The JSON array must strictly follow this structure without '```json' and '```' around it:
+    #
+    # [
+    #     {{
+    #         "EMBED_ID": <A unique identifier for the content piece.>,
+    #         "SOURCE": "<A string indicating the origin of the content.>"
+    #     }}
+    # ]
+    #
+    # If multiple pieces of CONTENT are used, include all relevant EMBED_IDs and SOURCEs in the JSON array.
+    # \n
+    # """
+    #
+    #     current_time = datetime.now()
+    #     formatted_time = current_time.strftime('%Y%m%d%H%M%S')
+    #
+    #     if include_current_time:
+    #         system_text += f"""
+    # The current time is {formatted_time} in format '%Y%m%d%H%M%S', When the Context contains multiple entries with dates,
+    # please consider these dates carefully when answering the question:
+    # - If the question asks about the "latest" or "most recent" information, use data from the most recent date
+    # - If the question asks about a specific time period, use data from that corresponding time period
+    # - If comparing different time periods, clearly specify which date's data you are referencing
+    # \n
+    # """
+    #
+    #     system_text += f"""
+    # ---コンテキスト：--- \n
+    # <context>
+    # {context}
+    # </context>
+    # \n
+    # """
+    #
+    #     user_text = f"""
+    # ---質問：--- \n
+    # <query>
+    # {query_text}
+    # </query>
+    # \n
+    # ---役に立つ回答：--- \n
+    # """
 
-    if include_citation:
-        system_text += f"""
-After providing the answer, **include the 'EMBED_ID' and 'SOURCE' of the 'CONTENT' used to formulate the answer in JSON format**.
-The JSON array must strictly follow this structure without '```json' and '```' around it:
-
-[
-    {{
-        "EMBED_ID": <A unique identifier for the content piece.>,
-        "SOURCE": "<A string indicating the origin of the content.>"
-    }}
-]
-
-If multiple pieces of CONTENT are used, include all relevant EMBED_IDs and SOURCEs in the JSON array.
-\n
-"""
-
-    current_time = datetime.now()
-    formatted_time = current_time.strftime('%Y%m%d%H%M%S')
-
-    if include_current_time:
-        system_text += f"""
-The current time is {formatted_time} in format '%Y%m%d%H%M%S', When the Context contains multiple entries with dates, 
-please consider these dates carefully when answering the question:
-- If the question asks about the "latest" or "most recent" information, use data from the most recent date
-- If the question asks about a specific time period, use data from that corresponding time period
-- If comparing different time periods, clearly specify which date's data you are referencing
-\n
-"""
-
-    system_text += f"""
----コンテキスト：--- \n
-{context} 
-\n
-"""
-
-    user_text = f"""
----質問：--- \n
-{query_text} 
-\n
----役に立つ回答：--- \n
-"""
+    system_text = ""
+    user_text = generate_langgpt_prompt(context, query_text, include_citation, include_current_time)
 
     command_r_user_text = user_text
     command_r_plus_user_text = user_text
@@ -3554,7 +3739,7 @@ def generate_download_file(
             'LLM モデル':
                 [
                     "cohere/command-r",
-                    # "cohere/command-r-plus",
+                    "cohere/command-r-plus",
                     "meta/llama-3-3-70b",
                     "meta/llama-3-2-90b-vision",
                     "openai/gpt-4o",
@@ -3567,7 +3752,7 @@ def generate_download_file(
                 ],
             'LLM メッセージ': [
                 command_r_response,
-                # command_r_plus_response,
+                command_r_plus_response,
                 llama_3_3_70b_response,
                 llama_3_2_90b_vision_response,
                 openai_gpt4o_response,
@@ -3580,7 +3765,7 @@ def generate_download_file(
             ],
             '引用 Contexts': [
                 command_r_referenced_contexts,
-                # command_r_plus_referenced_contexts,
+                command_r_plus_referenced_contexts,
                 llama_3_3_70b_referenced_contexts,
                 llama_3_2_90b_vision_referenced_contexts,
                 openai_gpt4o_referenced_contexts,
@@ -3593,7 +3778,7 @@ def generate_download_file(
             ],
             'Ragas 評価結果': [
                 command_r_evaluation,
-                # command_r_plus_evaluation,
+                command_r_plus_evaluation,
                 llama_3_3_70b_evaluation,
                 llama_3_2_90b_vision_evaluation,
                 openai_gpt4o_evaluation,
@@ -4926,10 +5111,10 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         tab_chat_document_reranker_threshold_slider = gr.Slider(
                             label="Rerank Score 閾値*",
                             minimum=0.0,
-                            info="Default value: 0.1。Rerank Scoreが閾値以上のデータのみを抽出する。",
+                            info="Default value: 0.0045。Rerank Scoreが閾値以上のデータのみを抽出する。",
                             maximum=0.99,
-                            step=0.001,
-                            value=0.1,
+                            step=0.0005,
+                            value=0.0045,
                             interactive=True
                         )
                 with gr.Accordion("Advanced Settings", open=False):
@@ -6644,12 +6829,12 @@ app.queue()
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", type=str, default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8081)
+    parser.add_argument("--port", type=int, default=8082)
     args = parser.parse_args()
     app.launch(
         server_name=args.host,
         server_port=args.port,
         max_threads=200,
         show_api=False,
-        auth=do_auth,
+        # auth=do_auth,
     )
