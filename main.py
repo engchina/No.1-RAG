@@ -6829,12 +6829,12 @@ app.queue()
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", type=str, default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8082)
+    parser.add_argument("--port", type=int, default=8080)
     args = parser.parse_args()
     app.launch(
         server_name=args.host,
         server_port=args.port,
         max_threads=200,
         show_api=False,
-        # auth=do_auth,
+        auth=do_auth,
     )
