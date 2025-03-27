@@ -5,6 +5,9 @@ bootcmd:
   - mkdir -p /u01/aipoc/props
 packages:
   - git
+  - unzip
+  - gcc
+  - build-essential
   - libmagic-dev
   - libgl1-mesa-dev
   - poppler-utils
@@ -44,6 +47,5 @@ runcmd:
   - echo "Downloading and running init script..."
   - cd /u01/aipoc
   - git clone -b main https://github.com/engchina/No.1-RAG.git; cd No.1-RAG
-  - cp No.1-RAG/init_script.sh init_script.sh
   - chmod +x init_script.sh
   - nohup bash init_script.sh >> /var/log/cloud-init-custom.log 2>&1 &

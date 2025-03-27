@@ -1,19 +1,13 @@
 #!/bin/bash
 echo "Initializing application setup..."
 
-# Git clone source code
-cd /u01/aipoc/No.1-RAG
-dos2unix main.cron
-crontab main.cron
+# Install and configure miniconda
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /u01/aipoc/miniconda.sh
+bash miniconda.sh -b -p /u01/aipoc/miniconda
+eval "$(/u01/aipoc/miniconda/bin/conda shell.bash hook)"
+/u01/aipoc/miniconda/bin/conda init bash
 
-# Docker setup
-chmod +x ./langfuse/install_docker.sh
-./langfuse/install_docker.sh
-systemctl start docker
-
-docker network create aipoc-network
-
-# Dowanload and configure instantclient
+# Download and configure instantclient
 cd /u01/aipoc
 wget https://download.oracle.com/otn_software/linux/instantclient/2350000/instantclient-basic-linux.x64-23.5.0.24.07.zip -O /u01/aipoc/instantclient-basic-linux.x64-23.5.0.24.07.zip
 unzip /u01/aipoc/instantclient-basic-linux.x64-23.5.0.24.07.zip -d ./
@@ -26,13 +20,7 @@ source /etc/profile
 
 # Unzip wallet and copy essential file to instantclient
 unzip /u01/aipoc/wallet.zip -d ./wallet
-cp /u01/aipoc/wallet/*  /u01/aipoc/instantclient_23_5/network/admin/
-
-# Application setup
-EXTERNAL_IP=$(curl -s -m 10 http://whatismyip.akamai.com/)
-sed -i "s|localhost:3000|$EXTERNAL_IP:3000|g" ./langfuse/docker-compose.yml
-chmod +x ./langfuse/main.sh
-nohup ./langfuse/main.sh &
+cp ./wallet/*  /u01/aipoc/instantclient_23_5/network/admin/
 
 # Update environment variables
 DB_CONNECTION_STRING=$(cat /u01/aipoc/props/db.env)
@@ -43,11 +31,23 @@ sed -i "s|ORACLE_23AI_CONNECTION_STRING=TODO|ORACLE_23AI_CONNECTION_STRING=$DB_C
 COMPARTMENT_ID=$(cat /u01/aipoc/props/compartment_id.txt)
 sed -i "s|OCI_COMPARTMENT_OCID=TODO|OCI_COMPARTMENT_OCID=$COMPARTMENT_ID|g" .env
 
-# Install and configure miniconda
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /u01/aipoc/miniconda.sh
-bash miniconda.sh -b -p /u01/aipoc/miniconda
-eval "$(/u01/aipoc/miniconda/bin/conda shell.bash hook)"
-/u01/aipoc/miniconda/bin/conda init bash
+# Git clone source code
+cd /u01/aipoc/No.1-RAG
+dos2unix main.cron
+crontab main.cron
+
+# Docker setup
+chmod +x ./langfuse/install_docker.sh
+./langfuse/install_docker.sh
+systemctl start docker
+
+docker network create aipoc-network
+
+# Application setup
+EXTERNAL_IP=$(curl -s -m 10 http://whatismyip.akamai.com/)
+sed -i "s|localhost:3000|$EXTERNAL_IP:3000|g" ./langfuse/docker-compose.yml
+chmod +x ./langfuse/main.sh
+nohup ./langfuse/main.sh &
 
 # Run ginza-api
 conda create -n ginza-api python=3.11 -y
