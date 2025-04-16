@@ -2563,7 +2563,8 @@ def search_document(
                               'SCORE': '-'} for doc in unranked_docs]
                 docs_dataframe = pd.DataFrame(docs_data)
 
-            if extend_first_chunk_size_input > 0:
+            print(f"{extend_first_chunk_size_input=}")
+            if extend_first_chunk_size_input > 0 and len(docs_dataframe) > 0:
                 filtered_doc_ids = "'" + "','".join(
                     [source.split(':')[0] for source in docs_dataframe['SOURCE'].tolist()]) + "'"
                 print(f"{filtered_doc_ids=}")
@@ -2575,7 +2576,7 @@ SELECT
         de.doc_id doc_id,
         '999999.0' vector_distance
 FROM 
-        {DEFAULT_COLLECTION_NAME}_embedding dc, {DEFAULT_COLLECTION_NAME}_collection dc
+        {DEFAULT_COLLECTION_NAME}_embedding de, {DEFAULT_COLLECTION_NAME}_collection dc
 WHERE 
         de.doc_id = dc.id AND 
         de.doc_id IN (:filtered_doc_ids) AND 
@@ -2707,7 +2708,7 @@ def extract_and_format(input_str, search_result_df):
     formatted += "[\n"
     for item in extracted:
         content = "N/A"
-        if item["EMBED_ID"] and item["SOURCE"]:
+        if item["EMBED_ID"] and isinstance(item["EMBED_ID"], int) and item["SOURCE"]:
             content = search_result_df.loc[
                 (search_result_df["EMBED_ID"].astype(int) == int(item["EMBED_ID"])) &
                 (search_result_df["SOURCE"] == item["SOURCE"]),
@@ -4348,7 +4349,7 @@ theme = gr.themes.Default(
 
 with gr.Blocks(css=custom_css, theme=theme) as app:
     gr.Markdown(value="# RAG精度あげたろう", elem_classes="main_Header")
-    gr.Markdown(value="### LLM＆RAG精度評価ツール（※このツール自体はRAGの評価対象ではありません）",
+    gr.Markdown(value="### LLM＆RAG精度評価ツール",
                 elem_classes="sub_Header")
 
     query_id_state = gr.State()
@@ -5070,8 +5071,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         tab_chat_document_reranker_model_radio = gr.Radio(
                             [
                                 "None",
-                                "cohere/rerank-multilingual-v3.1",
-                                "cohere/rerank-english-v3.1",
+                                # "cohere/rerank-multilingual-v3.1",
+                                # "cohere/rerank-english-v3.1",
                                 "cohere/rerank-multilingual-v3.0",
                                 "cohere/rerank-english-v3.0",
                             ],
@@ -5120,6 +5121,14 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 with gr.Accordion("Advanced Settings", open=False):
                     with gr.Row():
                         with gr.Column():
+                            tab_chat_document_answer_by_one_checkbox = gr.Checkbox(
+                                label="Highest-Ranked-One 文書による回答",
+                                value=False,
+                                info="他のすべての文書を無視し、最上位にランクされた1つの文書のみによって回答する。"
+                            )
+                        with gr.Column():
+                            pass
+                        with gr.Column(visible=False):
                             tab_chat_document_partition_by_k_slider = gr.Slider(
                                 label="Partition-By-K",
                                 minimum=0,
@@ -5127,12 +5136,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 step=1,
                                 interactive=True,
                                 info="Default value: 0。類似検索の対象ドキュメント数を指定。0: 全部。1: 1個。2：2個。... n: n個。"
-                            )
-                        with gr.Column():
-                            tab_chat_document_answer_by_one_checkbox = gr.Checkbox(
-                                label="Highest-Ranked-One 文書による回答",
-                                value=False,
-                                info="他のすべての文書を無視し、最上位にランクされた1つの文書のみによって回答する。"
                             )
                     with gr.Row():
                         with gr.Column():
@@ -6000,6 +6003,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     )
 
     gr.Markdown(value="### Developed by Oracle Japan", elem_classes="sub_Header")
+    gr.Markdown(value="### 本ソフトウェアは検証評価用です。日常利用のための基本機能は備えていない点につきましてご理解をよろしくお願い申し上げます。", elem_classes="sub_Header")
     tab_create_oci_clear_button.add(
         [
             tab_create_oci_cred_user_ocid_text,
@@ -6829,12 +6833,12 @@ app.queue()
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", type=str, default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--port", type=int, default=8081)
     args = parser.parse_args()
     app.launch(
         server_name=args.host,
         server_port=args.port,
         max_threads=200,
         show_api=False,
-        auth=do_auth,
+        # auth=do_auth,
     )
