@@ -2168,14 +2168,10 @@ def search_document(
         if not lists or len(lists) == 0:
             return lists
         if len(lists) > limit:
-            # lists = random.sample(lists, limit)
-            if limit == 1:
-                return lists[0]
-            half_limit = limit // 2
-            if limit % 2 == 0:
-                lists = lists[:half_limit] + lists[-half_limit:]
-            else:
-                lists = lists[:half_limit + 1] + lists[-half_limit:]
+            # 按字符串长度排序，优先去掉长的字符串
+            sorted_indices = sorted(range(len(lists)), key=lambda i: len(lists[i]))
+            lists = [lists[i] for i in sorted_indices[:limit]]
+            
         return lists
 
     def generate_combinations(words_list):
@@ -2411,8 +2407,12 @@ def search_document(
             # search_texts = cut_lists(search_texts, text_search_k_slider_input)
             # search_text = process_lists(search_texts)
         if len(search_text) > 0:
+            # where_sql += """
+            #             AND (""" + search_text + """) """
             where_sql += """
-                        AND (""" + search_text + """) """
+                        AND CONTAINS(de.embed_data, :search_texts, 1) > 0 
+                        ORDER BY SCORE(1) DESC FETCH FIRST :top_k ROWS ONLY 
+                    """
             region = get_region()
             full_text_search_sql = f"""
                         SELECT de.doc_id doc_id, de.embed_id embed_id, vector_distance(de.embed_vector, (
@@ -2461,6 +2461,8 @@ def search_document(
         params["doc_ids"] = doc_ids_str
     if partition_by_k_slider_input > 0:
         params["partition_by"] = partition_by_k_slider_input
+    if text_search_checkbox_input and search_texts:
+        params["search_texts"] = " ACCUM ".join(search_texts)
 
     # Add sub-query texts if they exist
     if sub_query1_text_input:
@@ -2861,7 +2863,6 @@ def generate_langgpt_prompt(context, query_text, include_citation=False, include
 ## Workflow
 1. Context Analysis Phase
    - Strict parsing with UTF-8 encoding
-   - Metadata extraction (EMBED_ID/SOURCE)
 2. Query Matching Phase
    - Apply exact string matching algorithm
    - Prioritize latest dates for multiple candidates
@@ -2903,12 +2904,12 @@ Context QA system initialized. Please provide the following elements:
 
     # Conditional time processing addition
     if include_current_time:
-        current_time = datetime.now().strftime('%Y%m%d%H%M%S')
+        current_time = datetime.now().strftime('%Y%m%d%H%M')
         prompt += f"""
 ## Time Series Processing Rules
-- Reference time: {current_time}
+- Current time: {current_time}
 - Latest information determination algorithm:
-  1. Date normalization (YYYYMMDDHHMMSS)
+  1. Date normalization (YYYYMMDDHHMM)
   2. Sort by temporal proximity
   3. Version control for identical information
 - Period-specific query support:
@@ -6840,5 +6841,5 @@ if __name__ == "__main__":
         server_port=args.port,
         max_threads=200,
         show_api=False,
-        auth=do_auth,
+        # auth=do_auth,
     )
