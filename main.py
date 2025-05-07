@@ -3270,13 +3270,13 @@ async def eval_by_ragas(
         # gr.Warning("検索結果が見つかりませんでした。設定もしくはクエリを変更して再度ご確認ください。")
     if llm_evaluation_checkbox and (not llm_answer_checkbox_group or llm_answer_checkbox_group == [""]):
         has_error = True
-        gr.Warning("Ragas 評価をオンにする場合、少なくとも1つのLLM モデルを選択してください")
+        gr.Warning("LLM 評価をオンにする場合、少なくとも1つのLLM モデルを選択してください")
     if llm_evaluation_checkbox and not system_text:
         has_error = True
-        gr.Warning("Ragas 評価をオンにする場合、Ragas 評価のシステム・メッセージを入力してください")
+        gr.Warning("LLM 評価をオンにする場合、LLM 評価のシステム・メッセージを入力してください")
     if llm_evaluation_checkbox and not standard_answer_text:
         has_error = True
-        gr.Warning("Ragas 評価をオンにする場合、Ragas 評価の標準回答を入力してください")
+        gr.Warning("LLM 評価をオンにする場合、LLM 評価の標準回答を入力してください")
     if has_error:
         yield (
             "",
@@ -3777,7 +3777,7 @@ def generate_download_file(
                 claude_3_sonnet_referenced_contexts,
                 claude_3_haiku_referenced_contexts
             ],
-            'Ragas 評価結果': [
+            'LLM 評価結果': [
                 command_r_evaluation,
                 command_r_plus_evaluation,
                 llama_3_3_70b_evaluation,
@@ -3854,7 +3854,7 @@ def generate_eval_result_file():
                 'SQL': '使用されたSQL',
                 'LLM_NAME': 'LLM モデル',
                 'LLM_ANSWER': 'LLM メッセージ',
-                'RAGAS_EVALUATION_RESULT': 'Ragas 評価結果',
+                'RAGAS_EVALUATION_RESULT': 'LLM 評価結果',
                 'HUMAN_EVALUATION_RESULT': 'Human 評価結果',
                 'USER_COMMENT': 'Human コメント',
                 'CREATED_DATE': '作成日時'
@@ -5210,7 +5210,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     )
                 with gr.Row():
                     tab_chat_document_llm_evaluation_checkbox = gr.Checkbox(
-                        label="Ragas 評価",
+                        label="LLM 評価",
                         show_label=True,
                         interactive=True,
                         value=False
@@ -5401,12 +5401,12 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                     variant="primary",
                                 )
                     with gr.Accordion(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_command_r_evaluation_accordion:
                         tab_chat_document_command_r_evaluation_text = gr.Textbox(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -5459,12 +5459,12 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                     variant="primary",
                                 )
                     with gr.Accordion(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_command_r_plus_evaluation_accordion:
                         tab_chat_document_command_r_plus_evaluation_text = gr.Textbox(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -5517,12 +5517,12 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                     variant="primary",
                                 )
                     with gr.Accordion(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_llama_3_3_70b_evaluation_accordion:
                         tab_chat_document_llama_3_3_70b_evaluation_text = gr.Textbox(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -5575,12 +5575,12 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                     variant="primary",
                                 )
                     with gr.Accordion(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_llama_3_2_90b_vision_evaluation_accordion:
                         tab_chat_document_llama_3_2_90b_vision_evaluation_text = gr.Textbox(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -5630,12 +5630,12 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                     variant="primary",
                                 )
                     with gr.Accordion(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_openai_gpt4o_evaluation_accordion:
                         tab_chat_document_openai_gpt4o_evaluation_text = gr.Textbox(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -5688,12 +5688,12 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                     variant="primary",
                                 )
                     with gr.Accordion(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_openai_gpt4_evaluation_accordion:
                         tab_chat_document_openai_gpt4_evaluation_text = gr.Textbox(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -5746,12 +5746,12 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                     variant="primary",
                                 )
                     with gr.Accordion(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_azure_openai_gpt4o_evaluation_accordion:
                         tab_chat_document_azure_openai_gpt4o_evaluation_text = gr.Textbox(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -5804,12 +5804,12 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                     variant="primary",
                                 )
                     with gr.Accordion(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_azure_openai_gpt4_evaluation_accordion:
                         tab_chat_document_azure_openai_gpt4_evaluation_text = gr.Textbox(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -5862,12 +5862,12 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                     variant="primary",
                                 )
                     with gr.Accordion(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_claude_3_opus_evaluation_accordion:
                         tab_chat_document_claude_3_opus_evaluation_text = gr.Textbox(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -5920,12 +5920,12 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                     variant="primary",
                                 )
                     with gr.Accordion(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_claude_3_sonnet_evaluation_accordion:
                         tab_chat_document_claude_3_sonnet_evaluation_text = gr.Textbox(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -5977,12 +5977,12 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                     variant="primary",
                                 )
                     with gr.Accordion(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_claude_3_haiku_evaluation_accordion:
                         tab_chat_document_claude_3_haiku_evaluation_text = gr.Textbox(
-                            label="Ragas 評価結果",
+                            label="LLM 評価結果",
                             show_label=False,
                             lines=2,
                             autoscroll=True,
@@ -6002,8 +6002,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         variant="primary",
                     )
 
-    gr.Markdown(value="### Developed by Oracle Japan", elem_classes="sub_Header")
     gr.Markdown(value="### 本ソフトウェアは検証評価用です。日常利用のための基本機能は備えていない点につきましてご理解をよろしくお願い申し上げます。", elem_classes="sub_Header")
+    gr.Markdown(value="### Developed by Oracle Japan", elem_classes="sub_Header")
     tab_create_oci_clear_button.add(
         [
             tab_create_oci_cred_user_ocid_text,

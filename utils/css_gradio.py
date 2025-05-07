@@ -99,7 +99,7 @@ textarea {
 /* Tab Styles */
 .tabs {
   background: var(--text-light);
-  border-radius: 0 3px 3px 3px !important;
+  border-radius: 3px 3px 3px 3px !important;
   box-shadow: var(--shadow-sm);
   gap: unset;
 }
