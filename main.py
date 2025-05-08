@@ -6841,5 +6841,5 @@ if __name__ == "__main__":
         server_port=args.port,
         max_threads=200,
         show_api=False,
-        # auth=do_auth,
+        auth=do_auth,
     )
