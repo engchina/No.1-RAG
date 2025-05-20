@@ -428,11 +428,11 @@ async def llama_3_2_90b_vision_task(system_text, query_image, query_text, llama_
         if system_text:
             messages = [
                 SystemMessage(content=system_text),
-                HumanMessage(content=query_text),
+                human_message,
             ]
         else:
             messages = [
-                HumanMessage(content=query_text),
+                human_message,
             ]
         start_time = time.time()
         print(f"{start_time=}")
