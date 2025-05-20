@@ -65,9 +65,11 @@ pip install -r requirements.txt
 pip install gradio==5.18.0
 pip install aiofiles==24.1.0
 pip install defusedxml==0.7.1 markitdown==0.0.2 pathvalidate==3.2.3 speechrecognition==3.14.1 youtube-transcript-api==1.0.1
-python -m nltk.downloader -u https://pastebin.com/raw/D3TBY4Mj punkt averaged_perceptron_tagger
 
 chmod +x main.sh
 nohup ./main.sh &
 
 echo "Initialization complete."
+
+# Optional
+python -m nltk.downloader punkt averaged_perceptron_tagger

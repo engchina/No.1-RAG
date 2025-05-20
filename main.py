@@ -239,6 +239,46 @@ def process_text_chunks(unstructured_chunks):
     return chunks
 
 
+async def command_a_task(system_text, query_text, command_a_checkbox):
+    region = get_region()
+    if command_a_checkbox:
+        command_a = ChatOCIGenAI(
+            model_id="cohere.command-a-03-2025",
+            provider="cohere",
+            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+        )
+        if system_text:
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=query_text),
+            ]
+        else:
+            messages = [
+                HumanMessage(content=query_text),
+            ]
+        start_time = time.time()
+        print(f"{start_time=}")
+        langfuse_handler = CallbackHandler(
+            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+            host=os.environ["LANGFUSE_HOST"],
+        )
+        async for chunk in command_a.astream(messages, config={"callbacks": [langfuse_handler],
+                                                               "metadata": {
+                                                                   "ls_model_name": "cohere.command-a-03-2025"}}):
+            yield chunk.content
+        end_time = time.time()
+        print(f"{end_time=}")
+        inference_time = end_time - start_time
+        print(f"\n推論時間: {inference_time:.2f}秒")
+        yield f"\n推論時間: {inference_time:.2f}秒"
+        yield "TASK_DONE"
+    else:
+        yield "TASK_DONE"
+
+
 async def command_r_task(system_text, query_text, command_r_checkbox):
     region = get_region()
     if command_r_checkbox:
@@ -249,10 +289,15 @@ async def command_r_task(system_text, query_text, command_r_checkbox):
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
             model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
         )
-        messages = [
-            # SystemMessage(content=system_text),
-            HumanMessage(content=query_text),
-        ]
+        if system_text:
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=query_text),
+            ]
+        else:
+            messages = [
+                HumanMessage(content=query_text),
+            ]
         start_time = time.time()
         print(f"{start_time=}")
         langfuse_handler = CallbackHandler(
@@ -284,10 +329,15 @@ async def command_r_plus_task(system_text, query_text, command_r_plus_checkbox):
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
             model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
         )
-        messages = [
-            # SystemMessage(content=system_text),
-            HumanMessage(content=query_text),
-        ]
+        if system_text:
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=query_text),
+            ]
+        else:
+            messages = [
+                HumanMessage(content=query_text),
+            ]
         start_time = time.time()
         print(f"{start_time=}")
         langfuse_handler = CallbackHandler(
@@ -319,10 +369,15 @@ async def llama_3_3_70b_task(system_text, query_text, llama_3_3_70b_checkbox):
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
             model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
         )
-        messages = [
-            # SystemMessage(content=system_text),
-            HumanMessage(content=query_text),
-        ]
+        if system_text:
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=query_text),
+            ]
+        else:
+            messages = [
+                HumanMessage(content=query_text),
+            ]
         start_time = time.time()
         print(f"{start_time=}")
         langfuse_handler = CallbackHandler(
@@ -370,10 +425,15 @@ async def llama_3_2_90b_vision_task(system_text, query_image, query_text, llama_
         else:
             human_message = HumanMessage(content=query_text)
 
-        messages = [
-            # SystemMessage(content=system_text),
-            human_message,
-        ]
+        if system_text:
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=query_text),
+            ]
+        else:
+            messages = [
+                HumanMessage(content=query_text),
+            ]
         start_time = time.time()
         print(f"{start_time=}")
         langfuse_handler = CallbackHandler(
@@ -408,10 +468,15 @@ async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
             base_url=os.environ["OPENAI_BASE_URL"],
             model_kwargs={"top_p": 0.75, "seed": 42},
         )
-        messages = [
-            # SystemMessage(content=system_text),
-            HumanMessage(content=query_text),
-        ]
+        if system_text:
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=query_text),
+            ]
+        else:
+            messages = [
+                HumanMessage(content=query_text),
+            ]
         start_time = time.time()
         print(f"{start_time=}")
         langfuse_handler = CallbackHandler(
@@ -444,10 +509,15 @@ async def openai_gpt4_task(system_text, query_text, openai_gpt4_checkbox):
             base_url=os.environ["OPENAI_BASE_URL"],
             model_kwargs={"top_p": 0.75, "seed": 42},
         )
-        messages = [
-            # SystemMessage(content=system_text),
-            HumanMessage(content=query_text),
-        ]
+        if system_text:
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=query_text),
+            ]
+        else:
+            messages = [
+                HumanMessage(content=query_text),
+            ]
         start_time = time.time()
         print(f"{start_time=}")
         langfuse_handler = CallbackHandler(
@@ -481,10 +551,15 @@ async def azure_openai_gpt4o_task(system_text, query_text, azure_openai_gpt4o_ch
             openai_api_version=os.environ["AZURE_OPENAI_API_VERSION_GPT_4O"],
             model_kwargs={"top_p": 0.75, "seed": 42},
         )
-        messages = [
-            # SystemMessage(content=system_text),
-            HumanMessage(content=query_text),
-        ]
+        if system_text:
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=query_text),
+            ]
+        else:
+            messages = [
+                HumanMessage(content=query_text),
+            ]
         start_time = time.time()
         print(f"{start_time=}")
         langfuse_handler = CallbackHandler(
@@ -518,10 +593,15 @@ async def azure_openai_gpt4_task(system_text, query_text, azure_openai_gpt4_chec
             openai_api_version=os.environ["AZURE_OPENAI_API_VERSION_GPT_4"],
             model_kwargs={"top_p": 0.75, "seed": 42},
         )
-        messages = [
-            # SystemMessage(content=system_text),
-            HumanMessage(content=query_text),
-        ]
+        if system_text:
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=query_text),
+            ]
+        else:
+            messages = [
+                HumanMessage(content=query_text),
+            ]
         start_time = time.time()
         print(f"{start_time=}")
         langfuse_handler = CallbackHandler(
@@ -551,10 +631,15 @@ async def claude_3_opus_task(system_text, query_text, claude_3_opus_checkbox):
             timeout=None,
             max_retries=2,
         )
-        messages = [
-            # SystemMessage(content=system_text),
-            HumanMessage(content=query_text),
-        ]
+        if system_text:
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=query_text),
+            ]
+        else:
+            messages = [
+                HumanMessage(content=query_text),
+            ]
         start_time = time.time()
         print(f"{start_time=}")
         langfuse_handler = CallbackHandler(
@@ -584,10 +669,15 @@ async def claude_3_sonnet_task(system_text, query_text, claude_3_sonnet_checkbox
             timeout=None,
             max_retries=2,
         )
-        messages = [
-            # SystemMessage(content=system_text),
-            HumanMessage(content=query_text),
-        ]
+        if system_text:
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=query_text),
+            ]
+        else:
+            messages = [
+                HumanMessage(content=query_text),
+            ]
         start_time = time.time()
         print(f"{start_time=}")
         langfuse_handler = CallbackHandler(
@@ -617,10 +707,15 @@ async def claude_3_haiku_task(system_text, query_text, claude_3_haiku_checkbox):
             timeout=None,
             max_retries=2,
         )
-        messages = [
-            # SystemMessage(content=system_text),
-            HumanMessage(content=query_text),
-        ]
+        if system_text:
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=query_text),
+            ]
+        else:
+            messages = [
+                HumanMessage(content=query_text),
+            ]
         start_time = time.time()
         print(f"{start_time=}")
         langfuse_handler = CallbackHandler(
@@ -642,6 +737,7 @@ async def claude_3_haiku_task(system_text, query_text, claude_3_haiku_checkbox):
 
 async def chat(
         system_text,
+        command_a_user_text,
         command_r_user_text,
         command_r_plus_user_text,
         llama_3_3_70b_user_text,
@@ -654,6 +750,7 @@ async def chat(
         claude_3_opus_user_text,
         claude_3_sonnet_user_text,
         claude_3_haiku_user_text,
+        command_a_checkbox,
         command_r_checkbox,
         command_r_plus_checkbox,
         llama_3_3_70b_checkbox,
@@ -666,6 +763,7 @@ async def chat(
         claude_3_sonnet_checkbox,
         claude_3_haiku_checkbox
 ):
+    command_a_gen = command_a_task(system_text, command_a_user_text, command_a_checkbox)
     command_r_gen = command_r_task(system_text, command_r_user_text, command_r_checkbox)
     command_r_plus_gen = command_r_plus_task(system_text, command_r_plus_user_text, command_r_plus_checkbox)
     llama_3_3_70b_gen = llama_3_3_70b_task(system_text, llama_3_3_70b_user_text, llama_3_3_70b_checkbox)
@@ -682,10 +780,10 @@ async def chat(
     claude_3_sonnet_gen = claude_3_sonnet_task(system_text, claude_3_sonnet_user_text, claude_3_sonnet_checkbox)
     claude_3_haiku_gen = claude_3_haiku_task(system_text, claude_3_haiku_user_text, claude_3_haiku_checkbox)
 
-    responses_status = ["", "", "", "", "", "", "", "", "", "", ""]
+    responses_status = ["", "", "", "", "", "", "", "", "", "", "", ""]
     while True:
-        responses = ["", "", "", "", "", "", "", "", "", "", ""]
-        generators = [command_r_gen, command_r_plus_gen,
+        responses = ["", "", "", "", "", "", "", "", "", "", "", ""]
+        generators = [command_a_gen, command_r_gen, command_r_plus_gen,
                       llama_3_3_70b_gen, llama_3_2_90b_vision_gen,
                       openai_gpt4o_gen, openai_gpt4_gen,
                       azure_openai_gpt4o_gen, azure_openai_gpt4_gen,
@@ -710,6 +808,7 @@ async def chat(
 
 
 def set_chat_llm_answer(llm_answer_checkbox):
+    command_a_answer_visible = False
     command_r_answer_visible = False
     command_r_plus_answer_visible = False
     llama_3_3_70b_answer_visible = False
@@ -721,6 +820,8 @@ def set_chat_llm_answer(llm_answer_checkbox):
     claude_3_opus_answer_visible = False
     claude_3_sonnet_answer_visible = False
     claude_3_haiku_answer_visible = False
+    if "cohere/command-a" in llm_answer_checkbox:
+        command_a_answer_visible = True
     if "cohere/command-r" in llm_answer_checkbox:
         command_r_answer_visible = True
     if "cohere/command-r-plus" in llm_answer_checkbox:
@@ -743,20 +844,24 @@ def set_chat_llm_answer(llm_answer_checkbox):
         claude_3_sonnet_answer_visible = True
     if "claude/haiku" in llm_answer_checkbox:
         claude_3_haiku_answer_visible = True
-    return (gr.Accordion(visible=command_r_answer_visible),
-            gr.Accordion(visible=command_r_plus_answer_visible),
-            gr.Accordion(visible=llama_3_3_70b_answer_visible),
-            gr.Accordion(visible=llama_3_2_90b_vision_answer_visible),
-            gr.Accordion(visible=openai_gpt4o_answer_visible),
-            gr.Accordion(visible=openai_gpt4_answer_visible),
-            gr.Accordion(visible=azure_openai_gpt4o_answer_visible),
-            gr.Accordion(visible=azure_openai_gpt4_answer_visible),
-            gr.Accordion(visible=claude_3_opus_answer_visible),
-            gr.Accordion(visible=claude_3_sonnet_answer_visible),
-            gr.Accordion(visible=claude_3_haiku_answer_visible))
+    return (
+        gr.Accordion(visible=command_a_answer_visible),
+        gr.Accordion(visible=command_r_answer_visible),
+        gr.Accordion(visible=command_r_plus_answer_visible),
+        gr.Accordion(visible=llama_3_3_70b_answer_visible),
+        gr.Accordion(visible=llama_3_2_90b_vision_answer_visible),
+        gr.Accordion(visible=openai_gpt4o_answer_visible),
+        gr.Accordion(visible=openai_gpt4_answer_visible),
+        gr.Accordion(visible=azure_openai_gpt4o_answer_visible),
+        gr.Accordion(visible=azure_openai_gpt4_answer_visible),
+        gr.Accordion(visible=claude_3_opus_answer_visible),
+        gr.Accordion(visible=claude_3_sonnet_answer_visible),
+        gr.Accordion(visible=claude_3_haiku_answer_visible)
+    )
 
 
 def set_chat_llm_evaluation(llm_evaluation_checkbox):
+    command_a_evaluation_visible = False
     command_r_evaluation_visible = False
     command_r_plus_evaluation_visible = False
     llama_3_3_70b_evaluation_visible = False
@@ -769,6 +874,7 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
     claude_3_sonnet_evaluation_visible = False
     claude_3_haiku_evaluation_visible = False
     if llm_evaluation_checkbox:
+        command_a_evaluation_visible = True
         command_r_evaluation_visible = True
         command_r_plus_evaluation_visible = True
         llama_3_3_70b_evaluation_visible = True
@@ -780,7 +886,9 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
         claude_3_opus_evaluation_visible = True
         claude_3_sonnet_evaluation_visible = True
         claude_3_haiku_evaluation_visible = True
-    return (gr.Accordion(visible=command_r_evaluation_visible),
+    return (
+        gr.Accordion(visible=command_a_evaluation_visible),
+        gr.Accordion(visible=command_r_evaluation_visible),
             gr.Accordion(visible=command_r_plus_evaluation_visible),
             gr.Accordion(visible=llama_3_3_70b_evaluation_visible),
             gr.Accordion(visible=llama_3_2_90b_vision_evaluation_visible),
@@ -790,7 +898,8 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
             gr.Accordion(visible=azure_openai_gpt4_evaluation_visible),
             gr.Accordion(visible=claude_3_opus_evaluation_visible),
             gr.Accordion(visible=claude_3_sonnet_evaluation_visible),
-            gr.Accordion(visible=claude_3_haiku_evaluation_visible))
+            gr.Accordion(visible=claude_3_haiku_evaluation_visible)
+    )
 
 
 async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox):
@@ -814,9 +923,11 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             "",
             "",
             "",
+            "",
             ""
         )
         return
+    command_a_user_text = query_text
     command_r_user_text = query_text
     command_r_plus_user_text = query_text
     llama_3_3_70b_user_text = query_text
@@ -830,6 +941,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     claude_3_sonnet_user_text = query_text
     claude_3_haiku_user_text = query_text
 
+    command_a_checkbox = False
     command_r_checkbox = False
     command_r_plus_checkbox = False
     llama_3_3_70b_checkbox = False
@@ -841,6 +953,8 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     claude_3_opus_checkbox = False
     claude_3_sonnet_checkbox = False
     claude_3_haiku_checkbox = False
+    if "cohere/command-a" in llm_answer_checkbox:
+        command_a_checkbox = True
     if "cohere/command-r" in llm_answer_checkbox:
         command_r_checkbox = True
     if "cohere/command-r-plus" in llm_answer_checkbox:
@@ -864,6 +978,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     if "claude/haiku" in llm_answer_checkbox:
         claude_3_haiku_checkbox = True
     # ChatOCIGenAI
+    command_a_response = ""
     command_r_response = ""
     command_r_plus_response = ""
     llama_3_3_70b_response = ""
@@ -875,8 +990,9 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     claude_3_opus_response = ""
     claude_3_sonnet_response = ""
     claude_3_haiku_response = ""
-    async for r, r_plus, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
+    async for command_a, command_r, command_r_plus, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
             system_text,
+            command_a_user_text,
             command_r_user_text,
             command_r_plus_user_text,
             llama_3_3_70b_user_text,
@@ -889,6 +1005,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             claude_3_opus_user_text,
             claude_3_sonnet_user_text,
             claude_3_haiku_user_text,
+            command_a_checkbox,
             command_r_checkbox,
             command_r_plus_checkbox,
             llama_3_3_70b_checkbox,
@@ -901,8 +1018,9 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             claude_3_sonnet_checkbox,
             claude_3_haiku_checkbox
     ):
-        command_r_response += r
-        command_r_plus_response += r_plus
+        command_a_response += command_a
+        command_r_response += command_r
+        command_r_plus_response += command_r_plus
         llama_3_3_70b_response += llama_3_3_70b
         llama_3_2_90b_vision_response += llama_3_2_90b_vision
         openai_gpt4o_response += gpt4o
@@ -913,6 +1031,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
         claude_3_sonnet_response += sonnet
         claude_3_haiku_response += haiku
         yield (
+            command_a_response,
             command_r_response,
             command_r_plus_response,
             llama_3_3_70b_response,
@@ -951,6 +1070,8 @@ def reset_eval_by_human_result():
         gr.Textbox(value=""),
         gr.Radio(value="good"),
         gr.Textbox(value=""),
+        gr.Radio(value="good"),
+        gr.Textbox(value=""),
     )
 
 
@@ -964,11 +1085,11 @@ def eval_by_human(
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
             update_sql = """
-                            UPDATE RAG_QA_FEEDBACK 
-                            SET human_evaluation_result = :1,
+                         UPDATE RAG_QA_FEEDBACK
+                         SET human_evaluation_result = :1,
                                 user_comment = :2
-                            WHERE query_id = :3 AND llm_name = :4
-                        """
+                         WHERE query_id = :3 AND llm_name = :4 \
+                         """
             cursor.execute(
                 update_sql,
                 [
@@ -1253,22 +1374,27 @@ def create_langfuse_cred(langfuse_cred_secret_key, langfuse_cred_public_key, lan
 def create_table():
     # Drop the preference if it exists
     check_preference_sql = """
-SELECT PRE_NAME FROM CTX_PREFERENCES WHERE PRE_NAME = 'WORLD_LEXER' AND PRE_OWNER = USER
-"""
+                           SELECT PRE_NAME
+                           FROM CTX_PREFERENCES
+                           WHERE PRE_NAME = 'WORLD_LEXER'
+                             AND PRE_OWNER = USER \
+                           """
 
     drop_preference_plsql = """
--- Drop Preference        
-BEGIN
-  CTX_DDL.DROP_PREFERENCE('world_lexer');
-END;
-"""
+                            -- Drop Preference        
+                            BEGIN
+  CTX_DDL.DROP_PREFERENCE
+                            ('world_lexer');
+                            END; \
+                            """
 
     create_preference_plsql = """
--- Create Preference    
-BEGIN
-  CTX_DDL.CREATE_PREFERENCE('world_lexer','WORLD_LEXER');
-END;
-"""
+                              -- Create Preference    
+                              BEGIN
+  CTX_DDL.CREATE_PREFERENCE
+                              ('world_lexer','WORLD_LEXER');
+                              END; \
+                              """
 
     # Drop the index if it exists
     check_index_sql = f"""
@@ -1307,36 +1433,91 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_embedding (
 """
 
     drop_rag_qa_result_sql = """
-DROP TABLE IF EXISTS RAG_QA_RESULT
-    """
+                             DROP TABLE IF EXISTS RAG_QA_RESULT \
+                             """
 
     create_rag_qa_result_sql = """
-CREATE TABLE IF NOT EXISTS RAG_QA_RESULT (
-    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    query_id VARCHAR2(100),
-    query VARCHAR2(4000),
-    standard_answer VARCHAR2(30000),
-    sql CLOB,
-    created_date TIMESTAMP DEFAULT TO_TIMESTAMP(TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS')
-)
-    """
+                               CREATE TABLE IF NOT EXISTS RAG_QA_RESULT
+                               (
+                                   id
+                                   NUMBER
+                                   GENERATED
+                                   ALWAYS AS
+                                   IDENTITY
+                                   PRIMARY
+                                   KEY,
+                                   query_id
+                                   VARCHAR2
+                               (
+                                   100
+                               ),
+                                   query VARCHAR2
+                               (
+                                   4000
+                               ),
+                                   standard_answer VARCHAR2
+                               (
+                                   30000
+                               ),
+                                   sql CLOB,
+                                   created_date TIMESTAMP DEFAULT TO_TIMESTAMP
+                               (
+                                   TO_CHAR
+                               (
+                                   SYSTIMESTAMP,
+                                   'YYYY-MM-DD HH24:MI:SS'
+                               ), 'YYYY-MM-DD HH24:MI:SS')
+                                   ) \
+                               """
 
     drop_rag_qa_feedback_sql = """
-DROP TABLE IF EXISTS RAG_QA_FEEDBACK
-"""
+                               DROP TABLE IF EXISTS RAG_QA_FEEDBACK \
+                               """
 
     create_rag_qa_feedback_sql = """
-CREATE TABLE IF NOT EXISTS RAG_QA_FEEDBACK (
-    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    query_id VARCHAR2(100),
-    llm_name VARCHAR2(100),
-    llm_answer VARCHAR2(30000),
-    ragas_evaluation_result VARCHAR2(30000),
-    human_evaluation_result VARCHAR2(20),
-    user_comment VARCHAR2(30000),
-    created_date TIMESTAMP DEFAULT TO_TIMESTAMP(TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS')
-)
-"""
+                                 CREATE TABLE IF NOT EXISTS RAG_QA_FEEDBACK
+                                 (
+                                     id
+                                     NUMBER
+                                     GENERATED
+                                     ALWAYS AS
+                                     IDENTITY
+                                     PRIMARY
+                                     KEY,
+                                     query_id
+                                     VARCHAR2
+                                 (
+                                     100
+                                 ),
+                                     llm_name VARCHAR2
+                                 (
+                                     100
+                                 ),
+                                     llm_answer VARCHAR2
+                                 (
+                                     30000
+                                 ),
+                                     ragas_evaluation_result VARCHAR2
+                                 (
+                                     30000
+                                 ),
+                                     human_evaluation_result VARCHAR2
+                                 (
+                                     20
+                                 ),
+                                     user_comment VARCHAR2
+                                 (
+                                     30000
+                                 ),
+                                     created_date TIMESTAMP DEFAULT TO_TIMESTAMP
+                                 (
+                                     TO_CHAR
+                                 (
+                                     SYSTIMESTAMP,
+                                     'YYYY-MM-DD HH24:MI:SS'
+                                 ), 'YYYY-MM-DD HH24:MI:SS')
+                                     ) \
+                                 """
 
     output_sql_text += "\n" + create_preference_plsql.strip() + "\n"
     output_sql_text += "\n" + drop_rag_qa_result_sql.strip() + ";"
@@ -1940,11 +2121,11 @@ def generate_query(query_text, generate_query_radio):
 
     region = get_region()
     chat_llm = ChatOCIGenAI(
-        model_id="cohere.command-r-08-2024",
+        model_id="cohere.command-a-03-2025",
         provider="cohere",
         service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
         compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-        model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+        model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 600, "seed": 42},
     )
 
     # RAG-Fusion
@@ -2171,7 +2352,7 @@ def search_document(
             # 按字符串长度排序，优先去掉长的字符串
             sorted_indices = sorted(range(len(lists)), key=lambda i: len(lists[i]))
             lists = [lists[i] for i in sorted_indices[:limit]]
-            
+
         return lists
 
     def generate_combinations(words_list):
@@ -2226,15 +2407,14 @@ def search_document(
     doc_ids_str = "'" + "','".join([str(doc_id) for doc_id in doc_id_checkbox_group_input if doc_id]) + "'"
     print(f"{doc_ids_str=}")
     with_sql = """
-    -- Select data
-    WITH offsets AS (
-            SELECT level - (:extend_around_chunk_size / 2 + 1) AS offset
-            FROM dual
-            CONNECT BY level <= (:extend_around_chunk_size + 1)
-    ),
-    selected_embed_ids AS 
-    ( 
-    """
+               -- Select data
+               WITH offsets AS (SELECT level - (:extend_around_chunk_size / 2 + 1) AS offset
+                                FROM dual
+               CONNECT BY level <= (:extend_around_chunk_size + 1)
+                   )
+                        , selected_embed_ids AS
+                        ( \
+               """
     where_sql = """
                     WHERE 1 = 1 
                     AND de.doc_id = dc.id """
@@ -2745,6 +2925,7 @@ def extract_citation(input_str):
     else:
         return None, None
 
+
 #
 # def generate_langgpt_prompt_ja(context, query_text, include_citation=False, include_current_time=False):
 #     # 固定するエラーメッセージ
@@ -2950,12 +3131,14 @@ async def chat_document(
             "",
             "",
             "",
+            "",
             ""
         )
         return
 
     query_text = query_text.strip()
 
+    command_a_response = ""
     command_r_response = ""
     command_r_plus_response = ""
     llama_3_3_70b_response = ""
@@ -2968,6 +3151,7 @@ async def chat_document(
     claude_3_sonnet_response = ""
     claude_3_haiku_response = ""
 
+    command_a_checkbox = False
     command_r_checkbox = False
     command_r_plus_checkbox = False
     llama_3_3_70b_checkbox = False
@@ -2979,6 +3163,8 @@ async def chat_document(
     claude_3_opus_checkbox = False
     claude_3_sonnet_checkbox = False
     claude_3_haiku_checkbox = False
+    if "cohere/command-a" in llm_answer_checkbox:
+        command_a_checkbox = True
     if "cohere/command-r" in llm_answer_checkbox:
         command_r_checkbox = True
     if "cohere/command-r-plus" in llm_answer_checkbox:
@@ -3074,6 +3260,7 @@ async def chat_document(
     system_text = ""
     user_text = generate_langgpt_prompt(context, query_text, include_citation, include_current_time)
 
+    command_a_user_text = user_text
     command_r_user_text = user_text
     command_r_plus_user_text = user_text
     llama_3_3_70b_user_text = user_text
@@ -3086,8 +3273,9 @@ async def chat_document(
     claude_3_sonnet_user_text = user_text
     claude_3_haiku_user_text = user_text
 
-    async for r, r_plus, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
+    async for command_a, command_r, command_r_plus, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
             system_text,
+            command_a_user_text,
             command_r_user_text,
             command_r_plus_user_text,
             llama_3_3_70b_user_text,
@@ -3100,6 +3288,7 @@ async def chat_document(
             claude_3_opus_user_text,
             claude_3_sonnet_user_text,
             claude_3_haiku_user_text,
+            command_a_checkbox,
             command_r_checkbox,
             command_r_plus_checkbox,
             llama_3_3_70b_checkbox,
@@ -3112,8 +3301,9 @@ async def chat_document(
             claude_3_sonnet_checkbox,
             claude_3_haiku_checkbox
     ):
-        command_r_response += r
-        command_r_plus_response += r_plus
+        command_a_response += command_a
+        command_r_response += command_r
+        command_r_plus_response += command_r_plus
         llama_3_3_70b_response += llama_3_3_70b
         llama_3_2_90b_vision_response += llama_3_2_90b_vision
         openai_gpt4o_response += gpt4o
@@ -3124,6 +3314,7 @@ async def chat_document(
         claude_3_sonnet_response += sonnet
         claude_3_haiku_response += haiku
         yield (
+            command_a_response,
             command_r_response,
             command_r_plus_response,
             llama_3_3_70b_response,
@@ -3145,6 +3336,7 @@ async def append_citation(
         query_text,
         doc_id_all_checkbox_input,
         doc_id_checkbox_group_input,
+        command_a_answer_text,
         command_r_answer_text,
         command_r_plus_answer_text,
         llama_3_3_70b_answer_text,
@@ -3169,6 +3361,7 @@ async def append_citation(
         # gr.Warning("検索結果が見つかりませんでした。設定もしくはクエリを変更して再度ご確認ください。")
     if has_error:
         yield (
+            command_a_answer_text,
             command_r_answer_text,
             command_r_plus_answer_text,
             llama_3_3_70b_answer_text,
@@ -3185,6 +3378,7 @@ async def append_citation(
 
     if not include_citation:
         yield (
+            command_a_answer_text,
             command_r_answer_text,
             command_r_plus_answer_text,
             llama_3_3_70b_answer_text,
@@ -3199,6 +3393,8 @@ async def append_citation(
         )
         return
 
+    if "cohere/command-a" in llm_answer_checkbox:
+        command_a_answer_text = extract_and_format(command_a_answer_text, search_result)
     if "cohere/command-r" in llm_answer_checkbox:
         command_r_answer_text = extract_and_format(command_r_answer_text, search_result)
     if "cohere/command-r-plus" in llm_answer_checkbox:
@@ -3223,6 +3419,7 @@ async def append_citation(
         claude_3_haiku_answer_text = extract_and_format(claude_3_haiku_answer_text, search_result)
 
     yield (
+        command_a_answer_text,
         command_r_answer_text,
         command_r_plus_answer_text,
         llama_3_3_70b_answer_text,
@@ -3247,6 +3444,7 @@ async def eval_by_ragas(
         llm_evaluation_checkbox,
         system_text,
         standard_answer_text,
+        command_a_response,
         command_r_response,
         command_r_plus_response,
         llama_3_3_70b_response,
@@ -3290,6 +3488,7 @@ async def eval_by_ragas(
             "",
             "",
             "",
+            "",
             ""
         )
         return
@@ -3320,9 +3519,11 @@ async def eval_by_ragas(
             "",
             "",
             "",
+            "",
             ""
         )
     else:
+        command_a_checkbox = False
         command_r_checkbox = False
         command_r_plus_checkbox = False
         llama_3_3_70b_checkbox = False
@@ -3334,6 +3535,8 @@ async def eval_by_ragas(
         claude_3_opus_checkbox = False
         claude_3_sonnet_checkbox = False
         claude_3_haiku_checkbox = False
+        if "cohere/command-a" in llm_answer_checkbox_group:
+            command_a_checkbox = True
         if "cohere/command-r" in llm_answer_checkbox_group:
             command_r_checkbox = True
         if "cohere/command-r-plus" in llm_answer_checkbox_group:
@@ -3357,6 +3560,7 @@ async def eval_by_ragas(
         if "claude/haiku" in llm_answer_checkbox_group:
             claude_3_haiku_checkbox = True
 
+        command_a_response = remove_last_line(command_a_response)
         command_r_response = remove_last_line(command_r_response)
         command_r_plus_response = remove_last_line(command_r_plus_response)
         llama_3_3_70b_response = remove_last_line(llama_3_3_70b_response)
@@ -3368,6 +3572,15 @@ async def eval_by_ragas(
         claude_3_opus_response = remove_last_line(claude_3_opus_response)
         claude_3_sonnet_response = remove_last_line(claude_3_sonnet_response)
         claude_3_haiku_response = remove_last_line(claude_3_haiku_response)
+
+        command_a_user_text = f"""
+-標準回答-
+ {standard_answer_text}
+
+-与えられた回答-
+ {command_a_response}
+
+-出力-\n　"""
 
         command_r_user_text = f"""
 -標準回答-
@@ -3468,6 +3681,7 @@ async def eval_by_ragas(
 
 -出力-\n　"""
 
+        eval_command_a_response = ""
         eval_command_r_response = ""
         eval_command_r_plus_response = ""
         eval_llama_3_3_70b_response = ""
@@ -3480,8 +3694,9 @@ async def eval_by_ragas(
         eval_claude_3_sonnet_response = ""
         eval_claude_3_haiku_response = ""
 
-        async for r, r_plus, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
+        async for command_a, command_r, command_r_plus, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
                 system_text,
+                command_a_user_text,
                 command_r_user_text,
                 command_r_plus_user_text,
                 llama_3_3_70b_user_text,
@@ -3494,6 +3709,7 @@ async def eval_by_ragas(
                 claude_3_opus_user_text,
                 claude_3_sonnet_user_text,
                 claude_3_haiku_user_text,
+                command_a_checkbox,
                 command_r_checkbox,
                 command_r_plus_checkbox,
                 llama_3_3_70b_checkbox,
@@ -3506,8 +3722,9 @@ async def eval_by_ragas(
                 claude_3_sonnet_checkbox,
                 claude_3_haiku_checkbox
         ):
-            eval_command_r_response += r
-            eval_command_r_plus_response += r_plus
+            eval_command_a_response += command_a
+            eval_command_r_response += command_r
+            eval_command_r_plus_response += command_r_plus
             eval_llama_3_3_70b_response += llama_3_3_70b
             eval_llama_3_2_90b_vision_response += llama_3_2_90b_vision
             eval_openai_gpt4o_response += gpt4o
@@ -3518,6 +3735,7 @@ async def eval_by_ragas(
             eval_claude_3_sonnet_response += sonnet
             eval_claude_3_haiku_response += haiku
             yield (
+                eval_command_a_response,
                 eval_command_r_response,
                 eval_command_r_plus_response,
                 eval_llama_3_3_70b_response,
@@ -3541,6 +3759,7 @@ def generate_download_file(
         doc_id_all_checkbox_input,
         doc_id_checkbox_group_input,
         standard_answer_text,
+        command_a_response,
         command_r_response,
         command_r_plus_response,
         llama_3_3_70b_response,
@@ -3552,6 +3771,7 @@ def generate_download_file(
         claude_3_opus_response,
         claude_3_sonnet_response,
         claude_3_haiku_response,
+        command_a_evaluation,
         command_r_evaluation,
         command_r_plus_evaluation,
         llama_3_3_70b_evaluation,
@@ -3578,6 +3798,20 @@ def generate_download_file(
     df1 = pd.DataFrame({'クエリ': [query_text], '標準回答': [standard_answer_text]})
 
     df2 = search_result
+
+    if "cohere/command-a" in llm_answer_checkbox_group:
+        command_a_response = command_a_response
+        command_a_referenced_contexts = ""
+        if include_citation:
+            command_a_response, command_a_referenced_contexts = extract_citation(command_a_response)
+        if llm_evaluation_checkbox:
+            command_a_evaluation = command_a_evaluation
+        else:
+            command_a_evaluation = ""
+    else:
+        command_a_response = ""
+        command_a_evaluation = ""
+        command_a_referenced_contexts = ""
 
     if "cohere/command-r" in llm_answer_checkbox_group:
         command_r_response = command_r_response
@@ -3740,6 +3974,7 @@ def generate_download_file(
         {
             'LLM モデル':
                 [
+                    "cohere/command-a",
                     "cohere/command-r",
                     "cohere/command-r-plus",
                     "meta/llama-3-3-70b",
@@ -3753,6 +3988,7 @@ def generate_download_file(
                     "claude/haiku"
                 ],
             'LLM メッセージ': [
+                command_a_response,
                 command_r_response,
                 command_r_plus_response,
                 llama_3_3_70b_response,
@@ -3766,6 +4002,7 @@ def generate_download_file(
                 claude_3_haiku_response
             ],
             '引用 Contexts': [
+                command_a_referenced_contexts,
                 command_r_referenced_contexts,
                 command_r_plus_referenced_contexts,
                 llama_3_3_70b_referenced_contexts,
@@ -3779,6 +4016,7 @@ def generate_download_file(
                 claude_3_haiku_referenced_contexts
             ],
             'LLM 評価結果': [
+                command_a_evaluation,
                 command_r_evaluation,
                 command_r_plus_evaluation,
                 llama_3_3_70b_evaluation,
@@ -3813,24 +4051,22 @@ def generate_eval_result_file():
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
             select_sql = """
-            SELECT 
-                r.query_id,
-                r.query,
-                r.standard_answer,
-                r.sql,
-                f.llm_name,
-                f.llm_answer,
-                f.ragas_evaluation_result,
-                f.human_evaluation_result,
-                f.user_comment,
-                TO_CHAR(r.created_date, 'YYYY-MM-DD HH24:MI:SS') AS created_date
-            FROM 
-                RAG_QA_RESULT r
-            JOIN 
-                RAG_QA_FEEDBACK f
-            ON 
-                r.query_id = f.query_id
-            """
+                         SELECT r.query_id,
+                                r.query,
+                                r.standard_answer,
+                                r.sql,
+                                f.llm_name,
+                                f.llm_answer,
+                                f.ragas_evaluation_result,
+                                f.human_evaluation_result,
+                                f.user_comment,
+                                TO_CHAR(r.created_date, 'YYYY-MM-DD HH24:MI:SS') AS created_date
+                         FROM RAG_QA_RESULT r
+                                  JOIN
+                              RAG_QA_FEEDBACK f
+                              ON
+                                  r.query_id = f.query_id \
+                         """
 
             cursor.execute(select_sql)
 
@@ -3893,6 +4129,7 @@ def insert_query_result(
         llm_answer_checkbox_group,
         llm_evaluation_checkbox,
         standard_answer_text,
+        command_a_response,
         command_r_response,
         command_r_plus_response,
         llama_3_3_70b_response,
@@ -3904,6 +4141,7 @@ def insert_query_result(
         claude_3_opus_response,
         claude_3_sonnet_response,
         claude_3_haiku_response,
+        command_a_evaluation,
         command_r_evaluation,
         command_r_plus_evaluation,
         llama_3_3_70b_evaluation,
@@ -3927,18 +4165,15 @@ def insert_query_result(
         with conn.cursor() as cursor:
             # 如果不存在记录，执行插入操作
             insert_sql = """
-                            INSERT INTO RAG_QA_RESULT (
-                                query_id,
-                                query,
-                                standard_answer,
-                                sql
-                            ) VALUES (
-                                :1,
-                                :2,
-                                :3,
-                                :4
-                            )
-                        """
+                         INSERT INTO RAG_QA_RESULT (query_id,
+                                                    query,
+                                                    standard_answer,
+                                                    sql)
+                         VALUES (:1,
+                                 :2,
+                                 :3,
+                                 :4) \
+                         """
             cursor.setinputsizes(None, None, oracledb.CLOB)
             cursor.execute(
                 insert_sql,
@@ -3950,6 +4185,34 @@ def insert_query_result(
                 ]
             )
 
+            if "cohere/command-a" in llm_answer_checkbox_group:
+                command_a_response = command_a_response
+                if llm_evaluation_checkbox:
+                    command_a_evaluation = command_a_evaluation
+                else:
+                    command_a_evaluation = ""
+
+                insert_sql = """
+                             INSERT INTO RAG_QA_FEEDBACK (query_id,
+                                                          llm_name,
+                                                          llm_answer,
+                                                          ragas_evaluation_result)
+                             VALUES (:1,
+                                     :2,
+                                     :3,
+                                     :4) \
+                             """
+                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.execute(
+                    insert_sql,
+                    [
+                        query_id,
+                        "cohere/command-a",
+                        command_a_response,
+                        command_a_evaluation
+                    ]
+                )
+
             if "cohere/command-r" in llm_answer_checkbox_group:
                 command_r_response = command_r_response
                 if llm_evaluation_checkbox:
@@ -3958,18 +4221,15 @@ def insert_query_result(
                     command_r_evaluation = ""
 
                 insert_sql = """
-                                                INSERT INTO RAG_QA_FEEDBACK (
-                                                    query_id,
-                                                    llm_name,
-                                                    llm_answer,
-                                                    ragas_evaluation_result
-                                                ) VALUES (
-                                                    :1,
-                                                    :2,
-                                                    :3,
-                                                    :4
-                                                )
-                                            """
+                             INSERT INTO RAG_QA_FEEDBACK (query_id,
+                                                          llm_name,
+                                                          llm_answer,
+                                                          ragas_evaluation_result)
+                             VALUES (:1,
+                                     :2,
+                                     :3,
+                                     :4) \
+                             """
                 cursor.setinputsizes(None, None, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
@@ -3989,18 +4249,15 @@ def insert_query_result(
                     command_r_plus_evaluation = ""
 
                 insert_sql = """
-                                                INSERT INTO RAG_QA_FEEDBACK (
-                                                    query_id,
-                                                    llm_name,
-                                                    llm_answer,
-                                                    ragas_evaluation_result
-                                                ) VALUES (
-                                                    :1,
-                                                    :2,
-                                                    :3,
-                                                    :4
-                                                )
-                                            """
+                             INSERT INTO RAG_QA_FEEDBACK (query_id,
+                                                          llm_name,
+                                                          llm_answer,
+                                                          ragas_evaluation_result)
+                             VALUES (:1,
+                                     :2,
+                                     :3,
+                                     :4) \
+                             """
                 cursor.setinputsizes(None, None, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
@@ -4020,18 +4277,15 @@ def insert_query_result(
                     llama_3_3_70b_evaluation = ""
 
                 insert_sql = """
-                                                INSERT INTO RAG_QA_FEEDBACK (
-                                                    query_id,
-                                                    llm_name,
-                                                    llm_answer,
-                                                    ragas_evaluation_result
-                                                ) VALUES (
-                                                    :1,
-                                                    :2,
-                                                    :3,
-                                                    :4
-                                                )
-                                            """
+                             INSERT INTO RAG_QA_FEEDBACK (query_id,
+                                                          llm_name,
+                                                          llm_answer,
+                                                          ragas_evaluation_result)
+                             VALUES (:1,
+                                     :2,
+                                     :3,
+                                     :4) \
+                             """
                 cursor.setinputsizes(None, None, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
@@ -4051,18 +4305,15 @@ def insert_query_result(
                     llama_3_2_90b_vision_evaluation = ""
 
                 insert_sql = """
-                                                INSERT INTO RAG_QA_FEEDBACK (
-                                                    query_id,
-                                                    llm_name,
-                                                    llm_answer,
-                                                    ragas_evaluation_result
-                                                ) VALUES (
-                                                    :1,
-                                                    :2,
-                                                    :3,
-                                                    :4
-                                                )
-                                            """
+                             INSERT INTO RAG_QA_FEEDBACK (query_id,
+                                                          llm_name,
+                                                          llm_answer,
+                                                          ragas_evaluation_result)
+                             VALUES (:1,
+                                     :2,
+                                     :3,
+                                     :4) \
+                             """
                 cursor.setinputsizes(None, None, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
@@ -4082,18 +4333,15 @@ def insert_query_result(
                     openai_gpt4o_evaluation = ""
 
                 insert_sql = """
-                                                INSERT INTO RAG_QA_FEEDBACK (
-                                                    query_id,
-                                                    llm_name,
-                                                    llm_answer,
-                                                    ragas_evaluation_result
-                                                ) VALUES (
-                                                    :1,
-                                                    :2,
-                                                    :3,
-                                                    :4
-                                                )
-                                            """
+                             INSERT INTO RAG_QA_FEEDBACK (query_id,
+                                                          llm_name,
+                                                          llm_answer,
+                                                          ragas_evaluation_result)
+                             VALUES (:1,
+                                     :2,
+                                     :3,
+                                     :4) \
+                             """
                 cursor.setinputsizes(None, None, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
@@ -4113,18 +4361,15 @@ def insert_query_result(
                     openai_gpt4_evaluation = ""
 
                 insert_sql = """
-                                                INSERT INTO RAG_QA_FEEDBACK (
-                                                    query_id,
-                                                    llm_name,
-                                                    llm_answer,
-                                                    ragas_evaluation_result
-                                                ) VALUES (
-                                                    :1,
-                                                    :2,
-                                                    :3,
-                                                    :4
-                                                )
-                                            """
+                             INSERT INTO RAG_QA_FEEDBACK (query_id,
+                                                          llm_name,
+                                                          llm_answer,
+                                                          ragas_evaluation_result)
+                             VALUES (:1,
+                                     :2,
+                                     :3,
+                                     :4) \
+                             """
                 cursor.setinputsizes(None, None, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
@@ -4144,18 +4389,15 @@ def insert_query_result(
                     azure_openai_gpt4o_evaluation = ""
 
                 insert_sql = """
-                                                INSERT INTO RAG_QA_FEEDBACK (
-                                                    query_id,
-                                                    llm_name,
-                                                    llm_answer,
-                                                    ragas_evaluation_result
-                                                ) VALUES (
-                                                    :1,
-                                                    :2,
-                                                    :3,
-                                                    :4
-                                                )
-                                            """
+                             INSERT INTO RAG_QA_FEEDBACK (query_id,
+                                                          llm_name,
+                                                          llm_answer,
+                                                          ragas_evaluation_result)
+                             VALUES (:1,
+                                     :2,
+                                     :3,
+                                     :4) \
+                             """
                 cursor.setinputsizes(None, None, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
@@ -4175,18 +4417,15 @@ def insert_query_result(
                     azure_openai_gpt4_evaluation = ""
 
                 insert_sql = """
-                                                INSERT INTO RAG_QA_FEEDBACK (
-                                                    query_id,
-                                                    llm_name,
-                                                    llm_answer,
-                                                    ragas_evaluation_result
-                                                ) VALUES (
-                                                    :1,
-                                                    :2,
-                                                    :3,
-                                                    :4
-                                                )
-                                            """
+                             INSERT INTO RAG_QA_FEEDBACK (query_id,
+                                                          llm_name,
+                                                          llm_answer,
+                                                          ragas_evaluation_result)
+                             VALUES (:1,
+                                     :2,
+                                     :3,
+                                     :4) \
+                             """
                 cursor.setinputsizes(None, None, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
@@ -4206,18 +4445,15 @@ def insert_query_result(
                     claude_3_opus_evaluation = ""
 
                 insert_sql = """
-                                                INSERT INTO RAG_QA_FEEDBACK (
-                                                    query_id,
-                                                    llm_name,
-                                                    llm_answer,
-                                                    ragas_evaluation_result
-                                                ) VALUES (
-                                                    :1,
-                                                    :2,
-                                                    :3,
-                                                    :4
-                                                )
-                                            """
+                             INSERT INTO RAG_QA_FEEDBACK (query_id,
+                                                          llm_name,
+                                                          llm_answer,
+                                                          ragas_evaluation_result)
+                             VALUES (:1,
+                                     :2,
+                                     :3,
+                                     :4) \
+                             """
                 cursor.setinputsizes(None, None, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
@@ -4237,18 +4473,15 @@ def insert_query_result(
                     claude_3_sonnet_evaluation = ""
 
                 insert_sql = """
-                                                INSERT INTO RAG_QA_FEEDBACK (
-                                                    query_id,
-                                                    llm_name,
-                                                    llm_answer,
-                                                    ragas_evaluation_result
-                                                ) VALUES (
-                                                    :1,
-                                                    :2,
-                                                    :3,
-                                                    :4
-                                                )
-                                            """
+                             INSERT INTO RAG_QA_FEEDBACK (query_id,
+                                                          llm_name,
+                                                          llm_answer,
+                                                          ragas_evaluation_result)
+                             VALUES (:1,
+                                     :2,
+                                     :3,
+                                     :4) \
+                             """
                 cursor.setinputsizes(None, None, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
@@ -4268,18 +4501,15 @@ def insert_query_result(
                     claude_3_haiku_evaluation = ""
 
                 insert_sql = """
-                                                INSERT INTO RAG_QA_FEEDBACK (
-                                                    query_id,
-                                                    llm_name,
-                                                    llm_answer,
-                                                    ragas_evaluation_result
-                                                ) VALUES (
-                                                    :1,
-                                                    :2,
-                                                    :3,
-                                                    :4
-                                                )
-                                            """
+                             INSERT INTO RAG_QA_FEEDBACK (query_id,
+                                                          llm_name,
+                                                          llm_answer,
+                                                          ragas_evaluation_result)
+                             VALUES (:1,
+                                     :2,
+                                     :3,
+                                     :4) \
+                             """
                 cursor.setinputsizes(None, None, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
@@ -4544,6 +4774,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     with gr.Column():
                         tab_chat_with_llm_answer_checkbox_group = gr.CheckboxGroup(
                             [
+                                "cohere/command-a",
                                 "cohere/command-r",
                                 # "cohere/command-r-plus",
                                 "meta/llama-3-3-70b",
@@ -4558,6 +4789,19 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             label="LLM モデル*",
                             value=[]
                         )
+                with gr.Accordion(
+                        label="Command-A メッセージ",
+                        visible=False,
+                        open=True
+                ) as tab_chat_with_llm_command_a_accordion:
+                    tab_chat_with_command_a_answer_text = gr.Textbox(
+                        label="LLM メッセージ",
+                        show_label=False,
+                        lines=2,
+                        autoscroll=True,
+                        interactive=False,
+                        show_copy_button=True
+                    )
                 with gr.Accordion(
                         label="Command-R メッセージ",
                         visible=False,
@@ -5045,6 +5289,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     with gr.Column():
                         tab_chat_document_llm_answer_checkbox_group = gr.CheckboxGroup(
                             [
+                                "cohere/command-a",
                                 "cohere/command-r",
                                 # "cohere/command-r-plus",
                                 "meta/llama-3-3-70b",
@@ -5355,6 +5600,64 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             wrap=True,
                             column_widths=["4%", "50%", "6%", "8%", "6%", "6%", "8%"],
                             interactive=False,
+                        )
+                with gr.Accordion(
+                        label="Command-A メッセージ",
+                        visible=False,
+                        open=True
+                ) as tab_chat_document_llm_command_a_accordion:
+                    tab_chat_document_command_a_answer_text = gr.Textbox(
+                        label="LLM メッセージ",
+                        show_label=False,
+                        lines=2,
+                        autoscroll=True,
+                        interactive=False,
+                        show_copy_button=True
+                    )
+                    with gr.Accordion(
+                            label="Human 評価",
+                            visible=True,
+                            open=True
+                    ) as tab_chat_document_llm_command_a_human_evaluation_accordion:
+                        with gr.Row():
+                            tab_chat_document_command_a_answer_human_eval_feedback_radio = gr.Radio(
+                                show_label=False,
+                                choices=[
+                                    ("Good response", "good"),
+                                    ("Neutral response", "neutral"),
+                                    ("Bad response", "bad"),
+                                ],
+                                value="good",
+                                container=False,
+                                interactive=True,
+                            )
+                        with gr.Row():
+                            with gr.Column(scale=11):
+                                tab_chat_document_command_a_answer_human_eval_feedback_text = gr.Textbox(
+                                    show_label=False,
+                                    container=False,
+                                    lines=2,
+                                    interactive=True,
+                                    autoscroll=True,
+                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                )
+                            with gr.Column(scale=1):
+                                tab_chat_document_command_a_answer_human_eval_feedback_send_button = gr.Button(
+                                    value="送信",
+                                    variant="primary",
+                                )
+                    with gr.Accordion(
+                            label="LLM 評価結果",
+                            visible=False,
+                            open=True
+                    ) as tab_chat_document_llm_command_a_evaluation_accordion:
+                        tab_chat_document_command_a_evaluation_text = gr.Textbox(
+                            label="LLM 評価結果",
+                            show_label=False,
+                            lines=2,
+                            autoscroll=True,
+                            interactive=False,
+                            show_copy_button=True
                         )
                 with gr.Accordion(
                         label="Command-R メッセージ",
@@ -6003,7 +6306,9 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         variant="primary",
                     )
 
-    gr.Markdown(value="### 本ソフトウェアは検証評価用です。日常利用のための基本機能は備えていない点につきましてご理解をよろしくお願い申し上げます。", elem_classes="sub_Header")
+    gr.Markdown(
+        value="### 本ソフトウェアは検証評価用です。日常利用のための基本機能は備えていない点につきましてご理解をよろしくお願い申し上げます。",
+        elem_classes="sub_Header")
     gr.Markdown(value="### Developed by Oracle Japan", elem_classes="sub_Header")
     tab_create_oci_clear_button.add(
         [
@@ -6097,6 +6402,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_llm_answer_checkbox_group
         ],
         outputs=[
+            tab_chat_with_llm_command_a_accordion,
             tab_chat_with_llm_command_r_accordion,
             tab_chat_with_llm_command_r_plus_accordion,
             tab_chat_with_llm_llama_3_3_70b_accordion,
@@ -6115,6 +6421,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_llm_query_image,
             tab_chat_with_llm_query_text,
             tab_chat_with_llm_answer_checkbox_group,
+            tab_chat_with_command_a_answer_text,
             tab_chat_with_command_r_answer_text,
             tab_chat_with_command_r_plus_answer_text,
             tab_chat_with_llama_3_3_70b_answer_text,
@@ -6137,6 +6444,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_llm_answer_checkbox_group
         ],
         outputs=[
+            tab_chat_with_command_a_answer_text,
             tab_chat_with_command_r_answer_text,
             tab_chat_with_command_r_plus_answer_text,
             tab_chat_with_llama_3_3_70b_answer_text,
@@ -6355,6 +6663,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_answer_checkbox_group
         ],
         outputs=[
+            tab_chat_document_llm_command_a_accordion,
             tab_chat_document_llm_command_r_accordion,
             tab_chat_document_llm_command_r_plus_accordion,
             tab_chat_document_llm_llama_3_3_70b_accordion,
@@ -6387,6 +6696,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_evaluation_checkbox
         ],
         outputs=[
+            tab_chat_document_llm_command_a_evaluation_accordion,
             tab_chat_document_llm_command_r_evaluation_accordion,
             tab_chat_document_llm_command_r_plus_evaluation_accordion,
             tab_chat_document_llm_llama_3_3_70b_evaluation_accordion,
@@ -6443,6 +6753,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         reset_eval_by_human_result,
         inputs=[],
         outputs=[
+            tab_chat_document_command_a_answer_human_eval_feedback_radio,
+            tab_chat_document_command_a_answer_human_eval_feedback_text,
             tab_chat_document_command_r_answer_human_eval_feedback_radio,
             tab_chat_document_command_r_answer_human_eval_feedback_text,
             tab_chat_document_command_r_plus_answer_human_eval_feedback_radio,
@@ -6505,6 +6817,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_doc_id_checkbox_group,
         ],
         outputs=[
+            tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -6526,6 +6839,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_query_text,
             tab_chat_document_doc_id_all_checkbox,
             tab_chat_document_doc_id_checkbox_group,
+            tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -6539,6 +6853,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_claude_3_haiku_answer_text,
         ],
         outputs=[
+            tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -6562,6 +6877,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_evaluation_checkbox,
             tab_chat_document_system_message_text,
             tab_chat_document_standard_answer_text,
+            tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -6575,6 +6891,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_claude_3_haiku_answer_text
         ],
         outputs=[
+            tab_chat_document_command_a_evaluation_text,
             tab_chat_document_command_r_evaluation_text,
             tab_chat_document_command_r_plus_evaluation_text,
             tab_chat_document_llama_3_3_70b_evaluation_text,
@@ -6598,6 +6915,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_doc_id_all_checkbox,
             tab_chat_document_doc_id_checkbox_group,
             tab_chat_document_standard_answer_text,
+            tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -6609,6 +6927,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_claude_3_opus_answer_text,
             tab_chat_document_claude_3_sonnet_answer_text,
             tab_chat_document_claude_3_haiku_answer_text,
+            tab_chat_document_command_a_evaluation_text,
             tab_chat_document_command_r_evaluation_text,
             tab_chat_document_command_r_plus_evaluation_text,
             tab_chat_document_llama_3_3_70b_evaluation_text,
@@ -6642,6 +6961,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_llm_evaluation_checkbox,
             tab_chat_document_standard_answer_text,
+            tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -6653,6 +6973,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_claude_3_opus_answer_text,
             tab_chat_document_claude_3_sonnet_answer_text,
             tab_chat_document_claude_3_haiku_answer_text,
+            tab_chat_document_command_a_evaluation_text,
             tab_chat_document_command_r_evaluation_text,
             tab_chat_document_command_r_plus_evaluation_text,
             tab_chat_document_llama_3_3_70b_evaluation_text,
@@ -6666,6 +6987,20 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_claude_3_haiku_evaluation_text,
         ],
         outputs=[]
+    )
+
+    tab_chat_document_command_a_answer_human_eval_feedback_send_button.click(
+        eval_by_human,
+        inputs=[
+            query_id_state,
+            gr.State(value="cohere/command-a"),
+            tab_chat_document_command_a_answer_human_eval_feedback_radio,
+            tab_chat_document_command_a_answer_human_eval_feedback_text,
+        ],
+        outputs=[
+            tab_chat_document_command_a_answer_human_eval_feedback_radio,
+            tab_chat_document_command_a_answer_human_eval_feedback_text,
+        ]
     )
 
     tab_chat_document_command_r_answer_human_eval_feedback_send_button.click(
