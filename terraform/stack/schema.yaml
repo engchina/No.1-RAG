@@ -15,7 +15,6 @@ variableGroups:
       - instance_boot_volume_vpus
       - instance_flex_shape_memory
       - instance_flex_shape_ocpus
-      - instance_shape
 
   - title: Required Configuration
     visible: true
@@ -122,6 +121,16 @@ variables:
       - "ocid1.image.oc1.us-chicago-1.aaaaaaaal25tbfrlwhh27tzgiatqr3oq5y3qzz7wgpezjouvjk2cdfdr4mnq"
     default: "ocid1.image.oc1.ap-osaka-1.aaaaaaaa7sbmd5q54w466eojxqwqfvvp554awzjpt2behuwsiefrxnwomq5a"
 
+  instance_shape:
+    type: enum
+    required: true
+    visible: true
+    title: "Choose the shape."
+    enum:
+      - "VM.Standard.E4.Flex"
+      - "VM.Standard.E5.Flex"
+    default: "VM.Standard.E5.Flex"
+
   instance_boot_volume_size:
     visible: false
   instance_boot_volume_vpus:
@@ -129,8 +138,6 @@ variables:
   instance_flex_shape_memory:
     visible: false
   instance_flex_shape_ocpus:
-    visible: false
-  instance_shape:
     visible: false
 
 outputs:
