@@ -1,4 +1,4 @@
-# Aim for No. 1 RAG
+# Aim for No.1 RAG
 
 ## Deploy
 
@@ -59,6 +59,6 @@ echo <your_salt> | openssl rand -base64 32
 
 [https://docs.oracle.com/en-us/iaas/images/image/50cf60da-4374-44e2-ab38-70185991f833/index.htm](https://docs.oracle.com/en-us/iaas/images/image/50cf60da-4374-44e2-ab38-70185991f833/index.htm)
 
-## License
+## Other License
 
-markdown package is released under the [MIT license](https://github.com/microsoft/markitdown).
+- markitdown package is released under the [MIT license](https://github.com/microsoft/markitdown).
