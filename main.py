@@ -36,6 +36,12 @@ from utils.chunk_util import RecursiveCharacterTextSplitter
 from utils.common_util import get_dict_value
 from utils.css_gradio import custom_css
 from utils.generator_util import generate_unique_id
+from utils.prompts import (
+    get_sub_query_prompt, get_rag_fusion_prompt, get_hyde_prompt, get_step_back_prompt,
+    get_langgpt_rag_prompt, get_llm_evaluation_system_message, get_chat_system_message,
+    get_markitdown_llm_prompt, get_query_generation_prompt, update_langgpt_rag_prompt,
+    update_llm_evaluation_system_message
+)
 
 # read local .env file
 load_dotenv(find_dotenv())
@@ -455,6 +461,118 @@ async def llama_3_2_90b_vision_task(system_text, query_image, query_text, llama_
         yield "TASK_DONE"
 
 
+async def llama_4_maverick_task(system_text, query_image, query_text, llama_4_maverick_checkbox):
+    def encode_image(image_path):
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+
+    region = get_region()
+    if llama_4_maverick_checkbox:
+        llama_4_maverick = ChatOCIGenAI(
+            model_id="meta.llama-4-maverick-17b-128e-instruct-fp8",
+            provider="meta",
+            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+        )
+        if query_image:
+            base64_image = encode_image(query_image)
+            human_message = HumanMessage(content=[
+                {"type": "text", "text": query_text},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                },
+            ], )
+        else:
+            human_message = HumanMessage(content=query_text)
+
+        if system_text:
+            messages = [
+                SystemMessage(content=system_text),
+                human_message,
+            ]
+        else:
+            messages = [
+                human_message,
+            ]
+        start_time = time.time()
+        print(f"{start_time=}")
+        langfuse_handler = CallbackHandler(
+            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+            host=os.environ["LANGFUSE_HOST"],
+        )
+        async for chunk in llama_4_maverick.astream(messages, config={"callbacks": [langfuse_handler],
+                                                                      "metadata": {
+                                                                          "ls_model_name": "meta.llama-4-maverick-17b-128e-instruct-fp8"}}):
+            yield chunk.content
+        end_time = time.time()
+        print(f"{end_time=}")
+        inference_time = end_time - start_time
+        print(f"\n推論時間: {inference_time:.2f}秒")
+        yield f"\n推論時間: {inference_time:.2f}秒"
+        yield "TASK_DONE"
+    else:
+        yield "TASK_DONE"
+
+
+async def llama_4_scout_task(system_text, query_image, query_text, llama_4_scout_checkbox):
+    def encode_image(image_path):
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+
+    region = get_region()
+    if llama_4_scout_checkbox:
+        llama_4_scout = ChatOCIGenAI(
+            model_id="meta.llama-4-scout-17b-16e-instruct",
+            provider="meta",
+            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+        )
+        if query_image:
+            base64_image = encode_image(query_image)
+            human_message = HumanMessage(content=[
+                {"type": "text", "text": query_text},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                },
+            ], )
+        else:
+            human_message = HumanMessage(content=query_text)
+
+        if system_text:
+            messages = [
+                SystemMessage(content=system_text),
+                human_message,
+            ]
+        else:
+            messages = [
+                human_message,
+            ]
+        start_time = time.time()
+        print(f"{start_time=}")
+        langfuse_handler = CallbackHandler(
+            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+            host=os.environ["LANGFUSE_HOST"],
+        )
+        async for chunk in llama_4_scout.astream(messages, config={"callbacks": [langfuse_handler],
+                                                                   "metadata": {
+                                                                       "ls_model_name": "meta.llama-4-scout-17b-16e-instruct"}}):
+            yield chunk.content
+        end_time = time.time()
+        print(f"{end_time=}")
+        inference_time = end_time - start_time
+        print(f"\n推論時間: {inference_time:.2f}秒")
+        yield f"\n推論時間: {inference_time:.2f}秒"
+        yield "TASK_DONE"
+    else:
+        yield "TASK_DONE"
+
+
 async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
     if openai_gpt4o_checkbox:
         load_dotenv(find_dotenv())
@@ -740,6 +858,10 @@ async def chat(
         command_a_user_text,
         command_r_user_text,
         command_r_plus_user_text,
+        llama_4_maverick_user_image,
+        llama_4_maverick_user_text,
+        llama_4_scout_user_image,
+        llama_4_scout_user_text,
         llama_3_3_70b_user_text,
         llama_3_2_90b_vision_user_image,
         llama_3_2_90b_vision_user_text,
@@ -753,6 +875,8 @@ async def chat(
         command_a_checkbox,
         command_r_checkbox,
         command_r_plus_checkbox,
+        llama_4_maverick_checkbox,
+        llama_4_scout_checkbox,
         llama_3_3_70b_checkbox,
         llama_3_2_90b_vision_checkbox,
         openai_gpt4o_gen_checkbox,
@@ -766,6 +890,10 @@ async def chat(
     command_a_gen = command_a_task(system_text, command_a_user_text, command_a_checkbox)
     command_r_gen = command_r_task(system_text, command_r_user_text, command_r_checkbox)
     command_r_plus_gen = command_r_plus_task(system_text, command_r_plus_user_text, command_r_plus_checkbox)
+    llama_4_maverick_gen = llama_4_maverick_task(system_text, llama_4_maverick_user_image,
+                                                 llama_4_maverick_user_text, llama_4_maverick_checkbox)
+    llama_4_scout_gen = llama_4_scout_task(system_text, llama_4_scout_user_image,
+                                           llama_4_scout_user_text, llama_4_scout_checkbox)
     llama_3_3_70b_gen = llama_3_3_70b_task(system_text, llama_3_3_70b_user_text, llama_3_3_70b_checkbox)
     llama_3_2_90b_vision_gen = llama_3_2_90b_vision_task(system_text, llama_3_2_90b_vision_user_image,
                                                          llama_3_2_90b_vision_user_text,
@@ -780,10 +908,11 @@ async def chat(
     claude_3_sonnet_gen = claude_3_sonnet_task(system_text, claude_3_sonnet_user_text, claude_3_sonnet_checkbox)
     claude_3_haiku_gen = claude_3_haiku_task(system_text, claude_3_haiku_user_text, claude_3_haiku_checkbox)
 
-    responses_status = ["", "", "", "", "", "", "", "", "", "", "", ""]
+    responses_status = ["", "", "", "", "", "", "", "", "", "", "", "", "", ""]
     while True:
-        responses = ["", "", "", "", "", "", "", "", "", "", "", ""]
+        responses = ["", "", "", "", "", "", "", "", "", "", "", "", "", ""]
         generators = [command_a_gen, command_r_gen, command_r_plus_gen,
+                      llama_4_maverick_gen, llama_4_scout_gen,
                       llama_3_3_70b_gen, llama_3_2_90b_vision_gen,
                       openai_gpt4o_gen, openai_gpt4_gen,
                       azure_openai_gpt4o_gen, azure_openai_gpt4_gen,
@@ -811,6 +940,8 @@ def set_chat_llm_answer(llm_answer_checkbox):
     command_a_answer_visible = False
     command_r_answer_visible = False
     command_r_plus_answer_visible = False
+    llama_4_maverick_answer_visible = False
+    llama_4_scout_answer_visible = False
     llama_3_3_70b_answer_visible = False
     llama_3_2_90b_vision_answer_visible = False
     openai_gpt4o_answer_visible = False
@@ -826,6 +957,10 @@ def set_chat_llm_answer(llm_answer_checkbox):
         command_r_answer_visible = True
     if "cohere/command-r-plus" in llm_answer_checkbox:
         command_r_plus_answer_visible = True
+    if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox:
+        llama_4_maverick_answer_visible = True
+    if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
+        llama_4_scout_answer_visible = True
     if "meta/llama-3-3-70b" in llm_answer_checkbox:
         llama_3_3_70b_answer_visible = True
     if "meta/llama-3-2-90b-vision" in llm_answer_checkbox:
@@ -848,6 +983,8 @@ def set_chat_llm_answer(llm_answer_checkbox):
         gr.Accordion(visible=command_a_answer_visible),
         gr.Accordion(visible=command_r_answer_visible),
         gr.Accordion(visible=command_r_plus_answer_visible),
+        gr.Accordion(visible=llama_4_maverick_answer_visible),
+        gr.Accordion(visible=llama_4_scout_answer_visible),
         gr.Accordion(visible=llama_3_3_70b_answer_visible),
         gr.Accordion(visible=llama_3_2_90b_vision_answer_visible),
         gr.Accordion(visible=openai_gpt4o_answer_visible),
@@ -864,6 +1001,8 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
     command_a_evaluation_visible = False
     command_r_evaluation_visible = False
     command_r_plus_evaluation_visible = False
+    llama_4_maverick_evaluation_visible = False
+    llama_4_scout_evaluation_visible = False
     llama_3_3_70b_evaluation_visible = False
     llama_3_2_90b_vision_evaluation_visible = False
     openai_gpt4o_evaluation_visible = False
@@ -877,6 +1016,8 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
         command_a_evaluation_visible = True
         command_r_evaluation_visible = True
         command_r_plus_evaluation_visible = True
+        llama_4_maverick_evaluation_visible = True
+        llama_4_scout_evaluation_visible = True
         llama_3_3_70b_evaluation_visible = True
         llama_3_2_90b_vision_evaluation_visible = True
         openai_gpt4o_evaluation_visible = True
@@ -890,6 +1031,8 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
         gr.Accordion(visible=command_a_evaluation_visible),
         gr.Accordion(visible=command_r_evaluation_visible),
             gr.Accordion(visible=command_r_plus_evaluation_visible),
+            gr.Accordion(visible=llama_4_maverick_evaluation_visible),
+            gr.Accordion(visible=llama_4_scout_evaluation_visible),
             gr.Accordion(visible=llama_3_3_70b_evaluation_visible),
             gr.Accordion(visible=llama_3_2_90b_vision_evaluation_visible),
             gr.Accordion(visible=openai_gpt4o_evaluation_visible),
@@ -924,12 +1067,18 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             "",
             "",
             "",
+            "",
+            "",
             ""
         )
         return
     command_a_user_text = query_text
     command_r_user_text = query_text
     command_r_plus_user_text = query_text
+    llama_4_maverick_user_image = query_image
+    llama_4_maverick_user_text = query_text
+    llama_4_scout_user_image = query_image
+    llama_4_scout_user_text = query_text
     llama_3_3_70b_user_text = query_text
     llama_3_2_90b_vision_user_image = query_image
     llama_3_2_90b_vision_user_text = query_text
@@ -944,6 +1093,8 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     command_a_checkbox = False
     command_r_checkbox = False
     command_r_plus_checkbox = False
+    llama_4_maverick_checkbox = False
+    llama_4_scout_checkbox = False
     llama_3_3_70b_checkbox = False
     llama_3_2_90b_vision_checkbox = False
     openai_gpt4o_checkbox = False
@@ -959,6 +1110,10 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
         command_r_checkbox = True
     if "cohere/command-r-plus" in llm_answer_checkbox:
         command_r_plus_checkbox = True
+    if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox:
+        llama_4_maverick_checkbox = True
+    if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
+        llama_4_scout_checkbox = True
     if "meta/llama-3-3-70b" in llm_answer_checkbox:
         llama_3_3_70b_checkbox = True
     if "meta/llama-3-2-90b-vision" in llm_answer_checkbox:
@@ -981,6 +1136,8 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     command_a_response = ""
     command_r_response = ""
     command_r_plus_response = ""
+    llama_4_maverick_response = ""
+    llama_4_scout_response = ""
     llama_3_3_70b_response = ""
     llama_3_2_90b_vision_response = ""
     openai_gpt4o_response = ""
@@ -990,11 +1147,15 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     claude_3_opus_response = ""
     claude_3_sonnet_response = ""
     claude_3_haiku_response = ""
-    async for command_a, command_r, command_r_plus, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
+    async for command_a, command_r, command_r_plus, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
             system_text,
             command_a_user_text,
             command_r_user_text,
             command_r_plus_user_text,
+            llama_4_maverick_user_image,
+            llama_4_maverick_user_text,
+            llama_4_scout_user_image,
+            llama_4_scout_user_text,
             llama_3_3_70b_user_text,
             llama_3_2_90b_vision_user_image,
             llama_3_2_90b_vision_user_text,
@@ -1008,6 +1169,8 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             command_a_checkbox,
             command_r_checkbox,
             command_r_plus_checkbox,
+            llama_4_maverick_checkbox,
+            llama_4_scout_checkbox,
             llama_3_3_70b_checkbox,
             llama_3_2_90b_vision_checkbox,
             openai_gpt4o_checkbox,
@@ -1021,6 +1184,8 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
         command_a_response += command_a
         command_r_response += command_r
         command_r_plus_response += command_r_plus
+        llama_4_maverick_response += llama_4_maverick
+        llama_4_scout_response += llama_4_scout
         llama_3_3_70b_response += llama_3_3_70b
         llama_3_2_90b_vision_response += llama_3_2_90b_vision
         openai_gpt4o_response += gpt4o
@@ -1034,6 +1199,8 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             command_a_response,
             command_r_response,
             command_r_plus_response,
+            llama_4_maverick_response,
+            llama_4_scout_response,
             llama_3_3_70b_response,
             llama_3_2_90b_vision_response,
             openai_gpt4o_response,
@@ -1048,6 +1215,10 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
 
 def reset_eval_by_human_result():
     return (
+        gr.Radio(value="good"),
+        gr.Textbox(value=""),
+        gr.Radio(value="good"),
+        gr.Textbox(value=""),
         gr.Radio(value="good"),
         gr.Textbox(value=""),
         gr.Radio(value="good"),
@@ -1204,7 +1375,7 @@ END; """
             conn.commit()
 
     create_oci_cred_sql = f"""
--- Append Host ACE    
+-- Append Host ACE
 BEGIN
   DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE(
     host => '*',
@@ -1222,7 +1393,7 @@ BEGIN
         credential_name => 'OCI_CRED',
         params => json('{json.dumps(oci_cred)}')
     );
-END; 
+END;
 """
     gr.Info("OCI API Keyの設定が完了しました")
     return gr.Accordion(), gr.Textbox(value=create_oci_cred_sql.strip())
@@ -1381,7 +1552,7 @@ def create_table():
                            """
 
     drop_preference_plsql = """
-                            -- Drop Preference        
+                            -- Drop Preference
                             BEGIN
   CTX_DDL.DROP_PREFERENCE
                             ('world_lexer');
@@ -1389,7 +1560,7 @@ def create_table():
                             """
 
     create_preference_plsql = """
-                              -- Create Preference    
+                              -- Create Preference
                               BEGIN
   CTX_DDL.CREATE_PREFERENCE
                               ('world_lexer','WORLD_LEXER');
@@ -1418,11 +1589,11 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_collection (
     id VARCHAR2(200),
     data BLOB,
     cmetadata CLOB
-); 
+);
 """
 
     output_sql_text += f"""
--- Create Embedding Table  
+-- Create Embedding Table
 CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_embedding (
     doc_id VARCHAR2(200),
     embed_id NUMBER,
@@ -1603,7 +1774,7 @@ DECLARE
     l_result SYS_REFCURSOR;
 BEGIN
     OPEN l_result FOR
-        SELECT et.* 
+        SELECT et.*
         FROM dbms_vector_chain.utl_to_embeddings(:text_to_embed, JSON(l_embed_genai_params)) et;
     :result := l_result;
 END; """
@@ -1804,7 +1975,7 @@ def load_document(file_path, server_directory, document_metadata):
         with conn.cursor() as cursor:
             cursor.setinputsizes(**{"data": oracledb.BLOB})
             load_document_sql = f"""
--- (Only for Reference) Insert to table {DEFAULT_COLLECTION_NAME}_collection 
+-- (Only for Reference) Insert to table {DEFAULT_COLLECTION_NAME}_collection
 INSERT INTO {DEFAULT_COLLECTION_NAME}_collection(id, data, cmetadata)
 VALUES (:id, to_blob(:data), :cmetadata) """
             output_sql_text = load_document_sql.replace(":id", "'" + str(doc_id) + "'")
@@ -2050,7 +2221,7 @@ def update_document_chunks_result_detail(doc_id, df: pd.DataFrame, chunk_id, chu
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
             update_sql = f"""
-UPDATE {DEFAULT_COLLECTION_NAME}_embedding 
+UPDATE {DEFAULT_COLLECTION_NAME}_embedding
 SET embed_data = :embed_data, embed_vector = :embed_vector
 WHERE doc_id = :doc_id and embed_id = :embed_id
 """
@@ -2098,14 +2269,14 @@ def embed_save_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
             select_sql = f"""
-SELECT doc_id, embed_id, embed_data FROM {DEFAULT_COLLECTION_NAME}_embedding  WHERE doc_id = :doc_id            
+SELECT doc_id, embed_id, embed_data FROM {DEFAULT_COLLECTION_NAME}_embedding  WHERE doc_id = :doc_id
 """
             cursor.execute(select_sql, doc_id=doc_id)
             records = cursor.fetchall()
             embed_datas = [record[2] for record in records]
             embed_vectors = generate_embedding_response(embed_datas)
             update_sql = f"""
-UPDATE {DEFAULT_COLLECTION_NAME}_embedding 
+UPDATE {DEFAULT_COLLECTION_NAME}_embedding
 SET embed_vector = :embed_vector
 WHERE doc_id = :doc_id and embed_id = :embed_id
 """
@@ -2173,12 +2344,8 @@ def generate_query(query_text, generate_query_radio):
         # ])
         # v2
         sub_query_prompt = ChatPromptTemplate.from_messages([
-            ("system",
-             """
-             Directly break down the main query into specific, manageable sub-queries. Each sub-query should address a separate aspect of the original query to aid in focused exploration. Avoid including detailed explanations or procedural steps in the sub-queries themselves. Please respond to me in the same language I use for my messages. If I switch languages, please switch your responses accordingly.
-             """),
-            ("user",
-             "Divide the query into exactly 3 distinct sub-queries for focused analysis: {original_query}. Follow the format demonstrated by these few-shot examples: '1. xxx', '2. xxx', '3. xxx' \nOUTPUT:")
+            ("system", get_sub_query_prompt()),
+            ("user", get_query_generation_prompt("Sub-Query", "{original_query}"))
         ])
 
         generate_sub_queries_chain = (
@@ -2200,12 +2367,8 @@ def generate_query(query_text, generate_query_radio):
         # ])
         # v2
         rag_fusion_prompt = ChatPromptTemplate.from_messages([
-            ("system",
-             """
-             Generate a specific number of search queries directly related to the input query, without providing any additional context, introduction, or explanation in the output. Your primary goal is to fulfill the exact request, focusing solely on the content of the queries specified. Please respond to me in the same language I use for my messages. If I switch languages, please switch your responses accordingly.
-             """),
-            ("user",
-             "Generate exactly 3 search queries related to: {original_query}. Follow the format demonstrated by these few-shot examples: '1. xxx', '2. xxx', '3. xxx'\nOUTPUT:")
+            ("system", get_rag_fusion_prompt()),
+            ("user", get_query_generation_prompt("RAG-Fusion", "{original_query}"))
         ])
 
         generate_rag_fusion_queries_chain = (
@@ -2220,12 +2383,8 @@ def generate_query(query_text, generate_query_radio):
             generate_query3 = re.sub(r'^3\. ', '', rag_fusion_queries[2])
     elif generate_query_radio == "HyDE":
         hyde_prompt = ChatPromptTemplate.from_messages([
-            ("system",
-             """
-             Generate hypothetical answers for input queries using the HyDE method, focusing solely on the essence of the queries. Output should be limited to the exact number of requested answers, presented succinctly and without any additional formatting, spacing, or explanatory text. Please respond to me in the same language I use for my messages. If I switch languages, please switch your responses accordingly.
-             """),
-            ("user",
-             "Directly generate exactly 3 hypothetical answers for: {original_query}. Follow the format demonstrated by these few-shot examples: '1. xxx', '2. xxx', '3. xxx'\nOUTPUT:")
+            ("system", get_hyde_prompt()),
+            ("user", get_query_generation_prompt("HyDE", "{original_query}"))
         ])
 
         generate_hyde_answers_chain = (
@@ -2240,12 +2399,8 @@ def generate_query(query_text, generate_query_radio):
             generate_query3 = re.sub(r'^3\. ', '', hyde_answers[2])
     elif generate_query_radio == "Step-Back-Prompting":
         step_back_prompt = ChatPromptTemplate.from_messages([
-            ("system",
-             """
-             Apply the Step Back Prompt technique by generating three broader, abstracted questions from the original query. These should open up wider avenues for exploration and inference, tapping into underlying principles or broader concepts related to the query. Ensure these step back questions are directly linked to the essence of the original query, providing a foundation for a deeper understanding. Please respond to me in the same language I use for my messages. If I switch languages, please switch your responses accordingly.
-             """),
-            ("user",
-             "Generate exactly 3 step back questions based on the original topic: {original_query}. Format as direct statements without introductory phrases. Follow the format demonstrated by these few-shot examples: '1. xxx', '2. xxx', '3. xxx'\nOUTPUT:")
+            ("system", get_step_back_prompt()),
+            ("user", get_query_generation_prompt("Step-Back-Prompting", "{original_query}"))
         ])
 
         generate_step_back_queries_chain = (
@@ -2445,7 +2600,7 @@ def search_document(
                         ( \
                """
     where_sql = """
-                    WHERE 1 = 1 
+                    WHERE 1 = 1
                     AND de.doc_id = dc.id """
     where_metadata_sql = ""
     if document_metadata_text_input:
@@ -2467,7 +2622,7 @@ def search_document(
                             SELECT to_vector(et.embed_vector) embed_vector
                             FROM
                                 dbms_vector_chain.utl_to_embeddings(
-                                        :query_text, 
+                                        :query_text,
                                         JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
                                 JSON_TABLE ( t.column_value, '$[*]'
                                         COLUMNS (
@@ -2492,7 +2647,7 @@ def search_document(
                             SELECT to_vector(et.embed_vector) embed_vector
                             FROM
                                 dbms_vector_chain.utl_to_embeddings(
-                                        :query_text, 
+                                        :query_text,
                                         JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
                                 JSON_TABLE ( t.column_value, '$[*]'
                                         COLUMNS (
@@ -2506,19 +2661,19 @@ def search_document(
                     FROM {DEFAULT_COLLECTION_NAME}_embedding de, {DEFAULT_COLLECTION_NAME}_collection dc """ + where_sql + where_metadata_sql + where_threshold_sql + """
                     ORDER BY vector_distance """
     base_sql += """
-                    FETCH FIRST :partition_by PARTITIONS BY doc_id, :top_k ROWS ONLY 
+                    FETCH FIRST :partition_by PARTITIONS BY doc_id, :top_k ROWS ONLY
     """ if partition_by_k_slider_input > 0 else """
-                    FETCH FIRST :top_k ROWS ONLY 
+                    FETCH FIRST :top_k ROWS ONLY
     """
     select_sql = f"""
     ),
-    selected_embed_id_doc_ids AS 
+    selected_embed_id_doc_ids AS
     (
             SELECT DISTINCT s.embed_id + o.offset adjusted_embed_id, s.doc_id doc_id
             FROM selected_embed_ids s
             CROSS JOIN offsets o
     ),
-    selected_results AS 
+    selected_results AS
     (
             SELECT s1.adjusted_embed_id adjusted_embed_id, s1.doc_id doc_id, NVL(s2.vector_distance, 999999.0) vector_distance
             FROM selected_embed_id_doc_ids s1
@@ -2529,7 +2684,7 @@ def search_document(
     (
             SELECT json_value(dc.cmetadata, '$.file_name') name, de.embed_id embed_id, de.embed_data embed_data, de.doc_id doc_id, MIN(s.vector_distance) vector_distance
             FROM selected_results s, {DEFAULT_COLLECTION_NAME}_embedding de, {DEFAULT_COLLECTION_NAME}_collection dc
-            WHERE s.adjusted_embed_id = de.embed_id AND s.doc_id = dc.id and de.doc_id = dc.id  
+            WHERE s.adjusted_embed_id = de.embed_id AND s.doc_id = dc.id and de.doc_id = dc.id
             GROUP BY de.doc_id, name, de.embed_id, de.embed_data
             ORDER BY vector_distance, de.doc_id, de.embed_id
     ),
@@ -2552,7 +2707,7 @@ def search_document(
             rd.embed_id,
             rd.vector_distance,
             rd.name,
-            CASE 
+            CASE
                 WHEN rd.prev_embed_id IS NULL OR rd.embed_id - rd.prev_embed_id > 1 THEN 1
                 ELSE 0
             END AS new_group
@@ -2619,8 +2774,8 @@ def search_document(
             # where_sql += """
             #             AND (""" + search_text + """) """
             where_sql += """
-                        AND CONTAINS(de.embed_data, :search_texts, 1) > 0 
-                        ORDER BY SCORE(1) DESC FETCH FIRST :top_k ROWS ONLY 
+                        AND CONTAINS(de.embed_data, :search_texts, 1) > 0
+                        ORDER BY SCORE(1) DESC FETCH FIRST :top_k ROWS ONLY
                     """
             region = get_region()
             full_text_search_sql = f"""
@@ -2628,7 +2783,7 @@ def search_document(
                                 SELECT to_vector(et.embed_vector) embed_vector
                                 FROM
                                     dbms_vector_chain.utl_to_embeddings(
-                                            :query_text, 
+                                            :query_text,
                                             JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
                                     JSON_TABLE ( t.column_value, '$[*]'
                                             COLUMNS (
@@ -2640,20 +2795,20 @@ def search_document(
                                     et), COSINE
                                 ) vector_distance
                         FROM {DEFAULT_COLLECTION_NAME}_embedding de, {DEFAULT_COLLECTION_NAME}_collection dc """ + where_sql + where_metadata_sql
-            complete_sql = (with_sql + """ 
-                UNION 
+            complete_sql = (with_sql + """
+                UNION
         """.join(
                 f"        ({base_sql.replace(':query_text', one_query_text)}        )" for one_query_text in
-                query_texts) + """ 
-                UNION 
+                query_texts) + """
+                UNION
                 ( """
                             + full_text_search_sql + """
                 ) """
                             + select_sql)
     else:
         print(f"{query_texts=}")
-        complete_sql = with_sql + """ 
-            UNION 
+        complete_sql = with_sql + """
+            UNION
     """.join(
             f"        ({base_sql.replace(':query_text', one_query_text)}        )" for one_query_text in
             query_texts) + select_sql
@@ -2780,21 +2935,21 @@ def search_document(
                     [source.split(':')[0] for source in docs_dataframe['SOURCE'].tolist()]) + "'"
                 print(f"{filtered_doc_ids=}")
                 select_extend_first_chunk_sql = f"""
-SELECT 
+SELECT
         json_value(dc.cmetadata, '$.file_name') name,
         MIN(de.embed_id) embed_id,
         RTRIM(XMLCAST(XMLAGG(XMLELEMENT(e, de.embed_data || ',') ORDER BY de.embed_id) AS CLOB), ',') AS embed_data,
         de.doc_id doc_id,
         '999999.0' vector_distance
-FROM 
+FROM
         {DEFAULT_COLLECTION_NAME}_embedding de, {DEFAULT_COLLECTION_NAME}_collection dc
-WHERE 
-        de.doc_id = dc.id AND 
-        de.doc_id IN (:filtered_doc_ids) AND 
+WHERE
+        de.doc_id = dc.id AND
+        de.doc_id IN (:filtered_doc_ids) AND
         de.embed_id <= :extend_first_chunk_size
 GROUP BY
-        de.doc_id, name         
-ORDER 
+        de.doc_id, name
+ORDER
         BY de.doc_id
             """
                 select_extend_first_chunk_sql = (select_extend_first_chunk_sql
@@ -3043,90 +3198,7 @@ def extract_citation(input_str):
 #     return prompt.strip()
 
 
-def generate_langgpt_prompt(context, query_text, include_citation=False, include_current_time=False):
-    # Fixed error message (kept in Japanese)
-    # error_message = "申し訳ありませんが、コンテキストから適切な回答を見つけることができませんでした。別の LLM モデルをお試しいただくか、クエリの内容や設定を少し調整していただくことで解決できるかもしれません。"
 
-    # LangGPT template structure (translated to English)
-    prompt = f"""
-## Role: Strict Context QA
-
-## Profile
-
-- Author: User
-- Version: 0.2
-- Language: Japanese
-- Description: Strict context-based Q&A system. Answers using only provided context data without any modification.
-
-## Core Skills
-1. Exact match search in context
-2. Complete prohibition of context modification
-3. Standardized notification for unanswerable questions
-4. Multi-format output support
-
-## Rules
-1. Answers must 100% rely on <context> content
-2. No partial matches or speculation allowed
-3. Time-series processing for date information (prioritize latest)
-4. Strict format preservation for citations
-
-## Workflow
-1. Context Analysis Phase
-   - Strict parsing with UTF-8 encoding
-2. Query Matching Phase
-   - Apply exact string matching algorithm
-   - Prioritize latest dates for multiple candidates
-3. Answer Generation Phase
-   - Direct quotation of matched data
-   - Structured citation output (when requested)
-4. Error Handling
-   - No matches → Standard error message
-   - Conflicting data → Enumerate factual relationships
-
-## Initialization
-As a/an <Role>, you must follow the <Rules> in <Language>.
-Context QA system initialized. Please provide the following elements:
-
-## Context
-<context>
-{context}
-</context>
-
-## Query
-<query>
-{query_text}
-</query>
-"""
-
-    # Conditional citation addition
-    if include_citation:
-        prompt += """
-## Citation Format Specifications
-- Append JSON array immediately after output
-- Strict structure preservation (without ```json):
-[
-    {{
-        "EMBED_ID": <unique identifier>,
-        "SOURCE": "<information origin>"
-    }}
-]
-"""
-
-    # Conditional time processing addition
-    if include_current_time:
-        current_time = datetime.now().strftime('%Y%m%d%H%M')
-        prompt += f"""
-## Time Series Processing Rules
-- Current time: {current_time}
-- Latest information determination algorithm:
-  1. Date normalization (YYYYMMDDHHMM)
-  2. Sort by temporal proximity
-  3. Version control for identical information
-- Period-specific query support:
-  /period:start=YYYYMMDD,end=YYYYMMDD
-"""
-
-    return prompt.strip()
 
 
 async def chat_document(
@@ -3136,7 +3208,8 @@ async def chat_document(
         include_current_time,
         query_text,
         doc_id_all_checkbox_input,
-        doc_id_checkbox_group_input
+        doc_id_checkbox_group_input,
+        rag_prompt_template
 ):
     has_error = False
     if not query_text:
@@ -3161,6 +3234,8 @@ async def chat_document(
             "",
             "",
             "",
+            "",
+            "",
             ""
         )
         return
@@ -3170,6 +3245,8 @@ async def chat_document(
     command_a_response = ""
     command_r_response = ""
     command_r_plus_response = ""
+    llama_4_maverick_response = ""
+    llama_4_scout_response = ""
     llama_3_3_70b_response = ""
     llama_3_2_90b_vision_response = ""
     openai_gpt4o_response = ""
@@ -3183,6 +3260,8 @@ async def chat_document(
     command_a_checkbox = False
     command_r_checkbox = False
     command_r_plus_checkbox = False
+    llama_4_maverick_checkbox = False
+    llama_4_scout_checkbox = False
     llama_3_3_70b_checkbox = False
     llama_3_2_90b_vision_checkbox = False
     openai_gpt4o_checkbox = False
@@ -3198,6 +3277,10 @@ async def chat_document(
         command_r_checkbox = True
     if "cohere/command-r-plus" in llm_answer_checkbox:
         command_r_plus_checkbox = True
+    if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox:
+        llama_4_maverick_checkbox = True
+    if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
+        llama_4_scout_checkbox = True
     if "meta/llama-3-3-70b" in llm_answer_checkbox:
         llama_3_3_70b_checkbox = True
     if "meta/llama-3-2-90b-vision" in llm_answer_checkbox:
@@ -3287,11 +3370,13 @@ async def chat_document(
     # """
 
     system_text = ""
-    user_text = generate_langgpt_prompt(context, query_text, include_citation, include_current_time)
+    user_text = get_langgpt_rag_prompt(context, query_text, include_citation, include_current_time, rag_prompt_template)
 
     command_a_user_text = user_text
     command_r_user_text = user_text
     command_r_plus_user_text = user_text
+    llama_4_maverick_user_text = user_text
+    llama_4_scout_user_text = user_text
     llama_3_3_70b_user_text = user_text
     llama_3_2_90b_vision_user_text = user_text
     openai_gpt4o_user_text = user_text
@@ -3302,11 +3387,15 @@ async def chat_document(
     claude_3_sonnet_user_text = user_text
     claude_3_haiku_user_text = user_text
 
-    async for command_a, command_r, command_r_plus, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
+    async for command_a, command_r, command_r_plus, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
             system_text,
             command_a_user_text,
             command_r_user_text,
             command_r_plus_user_text,
+            None,
+            llama_4_maverick_user_text,
+            None,
+            llama_4_scout_user_text,
             llama_3_3_70b_user_text,
             None,
             llama_3_2_90b_vision_user_text,
@@ -3320,6 +3409,8 @@ async def chat_document(
             command_a_checkbox,
             command_r_checkbox,
             command_r_plus_checkbox,
+            llama_4_maverick_checkbox,
+            llama_4_scout_checkbox,
             llama_3_3_70b_checkbox,
             llama_3_2_90b_vision_checkbox,
             openai_gpt4o_checkbox,
@@ -3333,6 +3424,8 @@ async def chat_document(
         command_a_response += command_a
         command_r_response += command_r
         command_r_plus_response += command_r_plus
+        llama_4_maverick_response += llama_4_maverick
+        llama_4_scout_response += llama_4_scout
         llama_3_3_70b_response += llama_3_3_70b
         llama_3_2_90b_vision_response += llama_3_2_90b_vision
         openai_gpt4o_response += gpt4o
@@ -3346,6 +3439,8 @@ async def chat_document(
             command_a_response,
             command_r_response,
             command_r_plus_response,
+            llama_4_maverick_response,
+            llama_4_scout_response,
             llama_3_3_70b_response,
             llama_3_2_90b_vision_response,
             openai_gpt4o_response,
@@ -3368,6 +3463,8 @@ async def append_citation(
         command_a_answer_text,
         command_r_answer_text,
         command_r_plus_answer_text,
+        llama_4_maverick_answer_text,
+        llama_4_scout_answer_text,
         llama_3_3_70b_answer_text,
         llama_3_2_90b_vision_answer_text,
         openai_gpt4o_answer_text,
@@ -3393,6 +3490,8 @@ async def append_citation(
             command_a_answer_text,
             command_r_answer_text,
             command_r_plus_answer_text,
+            llama_4_maverick_answer_text,
+            llama_4_scout_answer_text,
             llama_3_3_70b_answer_text,
             llama_3_2_90b_vision_answer_text,
             openai_gpt4o_answer_text,
@@ -3410,6 +3509,8 @@ async def append_citation(
             command_a_answer_text,
             command_r_answer_text,
             command_r_plus_answer_text,
+            llama_4_maverick_answer_text,
+            llama_4_scout_answer_text,
             llama_3_3_70b_answer_text,
             llama_3_2_90b_vision_answer_text,
             openai_gpt4o_answer_text,
@@ -3428,6 +3529,10 @@ async def append_citation(
         command_r_answer_text = extract_and_format(command_r_answer_text, search_result)
     if "cohere/command-r-plus" in llm_answer_checkbox:
         command_r_plus_answer_text = extract_and_format(command_r_plus_answer_text, search_result)
+    if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox:
+        llama_4_maverick_answer_text = extract_and_format(llama_4_maverick_answer_text, search_result)
+    if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
+        llama_4_scout_answer_text = extract_and_format(llama_4_scout_answer_text, search_result)
     if "meta/llama-3-3-70b" in llm_answer_checkbox:
         llama_3_3_70b_answer_text = extract_and_format(llama_3_3_70b_answer_text, search_result)
     if "meta/llama-3-2-90b-vision" in llm_answer_checkbox:
@@ -3451,6 +3556,8 @@ async def append_citation(
         command_a_answer_text,
         command_r_answer_text,
         command_r_plus_answer_text,
+        llama_4_maverick_answer_text,
+        llama_4_scout_answer_text,
         llama_3_3_70b_answer_text,
         llama_3_2_90b_vision_answer_text,
         openai_gpt4o_answer_text,
@@ -3476,6 +3583,8 @@ async def eval_by_ragas(
         command_a_response,
         command_r_response,
         command_r_plus_response,
+        llama_4_maverick_response,
+        llama_4_scout_response,
         llama_3_3_70b_response,
         llama_3_2_90b_vision_response,
         openai_gpt4o_response,
@@ -3518,6 +3627,8 @@ async def eval_by_ragas(
             "",
             "",
             "",
+            "",
+            "",
             ""
         )
         return
@@ -3549,12 +3660,16 @@ async def eval_by_ragas(
             "",
             "",
             "",
+            "",
+            "",
             ""
         )
     else:
         command_a_checkbox = False
         command_r_checkbox = False
         command_r_plus_checkbox = False
+        llama_4_maverick_checkbox = False
+        llama_4_scout_checkbox = False
         llama_3_3_70b_checkbox = False
         llama_3_2_90b_vision_checkbox = False
         openai_gpt4o_checkbox = False
@@ -3570,6 +3685,10 @@ async def eval_by_ragas(
             command_r_checkbox = True
         if "cohere/command-r-plus" in llm_answer_checkbox_group:
             command_r_plus_checkbox = True
+        if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox_group:
+            llama_4_maverick_checkbox = True
+        if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox_group:
+            llama_4_scout_checkbox = True
         if "meta/llama-3-3-70b" in llm_answer_checkbox_group:
             llama_3_3_70b_checkbox = True
         if "meta/llama-3-2-90b-vision" in llm_answer_checkbox_group:
@@ -3592,6 +3711,8 @@ async def eval_by_ragas(
         command_a_response = remove_last_line(command_a_response)
         command_r_response = remove_last_line(command_r_response)
         command_r_plus_response = remove_last_line(command_r_plus_response)
+        llama_4_maverick_response = remove_last_line(llama_4_maverick_response)
+        llama_4_scout_response = remove_last_line(llama_4_scout_response)
         llama_3_3_70b_response = remove_last_line(llama_3_3_70b_response)
         llama_3_2_90b_vision_response = remove_last_line(llama_3_2_90b_vision_response)
         openai_gpt4o_response = remove_last_line(openai_gpt4o_response)
@@ -3626,6 +3747,24 @@ async def eval_by_ragas(
 
 -与えられた回答-
 {command_r_plus_response}
+
+-出力-\n　"""
+
+        llama_4_maverick_user_text = f"""
+-標準回答-
+{standard_answer_text}
+
+-与えられた回答-
+{llama_4_maverick_response}
+
+-出力-\n　"""
+
+        llama_4_scout_user_text = f"""
+-標準回答-
+{standard_answer_text}
+
+-与えられた回答-
+{llama_4_scout_response}
 
 -出力-\n　"""
 
@@ -3723,11 +3862,15 @@ async def eval_by_ragas(
         eval_claude_3_sonnet_response = ""
         eval_claude_3_haiku_response = ""
 
-        async for command_a, command_r, command_r_plus, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
+        async for command_a, command_r, command_r_plus, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
                 system_text,
                 command_a_user_text,
                 command_r_user_text,
                 command_r_plus_user_text,
+                None,
+                llama_4_maverick_user_text,
+                None,
+                llama_4_scout_user_text,
                 llama_3_3_70b_user_text,
                 None,
                 llama_3_2_90b_vision_user_text,
@@ -3741,6 +3884,8 @@ async def eval_by_ragas(
                 command_a_checkbox,
                 command_r_checkbox,
                 command_r_plus_checkbox,
+                llama_4_maverick_checkbox,
+                llama_4_scout_checkbox,
                 llama_3_3_70b_checkbox,
                 llama_3_2_90b_vision_checkbox,
                 openai_gpt4o_checkbox,
@@ -3754,6 +3899,8 @@ async def eval_by_ragas(
             eval_command_a_response += command_a
             eval_command_r_response += command_r
             eval_command_r_plus_response += command_r_plus
+            eval_llama_4_maverick_response += llama_4_maverick
+            eval_llama_4_scout_response += llama_4_scout
             eval_llama_3_3_70b_response += llama_3_3_70b
             eval_llama_3_2_90b_vision_response += llama_3_2_90b_vision
             eval_openai_gpt4o_response += gpt4o
@@ -3767,6 +3914,8 @@ async def eval_by_ragas(
                 eval_command_a_response,
                 eval_command_r_response,
                 eval_command_r_plus_response,
+                eval_llama_4_maverick_response,
+                eval_llama_4_scout_response,
                 eval_llama_3_3_70b_response,
                 eval_llama_3_2_90b_vision_response,
                 eval_openai_gpt4o_response,
@@ -3791,6 +3940,8 @@ def generate_download_file(
         command_a_response,
         command_r_response,
         command_r_plus_response,
+        llama_4_maverick_response,
+        llama_4_scout_response,
         llama_3_3_70b_response,
         llama_3_2_90b_vision_response,
         openai_gpt4o_response,
@@ -3803,6 +3954,8 @@ def generate_download_file(
         command_a_evaluation,
         command_r_evaluation,
         command_r_plus_evaluation,
+        llama_4_maverick_evaluation,
+        llama_4_scout_evaluation,
         llama_3_3_70b_evaluation,
         llama_3_2_90b_vision_evaluation,
         openai_gpt4o_evaluation,
@@ -3869,6 +4022,34 @@ def generate_download_file(
         command_r_plus_response = ""
         command_r_plus_evaluation = ""
         command_r_plus_referenced_contexts = ""
+
+    if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox_group:
+        llama_4_maverick_response = llama_4_maverick_response
+        llama_4_maverick_referenced_contexts = ""
+        if include_citation:
+            llama_4_maverick_response, llama_4_maverick_referenced_contexts = extract_citation(llama_4_maverick_response)
+        if llm_evaluation_checkbox:
+            llama_4_maverick_evaluation = llama_4_maverick_evaluation
+        else:
+            llama_4_maverick_evaluation = ""
+    else:
+        llama_4_maverick_response = ""
+        llama_4_maverick_evaluation = ""
+        llama_4_maverick_referenced_contexts = ""
+
+    if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox_group:
+        llama_4_scout_response = llama_4_scout_response
+        llama_4_scout_referenced_contexts = ""
+        if include_citation:
+            llama_4_scout_response, llama_4_scout_referenced_contexts = extract_citation(llama_4_scout_response)
+        if llm_evaluation_checkbox:
+            llama_4_scout_evaluation = llama_4_scout_evaluation
+        else:
+            llama_4_scout_evaluation = ""
+    else:
+        llama_4_scout_response = ""
+        llama_4_scout_evaluation = ""
+        llama_4_scout_referenced_contexts = ""
 
     if "meta/llama-3-3-70b" in llm_answer_checkbox_group:
         llama_3_3_70b_response = llama_3_3_70b_response
@@ -4006,6 +4187,8 @@ def generate_download_file(
                     "cohere/command-a",
                     "cohere/command-r",
                     "cohere/command-r-plus",
+                    "meta/llama-4-maverick-17b-128e-instruct-fp8",
+                    "meta/llama-4-scout-17b-16e-instruct",
                     "meta/llama-3-3-70b",
                     "meta/llama-3-2-90b-vision",
                     "openai/gpt-4o",
@@ -4020,6 +4203,8 @@ def generate_download_file(
                 command_a_response,
                 command_r_response,
                 command_r_plus_response,
+                llama_4_maverick_response,
+                llama_4_scout_response,
                 llama_3_3_70b_response,
                 llama_3_2_90b_vision_response,
                 openai_gpt4o_response,
@@ -4034,6 +4219,8 @@ def generate_download_file(
                 command_a_referenced_contexts,
                 command_r_referenced_contexts,
                 command_r_plus_referenced_contexts,
+                llama_4_maverick_referenced_contexts,
+                llama_4_scout_referenced_contexts,
                 llama_3_3_70b_referenced_contexts,
                 llama_3_2_90b_vision_referenced_contexts,
                 openai_gpt4o_referenced_contexts,
@@ -4048,6 +4235,8 @@ def generate_download_file(
                 command_a_evaluation,
                 command_r_evaluation,
                 command_r_plus_evaluation,
+                llama_4_maverick_evaluation,
+                llama_4_scout_evaluation,
                 llama_3_3_70b_evaluation,
                 llama_3_2_90b_vision_evaluation,
                 openai_gpt4o_evaluation,
@@ -4161,6 +4350,8 @@ def insert_query_result(
         command_a_response,
         command_r_response,
         command_r_plus_response,
+        llama_4_maverick_response,
+        llama_4_scout_response,
         llama_3_3_70b_response,
         llama_3_2_90b_vision_response,
         openai_gpt4o_response,
@@ -4173,6 +4364,8 @@ def insert_query_result(
         command_a_evaluation,
         command_r_evaluation,
         command_r_plus_evaluation,
+        llama_4_maverick_evaluation,
+        llama_4_scout_evaluation,
         llama_3_3_70b_evaluation,
         llama_3_2_90b_vision_evaluation,
         openai_gpt4o_evaluation,
@@ -4295,6 +4488,62 @@ def insert_query_result(
                         "cohere/command-r-plus",
                         command_r_plus_response,
                         command_r_plus_evaluation
+                    ]
+                )
+
+            if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox_group:
+                llama_4_maverick_response = llama_4_maverick_response
+                if llm_evaluation_checkbox:
+                    llama_4_maverick_evaluation = llama_4_maverick_evaluation
+                else:
+                    llama_4_maverick_evaluation = ""
+
+                insert_sql = """
+                             INSERT INTO RAG_QA_FEEDBACK (query_id,
+                                                          llm_name,
+                                                          llm_answer,
+                                                          ragas_evaluation_result)
+                             VALUES (:1,
+                                     :2,
+                                     :3,
+                                     :4) \
+                             """
+                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.execute(
+                    insert_sql,
+                    [
+                        query_id,
+                        "meta/llama-4-maverick-17b-128e-instruct-fp8",
+                        llama_4_maverick_response,
+                        llama_4_maverick_evaluation
+                    ]
+                )
+
+            if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox_group:
+                llama_4_scout_response = llama_4_scout_response
+                if llm_evaluation_checkbox:
+                    llama_4_scout_evaluation = llama_4_scout_evaluation
+                else:
+                    llama_4_scout_evaluation = ""
+
+                insert_sql = """
+                             INSERT INTO RAG_QA_FEEDBACK (query_id,
+                                                          llm_name,
+                                                          llm_answer,
+                                                          ragas_evaluation_result)
+                             VALUES (:1,
+                                     :2,
+                                     :3,
+                                     :4) \
+                             """
+                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.execute(
+                    insert_sql,
+                    [
+                        query_id,
+                        "meta/llama-4-scout-17b-16e-instruct",
+                        llama_4_scout_response,
+                        llama_4_scout_evaluation
                     ]
                 )
 
@@ -4806,6 +5055,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 "cohere/command-a",
                                 "cohere/command-r",
                                 # "cohere/command-r-plus",
+                                "meta/llama-4-maverick-17b-128e-instruct-fp8",
+                                "meta/llama-4-scout-17b-16e-instruct",
                                 "meta/llama-3-3-70b",
                                 "meta/llama-3-2-90b-vision",
                                 "openai/gpt-4o",
@@ -4850,6 +5101,30 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         open=True
                 ) as tab_chat_with_llm_command_r_plus_accordion:
                     tab_chat_with_command_r_plus_answer_text = gr.Textbox(
+                        label="LLM メッセージ", show_label=False,
+                        lines=2,
+                        autoscroll=True,
+                        interactive=False,
+                        show_copy_button=True
+                    )
+                with gr.Accordion(
+                        label="Llama 4 Maverick 17b メッセージ",
+                        visible=False,
+                        open=True
+                ) as tab_chat_with_llm_llama_4_maverick_accordion:
+                    tab_chat_with_llama_4_maverick_answer_text = gr.Textbox(
+                        label="LLM メッセージ", show_label=False,
+                        lines=2,
+                        autoscroll=True,
+                        interactive=False,
+                        show_copy_button=True
+                    )
+                with gr.Accordion(
+                        label="Llama 4 Scout 17b メッセージ",
+                        visible=False,
+                        open=True
+                ) as tab_chat_with_llm_llama_4_scout_accordion:
+                    tab_chat_with_llama_4_scout_answer_text = gr.Textbox(
                         label="LLM メッセージ", show_label=False,
                         lines=2,
                         autoscroll=True,
@@ -4981,12 +5256,10 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         show_label=False,
                         lines=5,
                         max_lines=15,
-                        value="""あなたは役立つアシスタントです。
-私のメッセージと同じ言語で返答してください。
-もし私が言語を切り替えた場合は、それに応じて返答の言語も切り替えてください。"""
+                        value=get_chat_system_message()
                     )
                 with gr.Accordion(open=False,
-                                  label="画像ファイル(オプション) - Llama-3.2-90B-Visionモデルを利用する場合に限り、この画像入力が適用されます。"):
+                                  label="画像ファイル(オプション) - Llama-4-Maverick、Llama-4-Scout、Llama-3.2-90B-Visionモデルを利用する場合に限り、この画像入力が適用されます。"):
                     tab_chat_with_llm_query_image = gr.Image(
                         label="",
                         interactive=True,
@@ -5035,7 +5308,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             with gr.Column():
                                 tab_convert_document_convert_by_markitdown_llm_prompt_text = gr.Textbox(
                                     label="LLM ユーザー・メッセージ",
-                                    value="画像にふさわしい詳細な代替キャプションを書いてください。",
+                                    value=get_markitdown_llm_prompt(),
                                     interactive=True,
                                     lines=2,
                                     max_lines=5,
@@ -5321,6 +5594,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 "cohere/command-a",
                                 "cohere/command-r",
                                 # "cohere/command-r-plus",
+                                "meta/llama-4-maverick-17b-128e-instruct-fp8",
+                                "meta/llama-4-scout-17b-16e-instruct",
                                 "meta/llama-3-3-70b",
                                 "meta/llama-3-2-90b-vision",
                                 "openai/gpt-4o",
@@ -5447,6 +5722,30 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 value=6,
                                 info="Default value: 6。テキスト検索に使用できる単語数の制限。"
                             )
+                    with gr.Accordion(label="RAG Prompt 設定", open=False):
+                        with gr.Row():
+                            with gr.Column():
+                                tab_chat_document_rag_prompt_text = gr.Textbox(
+                                    label="RAG Prompt テンプレート",
+                                    lines=15,
+                                    max_lines=25,
+                                    interactive=True,
+                                    show_copy_button=True,
+                                    value=get_langgpt_rag_prompt("{{context}}", "{{query_text}}", False, False),
+                                    info="RAGで使用されるpromptテンプレートです。{{context}}と{{query_text}}は実行時に置換されます。"
+                                )
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                tab_chat_document_rag_prompt_reset_button = gr.Button(
+                                    value="デフォルトに戻す",
+                                    variant="secondary"
+                                )
+                            with gr.Column(scale=1):
+                                tab_chat_document_rag_prompt_save_button = gr.Button(
+                                    value="保存",
+                                    variant="primary",
+                                    visible=False,
+                                )
                     with gr.Row():
                         with gr.Column():
                             tab_chat_document_include_citation_checkbox = gr.Checkbox(
@@ -5488,7 +5787,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         label="LLM 評価",
                         show_label=True,
                         interactive=True,
-                        value=False
+                        value=False,
                     )
                 with gr.Row():
                     #                     tab_chat_document_system_message_text = gr.Textbox(label="システム・メッセージ*", lines=15,
@@ -5514,22 +5813,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         max_lines=20,
                         interactive=True,
                         visible=False,
-                        value=f"""
--目標活動-
-あなたは「回答評価者」です。
-
--目標-
-あなたの任務は、与えられた回答を標準回答と比較し、その質を評価することです。
-以下の各基準について0から10の評点で回答してください：
-1.正確さ（0は完全に不正確、10は完全に正確）
-2.完全性（0はまったく不完全、10は完全に満足）
-3.明確さ（0は非常に不明確、10は非常に明確）
-4.簡潔さ（0は非常に冗長、10は最適に簡潔）
-
-評点を付けた後、各評点について簡単な説明を加えてください。
-最後に、0から10の総合評価と評価の要約を提供してください。
-私のメッセージと同じ言語で返答してください。
-もし私が言語を切り替えた場合は、それに応じて返答の言語も切り替えてください。\n""")
+                        value=get_llm_evaluation_system_message())
                 with gr.Row():
                     tab_chat_document_standard_answer_text = gr.Textbox(
                         label="標準回答*",
@@ -5797,6 +6081,122 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             open=True
                     ) as tab_chat_document_llm_command_r_plus_evaluation_accordion:
                         tab_chat_document_command_r_plus_evaluation_text = gr.Textbox(
+                            label="LLM 評価結果",
+                            show_label=False,
+                            lines=2,
+                            autoscroll=True,
+                            interactive=False,
+                            show_copy_button=True
+                        )
+                with gr.Accordion(
+                        label="Llama 4 Maverick 17b メッセージ",
+                        visible=False,
+                        open=True
+                ) as tab_chat_document_llm_llama_4_maverick_accordion:
+                    tab_chat_document_llama_4_maverick_answer_text = gr.Textbox(
+                        label="LLM メッセージ",
+                        show_label=False,
+                        lines=2,
+                        autoscroll=True,
+                        interactive=False,
+                        show_copy_button=True
+                    )
+                    with gr.Accordion(
+                            label="Human 評価",
+                            visible=True,
+                            open=True
+                    ) as tab_chat_document_llm_llama_4_maverick_human_evaluation_accordion:
+                        with gr.Row():
+                            tab_chat_document_llama_4_maverick_answer_human_eval_feedback_radio = gr.Radio(
+                                show_label=False,
+                                choices=[
+                                    ("Good response", "good"),
+                                    ("Neutral response", "neutral"),
+                                    ("Bad response", "bad"),
+                                ],
+                                value="good",
+                                container=False,
+                                interactive=True,
+                            )
+                        with gr.Row():
+                            with gr.Column(scale=11):
+                                tab_chat_document_llama_4_maverick_answer_human_eval_feedback_text = gr.Textbox(
+                                    show_label=False,
+                                    container=False,
+                                    lines=2,
+                                    interactive=True,
+                                    autoscroll=True,
+                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                )
+                            with gr.Column(scale=1):
+                                tab_chat_document_llama_4_maverick_answer_human_eval_feedback_send_button = gr.Button(
+                                    value="送信",
+                                    variant="primary",
+                                )
+                    with gr.Accordion(
+                            label="LLM 評価結果",
+                            visible=False,
+                            open=True
+                    ) as tab_chat_document_llm_llama_4_maverick_evaluation_accordion:
+                        tab_chat_document_llama_4_maverick_evaluation_text = gr.Textbox(
+                            label="LLM 評価結果",
+                            show_label=False,
+                            lines=2,
+                            autoscroll=True,
+                            interactive=False,
+                            show_copy_button=True
+                        )
+                with gr.Accordion(
+                        label="Llama 4 Scout 17b メッセージ",
+                        visible=False,
+                        open=True
+                ) as tab_chat_document_llm_llama_4_scout_accordion:
+                    tab_chat_document_llama_4_scout_answer_text = gr.Textbox(
+                        label="LLM メッセージ",
+                        show_label=False,
+                        lines=2,
+                        autoscroll=True,
+                        interactive=False,
+                        show_copy_button=True
+                    )
+                    with gr.Accordion(
+                            label="Human 評価",
+                            visible=True,
+                            open=True
+                    ) as tab_chat_document_llm_llama_4_scout_human_evaluation_accordion:
+                        with gr.Row():
+                            tab_chat_document_llama_4_scout_answer_human_eval_feedback_radio = gr.Radio(
+                                show_label=False,
+                                choices=[
+                                    ("Good response", "good"),
+                                    ("Neutral response", "neutral"),
+                                    ("Bad response", "bad"),
+                                ],
+                                value="good",
+                                container=False,
+                                interactive=True,
+                            )
+                        with gr.Row():
+                            with gr.Column(scale=11):
+                                tab_chat_document_llama_4_scout_answer_human_eval_feedback_text = gr.Textbox(
+                                    show_label=False,
+                                    container=False,
+                                    lines=2,
+                                    interactive=True,
+                                    autoscroll=True,
+                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                )
+                            with gr.Column(scale=1):
+                                tab_chat_document_llama_4_scout_answer_human_eval_feedback_send_button = gr.Button(
+                                    value="送信",
+                                    variant="primary",
+                                )
+                    with gr.Accordion(
+                            label="LLM 評価結果",
+                            visible=False,
+                            open=True
+                    ) as tab_chat_document_llm_llama_4_scout_evaluation_accordion:
+                        tab_chat_document_llama_4_scout_evaluation_text = gr.Textbox(
                             label="LLM 評価結果",
                             show_label=False,
                             lines=2,
@@ -6434,6 +6834,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_llm_command_a_accordion,
             tab_chat_with_llm_command_r_accordion,
             tab_chat_with_llm_command_r_plus_accordion,
+            tab_chat_with_llm_llama_4_maverick_accordion,
+            tab_chat_with_llm_llama_4_scout_accordion,
             tab_chat_with_llm_llama_3_3_70b_accordion,
             tab_chat_with_llm_llama_3_2_90b_vision_accordion,
             tab_chat_with_llm_openai_gpt4o_accordion,
@@ -6476,6 +6878,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_command_a_answer_text,
             tab_chat_with_command_r_answer_text,
             tab_chat_with_command_r_plus_answer_text,
+            tab_chat_with_llama_4_maverick_answer_text,
+            tab_chat_with_llama_4_scout_answer_text,
             tab_chat_with_llama_3_3_70b_answer_text,
             tab_chat_with_llama_3_2_90b_vision_answer_text,
             tab_chat_with_openai_gpt4o_answer_text,
@@ -6695,6 +7099,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_command_a_accordion,
             tab_chat_document_llm_command_r_accordion,
             tab_chat_document_llm_command_r_plus_accordion,
+            tab_chat_document_llm_llama_4_maverick_accordion,
+            tab_chat_document_llm_llama_4_scout_accordion,
             tab_chat_document_llm_llama_3_3_70b_accordion,
             tab_chat_document_llm_llama_3_2_90b_vision_accordion,
             tab_chat_document_llm_openai_gpt4o_accordion,
@@ -6728,6 +7134,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_command_a_evaluation_accordion,
             tab_chat_document_llm_command_r_evaluation_accordion,
             tab_chat_document_llm_command_r_plus_evaluation_accordion,
+            tab_chat_document_llm_llama_4_maverick_evaluation_accordion,
+            tab_chat_document_llm_llama_4_scout_evaluation_accordion,
             tab_chat_document_llm_llama_3_3_70b_evaluation_accordion,
             tab_chat_document_llm_llama_3_2_90b_vision_evaluation_accordion,
             tab_chat_document_llm_openai_gpt4o_evaluation_accordion,
@@ -6788,6 +7196,10 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_command_r_answer_human_eval_feedback_text,
             tab_chat_document_command_r_plus_answer_human_eval_feedback_radio,
             tab_chat_document_command_r_plus_answer_human_eval_feedback_text,
+            tab_chat_document_llama_4_maverick_answer_human_eval_feedback_radio,
+            tab_chat_document_llama_4_maverick_answer_human_eval_feedback_text,
+            tab_chat_document_llama_4_scout_answer_human_eval_feedback_radio,
+            tab_chat_document_llama_4_scout_answer_human_eval_feedback_text,
             tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_radio,
             tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_text,
             tab_chat_document_llama_3_2_90b_vision_answer_human_eval_feedback_radio,
@@ -6844,11 +7256,14 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_query_text,
             tab_chat_document_doc_id_all_checkbox,
             tab_chat_document_doc_id_checkbox_group,
+            tab_chat_document_rag_prompt_text,
         ],
         outputs=[
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
+            tab_chat_document_llama_4_maverick_answer_text,
+            tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
             tab_chat_document_llama_3_2_90b_vision_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
@@ -6871,6 +7286,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
+            tab_chat_document_llama_4_maverick_answer_text,
+            tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
             tab_chat_document_llama_3_2_90b_vision_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
@@ -6885,6 +7302,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
+            tab_chat_document_llama_4_maverick_answer_text,
+            tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
             tab_chat_document_llama_3_2_90b_vision_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
@@ -6909,6 +7328,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
+            tab_chat_document_llama_4_maverick_answer_text,
+            tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
             tab_chat_document_llama_3_2_90b_vision_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
@@ -6923,6 +7344,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_command_a_evaluation_text,
             tab_chat_document_command_r_evaluation_text,
             tab_chat_document_command_r_plus_evaluation_text,
+            tab_chat_document_llama_4_maverick_evaluation_text,
+            tab_chat_document_llama_4_scout_evaluation_text,
             tab_chat_document_llama_3_3_70b_evaluation_text,
             tab_chat_document_llama_3_2_90b_vision_evaluation_text,
             tab_chat_document_openai_gpt4o_evaluation_text,
@@ -6947,6 +7370,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
+            tab_chat_document_llama_4_maverick_answer_text,
+            tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
             tab_chat_document_llama_3_2_90b_vision_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
@@ -6959,6 +7384,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_command_a_evaluation_text,
             tab_chat_document_command_r_evaluation_text,
             tab_chat_document_command_r_plus_evaluation_text,
+            tab_chat_document_llama_4_maverick_evaluation_text,
+            tab_chat_document_llama_4_scout_evaluation_text,
             tab_chat_document_llama_3_3_70b_evaluation_text,
             tab_chat_document_llama_3_2_90b_vision_evaluation_text,
             tab_chat_document_openai_gpt4o_evaluation_text,
@@ -6993,6 +7420,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
+            tab_chat_document_llama_4_maverick_answer_text,
+            tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
             tab_chat_document_llama_3_2_90b_vision_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
@@ -7005,6 +7434,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_command_a_evaluation_text,
             tab_chat_document_command_r_evaluation_text,
             tab_chat_document_command_r_plus_evaluation_text,
+            tab_chat_document_llama_4_maverick_evaluation_text,
+            tab_chat_document_llama_4_scout_evaluation_text,
             tab_chat_document_llama_3_3_70b_evaluation_text,
             tab_chat_document_llama_3_2_90b_vision_evaluation_text,
             tab_chat_document_openai_gpt4o_evaluation_text,
@@ -7057,6 +7488,34 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_chat_document_command_r_plus_answer_human_eval_feedback_radio,
             tab_chat_document_command_r_plus_answer_human_eval_feedback_text,
+        ]
+    )
+
+    tab_chat_document_llama_4_maverick_answer_human_eval_feedback_send_button.click(
+        eval_by_human,
+        inputs=[
+            query_id_state,
+            gr.State(value="meta/llama-4-maverick-17b-128e-instruct-fp8"),
+            tab_chat_document_llama_4_maverick_answer_human_eval_feedback_radio,
+            tab_chat_document_llama_4_maverick_answer_human_eval_feedback_text,
+        ],
+        outputs=[
+            tab_chat_document_llama_4_maverick_answer_human_eval_feedback_radio,
+            tab_chat_document_llama_4_maverick_answer_human_eval_feedback_text,
+        ]
+    )
+
+    tab_chat_document_llama_4_scout_answer_human_eval_feedback_send_button.click(
+        eval_by_human,
+        inputs=[
+            query_id_state,
+            gr.State(value="meta/llama-4-scout-17b-16e-instruct"),
+            tab_chat_document_llama_4_scout_answer_human_eval_feedback_radio,
+            tab_chat_document_llama_4_scout_answer_human_eval_feedback_text,
+        ],
+        outputs=[
+            tab_chat_document_llama_4_scout_answer_human_eval_feedback_radio,
+            tab_chat_document_llama_4_scout_answer_human_eval_feedback_text,
         ]
     )
 
@@ -7192,6 +7651,33 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_download_eval_result_download_button,
         ]
+    )
+
+    # RAG Prompt 設定のイベントハンドラー
+    def save_rag_prompt(prompt_text):
+        """RAG promptを保存する"""
+        try:
+            update_langgpt_rag_prompt(prompt_text)
+            return gr.Info("Promptが保存されました。")
+        except Exception as e:
+            return gr.Warning(f"Promptの保存に失敗しました: {str(e)}")
+
+    def reset_rag_prompt():
+        """RAG promptをデフォルトに戻す"""
+        default_prompt = get_langgpt_rag_prompt("{{context}}", "{{query_text}}", False, False)
+        update_langgpt_rag_prompt(default_prompt)
+        return default_prompt
+
+    tab_chat_document_rag_prompt_save_button.click(
+        save_rag_prompt,
+        inputs=[tab_chat_document_rag_prompt_text],
+        outputs=[]
+    )
+
+    tab_chat_document_rag_prompt_reset_button.click(
+        reset_rag_prompt,
+        inputs=[],
+        outputs=[tab_chat_document_rag_prompt_text]
     )
 
 app.queue()
