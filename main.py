@@ -3179,7 +3179,8 @@ async def chat_document(
         include_current_time,
         query_text,
         doc_id_all_checkbox_input,
-        doc_id_checkbox_group_input
+        doc_id_checkbox_group_input,
+        rag_prompt_template
 ):
     has_error = False
     if not query_text:
@@ -3340,7 +3341,7 @@ async def chat_document(
     # """
 
     system_text = ""
-    user_text = get_langgpt_rag_prompt(context, query_text, include_citation, include_current_time)
+    user_text = get_langgpt_rag_prompt(context, query_text, include_citation, include_current_time, rag_prompt_template)
 
     command_a_user_text = user_text
     command_r_user_text = user_text
@@ -7226,6 +7227,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_query_text,
             tab_chat_document_doc_id_all_checkbox,
             tab_chat_document_doc_id_checkbox_group,
+            tab_chat_document_rag_prompt_text,
         ],
         outputs=[
             tab_chat_document_command_a_answer_text,

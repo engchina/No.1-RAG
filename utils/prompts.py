@@ -22,6 +22,13 @@ STEP_BACK_PROMPT_TEMPLATE = """
 Generate broader, more abstract questions that step back from the specific details of the input query. These questions should help explore the fundamental concepts and principles underlying the original query. Please respond to me in the same language I use for my messages. If I switch languages, please switch your responses accordingly.
 """
 
+# Unused
+"""
+1. If no appropriate answer can be found from the context, respond with: "申し訳ありませんが、コンテキストから適切な回答を見つけることができませんでした。別の LLM モデルをお試しいただくか、クエリの内容や設定を少し調整していただくことで解決できるかもしれません。"
+
+- Strict analysis with UTF-8 encoding
+"""
+
 # LangGPT RAG prompt template
 LANGGPT_RAG_PROMPT_TEMPLATE = """
 ## Role: Strict Context QA
@@ -39,15 +46,13 @@ LANGGPT_RAG_PROMPT_TEMPLATE = """
 4. Multi-format output support
 
 ## Rules
-1. If no appropriate answer can be found from the context, respond with: "申し訳ありませんが、コンテキストから適切な回答を見つけることができませんでした。別の LLM モデルをお試しいただくか、クエリの内容や設定を少し調整していただくことで解決できるかもしれません。"
-2. Answers must be 100% dependent on the content within <context></context>
-3. Do not perform partial matching or speculation
-4. Handle chronological processing when date information is available (prioritize latest information)
-5. Maintain strict formatting of citation information
+1. Answers must be 100% dependent on the content within <context></context>
+2. Do not perform partial matching or speculation
+3. Handle chronological processing when date information is available (prioritize latest information)
+4. Maintain strict formatting of citation information
 
 ## Workflow
 1. Context Analysis Phase
-   - Strict analysis with UTF-8 encoding
    - Extract metadata (EMBED_ID/SOURCE)
 2. Query Matching Phase
    - Apply complete string matching algorithm
@@ -131,10 +136,17 @@ def get_step_back_prompt():
     """Get Step-Back-Prompting template"""
     return STEP_BACK_PROMPT_TEMPLATE
 
-def get_langgpt_rag_prompt(context, query_text, include_citation=False, include_current_time=False):
+def get_langgpt_rag_prompt(context, query_text, include_citation=False, include_current_time=False, custom_template=None):
     """Get LangGPT RAG prompt with context and query"""
-    prompt = LANGGPT_RAG_PROMPT_TEMPLATE.format(context=context, query_text=query_text)
-    
+    # Use custom template if provided, otherwise use default template
+    template = custom_template if custom_template else LANGGPT_RAG_PROMPT_TEMPLATE
+
+    # Replace double braces with single braces for format() function
+    if custom_template:
+        template = template.replace('{{context}}', '{context}').replace('{{query_text}}', '{query_text}')
+
+    prompt = template.format(context=context, query_text=query_text)
+
     # Add citation format if requested
     if include_citation:
         prompt += """
@@ -148,7 +160,7 @@ def get_langgpt_rag_prompt(context, query_text, include_citation=False, include_
     }
 ]
 """
-    
+
     # Add time processing if requested
     if include_current_time:
         from datetime import datetime
@@ -156,7 +168,7 @@ def get_langgpt_rag_prompt(context, query_text, include_citation=False, include_
         prompt += f"""
 The current date is {current_time}.
 """
-    
+
     return prompt.strip()
 
 def get_llm_evaluation_system_message():
@@ -186,3 +198,21 @@ def update_llm_evaluation_system_message(new_message):
     """Update LLM evaluation system message"""
     global LLM_EVALUATION_SYSTEM_MESSAGE
     LLM_EVALUATION_SYSTEM_MESSAGE = new_message
+
+# Test function for the custom template functionality
+if __name__ == "__main__":
+    # Test with default template
+    default_result = get_langgpt_rag_prompt("test context", "test query")
+    print("Default template test:")
+    print(default_result[:100] + "...")
+
+    # Test with custom template
+    custom_template = """
+Custom RAG Template:
+Context: {{context}}
+Query: {{query_text}}
+Please answer based on the context.
+"""
+    custom_result = get_langgpt_rag_prompt("test context", "test query", custom_template=custom_template)
+    print("\nCustom template test:")
+    print(custom_result)
