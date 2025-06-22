@@ -1865,6 +1865,33 @@ def convert_to_markdown_document(file_path, use_llm, llm_prompt):
         gr.File(value=output_file_path)
     )
 
+def fix_json_format(result: str) -> str:
+    """
+    处理包含 '<FIXED_DELIMITER>' 分隔符的字符串，对每个 JSON 片段添加逗号分隔符，
+    然后重新用 '<FIXED_DELIMITER>' 连接。
+
+    Args:
+        result (str): 包含 '<FIXED_DELIMITER>' 的原始字符串。
+
+    Returns:
+        str: 处理后的字符串。
+    """
+    if "<FIXED_DELIMITER>" not in result:
+        return result
+
+    parts = result.split("<FIXED_DELIMITER>")
+
+    fixed_parts = []
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        # 插入逗号：匹配 key": value "key": value 模式，并在中间插入逗号
+        fixed_part = re.sub(r'(": [^"{}[\]]+)\s+(")', r'\1, \2', part)
+        fixed_part = re.sub(r'([^,{])\s+("[a-zA-Z0-9_\u4e00-\u9fff]+":)', r'\1, \2', fixed_part)
+        fixed_parts.append(fixed_part)
+
+    return " <FIXED_DELIMITER> ".join(fixed_parts)
 
 def load_document(file_path, server_directory, document_metadata):
     print("in load_document() start...")
@@ -1932,6 +1959,7 @@ def load_document(file_path, server_directory, document_metadata):
     for el in elements:
         print(f"{el=}")
     original_contents = " \n".join(el.text.replace('\x0b', '\n') for el in elements)
+    original_contents = fix_json_format(original_contents)
     print(f"{original_contents=}")
 
     collection_cmeta['file_name'] = file_name
@@ -2116,6 +2144,7 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
 
     for element in elements:
         element.text = element.text.replace('\x0b', '\n')
+        element.text = fix_json_format(element.text)
     # unstructured_chunks = chunk_by_title(
     #     elements,
     #     include_orig_elements=True,
