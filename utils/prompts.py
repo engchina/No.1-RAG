@@ -50,6 +50,7 @@ LANGGPT_RAG_PROMPT_TEMPLATE = """
 2. Do not perform partial matching or speculation
 3. Handle chronological processing when date information is available (prioritize latest information)
 4. Maintain strict formatting of citation information
+5. You always respond to the user in the Japanese language.
 
 ## Workflow
 1. Context Analysis Phase
