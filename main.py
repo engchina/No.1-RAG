@@ -25,6 +25,7 @@ from langchain_community.vectorstores.utils import DistanceStrategy
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_community.document_loaders import TextLoader
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langfuse.callback import CallbackHandler
 from oracledb import DatabaseError
@@ -1196,20 +1197,20 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
         claude_3_sonnet_response += sonnet
         claude_3_haiku_response += haiku
         yield (
-            command_a_response,
-            command_r_response,
-            command_r_plus_response,
-            llama_4_maverick_response,
-            llama_4_scout_response,
-            llama_3_3_70b_response,
-            llama_3_2_90b_vision_response,
-            openai_gpt4o_response,
-            openai_gpt4_response,
-            azure_openai_gpt4o_response,
-            azure_openai_gpt4_response,
-            claude_3_opus_response,
-            claude_3_sonnet_response,
-            claude_3_haiku_response
+            gr.Markdown(value=command_a_response),
+            gr.Markdown(value=command_r_response),
+            gr.Markdown(value=command_r_plus_response),
+            gr.Markdown(value=llama_4_maverick_response),
+            gr.Markdown(value=llama_4_scout_response),
+            gr.Markdown(value=llama_3_3_70b_response),
+            gr.Markdown(value=llama_3_2_90b_vision_response),
+            gr.Markdown(value=openai_gpt4o_response),
+            gr.Markdown(value=openai_gpt4_response),
+            gr.Markdown(value=azure_openai_gpt4o_response),
+            gr.Markdown(value=azure_openai_gpt4_response),
+            gr.Markdown(value=claude_3_opus_response),
+            gr.Markdown(value=claude_3_sonnet_response),
+            gr.Markdown(value=claude_3_haiku_response)
         )
 
 
@@ -1865,33 +1866,6 @@ def convert_to_markdown_document(file_path, use_llm, llm_prompt):
         gr.File(value=output_file_path)
     )
 
-def fix_json_format(result: str) -> str:
-    """
-    处理包含 '<FIXED_DELIMITER>' 分隔符的字符串，对每个 JSON 片段添加逗号分隔符，
-    然后重新用 '<FIXED_DELIMITER>' 连接。
-
-    Args:
-        result (str): 包含 '<FIXED_DELIMITER>' 的原始字符串。
-
-    Returns:
-        str: 处理后的字符串。
-    """
-    if "<FIXED_DELIMITER>" not in result:
-        return result
-
-    parts = result.split("<FIXED_DELIMITER>")
-
-    fixed_parts = []
-    for part in parts:
-        part = part.strip()
-        if not part:
-            continue
-        # 插入逗号：匹配 key": value "key": value 模式，并在中间插入逗号
-        fixed_part = re.sub(r'(": [^"{}[\]]+)\s+(")', r'\1, \2', part)
-        fixed_part = re.sub(r'([^,{])\s+("[a-zA-Z0-9_\u4e00-\u9fff]+":)', r'\1, \2', fixed_part)
-        fixed_parts.append(fixed_part)
-
-    return " <FIXED_DELIMITER> ".join(fixed_parts)
 
 def load_document(file_path, server_directory, document_metadata):
     print("in load_document() start...")
@@ -1926,41 +1900,23 @@ def load_document(file_path, server_directory, document_metadata):
     shutil.copy(file_path.name, server_path)
 
     collection_cmeta = {}
-    # if file_extension == ".pdf":
-    #     loader = PyMuPDFLoader(file_path.name)
-    #     documents = loader.load()
-    #     # collection_cmeta = documents[0].metadata
-    #     # collection_cmeta.pop('page', None)
-    #     contents = "".join(fc.page_content for fc in documents)
-    #     pages_count = len(documents)
-    # else:
-    #     with open(server_path, 'rb') as file:
-    #         contents = file.read()
-    #     pages_count = 1
-
-    # https://docs.unstructured.io/open-source/core-functionality/overview
-    pages_count = 1
-    # if file_extension == ".pdf":
-    #     elements = partition(filename=server_path,
-    #                          strategy='hi_res',
-    #                          languages=["jpn", "eng", "chi_sim"]
-    #                          )
-    # else:
-    #     # for issue: https://github.com/Unstructured-IO/unstructured/issues/3396
-    #     elements = partition(filename=server_path, strategy='hi_res',
-    #                          languages=["jpn", "eng", "chi_sim"],
-    #                          skip_infer_table_types=["doc", "docx"])
-    elements = partition(filename=server_path, strategy='fast',
-                         languages=["jpn", "eng", "chi_sim"],
-                         extract_image_block_types=["Table"],
-                         extract_image_block_to_payload=False,
-                         # skip_infer_table_types=["pdf", "ppt", "pptx", "doc", "docx", "xls", "xlsx"])
-                         skip_infer_table_types=["pdf", "jpg", "png", "heic", "doc", "docx"])
-    for el in elements:
-        print(f"{el=}")
-    original_contents = " \n".join(el.text.replace('\x0b', '\n') for el in elements)
-    original_contents = fix_json_format(original_contents)
-    print(f"{original_contents=}")
+    if file_extension == ".md":
+        loader = TextLoader(server_path)
+        documents = loader.load()
+        original_contents = "".join(doc.page_content for doc in documents)
+        pages_count = len(documents)
+    else:
+        # https://docs.unstructured.io/open-source/core-functionality/overview
+        pages_count = 1
+        elements = partition(filename=server_path, strategy='fast',
+                             languages=["jpn", "eng", "chi_sim"],
+                             extract_image_block_types=["Table"],
+                             extract_image_block_to_payload=False,
+                             skip_infer_table_types=["pdf", "jpg", "png", "heic", "doc", "docx"])
+        for el in elements:
+            print(f"{el=}")
+        original_contents = " \n".join(el.text.replace('\x0b', '\n') for el in elements)
+        print(f"{original_contents=}")
 
     collection_cmeta['file_name'] = file_name
     collection_cmeta['source'] = server_path
@@ -1975,9 +1931,9 @@ def load_document(file_path, server_directory, document_metadata):
         with conn.cursor() as cursor:
             cursor.setinputsizes(**{"data": oracledb.BLOB})
             load_document_sql = f"""
--- (Only for Reference) Insert to table {DEFAULT_COLLECTION_NAME}_collection
-INSERT INTO {DEFAULT_COLLECTION_NAME}_collection(id, data, cmetadata)
-VALUES (:id, to_blob(:data), :cmetadata) """
+ -- (Only for Reference) Insert to table {DEFAULT_COLLECTION_NAME}_collection
+ INSERT INTO {DEFAULT_COLLECTION_NAME}_collection(id, data, cmetadata)
+ VALUES (:id, to_blob(:data), :cmetadata) """
             output_sql_text = load_document_sql.replace(":id", "'" + str(doc_id) + "'")
             output_sql_text = output_sql_text.replace(":data", "'...'")
             output_sql_text = output_sql_text.replace(":cmetadata", "'" + json.dumps(collection_cmeta) + "'") + ";"
@@ -2077,10 +2033,10 @@ def reset_document_chunks_result_detail():
 
 
 def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
-                                   chunks_overlap_size,
-                                   chunks_split_by, chunks_split_by_custom,
-                                   chunks_language, chunks_normalize,
-                                   chunks_normalize_options):
+                                    chunks_overlap_size,
+                                    chunks_split_by, chunks_split_by_custom,
+                                    chunks_language, chunks_normalize,
+                                    chunks_normalize_options):
     has_error = False
     if not doc_id:
         has_error = True
@@ -2095,46 +2051,69 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
     output_sql = ""
     server_path = get_server_path(doc_id)
 
-    # Use claude to get table data
-    # page_table_documents = parser_pdf(server_path)
-    page_table_documents = {}
-    # elements = partition(filename=server_path,
-    #                      strategy='hi_res',
-    #                      languages=["jpn", "eng", "chi_sim"]
-    #                      )
-    # for issue: https://github.com/Unstructured-IO/unstructured/issues/3396
-    elements = partition(filename=server_path, strategy='fast',
-                         languages=["jpn", "eng", "chi_sim"],
-                         extract_image_block_types=["Table"],
-                         extract_image_block_to_payload=False,
-                         # skip_infer_table_types=["pdf", "ppt", "pptx", "doc", "docx", "xls", "xlsx"])
-                         skip_infer_table_types=["pdf", "jpg", "png", "heic", "doc", "docx"])
-    prev_page_number = 0
-    table_idx = 1
-    for el in elements:
-        # print(f"{el.category=}")
-        # print(f"{el.text=}")
-        # print(f"{el.metadata.page_number=}")
-        page_number = el.metadata.page_number
-        if prev_page_number != page_number:
-            prev_page_number = page_number
-            table_idx = 1
-        # print(f"{type(el.category)=}")
-        if el.category == "Table":
-            table_id = f"page_{page_number}_table_{table_idx}"
-            print(f"{table_id=}")
-            print(f"{page_table_documents=}")
-            if page_table_documents:
-                page_table_document = get_dict_value(page_table_documents, table_id)
-                print(f"{page_table_document=}")
-                if page_table_document:
-                    page_content = get_dict_value(page_table_document, "page_content")
-                    table_to_markdown = get_dict_value(page_table_document, "table_to_markdown")
-                    if page_content and table_to_markdown:
-                        print(f"Before: {el.text=}")
-                        el.text = page_content + "\n" + table_to_markdown + "\n"
-                        print(f"After: {el.text=}")
-            table_idx += 1
+    # Check if it's a .md file and get content from database instead of reading the file
+    doc_data = ""
+    if server_path.lower().endswith('.md'):
+        loader = TextLoader(server_path)
+        documents = loader.load()
+        doc_data = "\n".join(doc.page_content for doc in documents)
+
+        # Check if doc_data contains image blocks and extract OCR content if needed
+        if re.search(r'<!-- image_begin -->.*?<!-- image_end -->', doc_data, re.DOTALL):
+            # Extract all OCR content blocks
+            ocr_contents = re.findall(r'<!-- image_ocr_content_begin -->(.*?)<!-- image_ocr_content_end -->', doc_data, re.DOTALL)
+            doc_data = "\n".join(ocr.strip() for ocr in ocr_contents if ocr.strip())
+    else:
+        # If we can't get data from database, fall back to reading the file
+        elements = partition(filename=server_path, strategy='fast',
+                            languages=["jpn", "eng", "chi_sim"],
+                            extract_image_block_types=["Table"],
+                            extract_image_block_to_payload=False,
+                            skip_infer_table_types=["pdf", "jpg", "png", "heic", "doc", "docx"])
+        # Use claude to get table data
+        # page_table_documents = parser_pdf(server_path)
+        page_table_documents = {}
+        # elements = partition(filename=server_path,
+        #                      strategy='hi_res',
+        #                      languages=["jpn", "eng", "chi_sim"]
+        #                      )
+        # for issue: https://github.com/Unstructured-IO/unstructured/issues/3396
+        elements = partition(filename=server_path, strategy='fast',
+                             languages=["jpn", "eng", "chi_sim"],
+                             extract_image_block_types=["Table"],
+                             extract_image_block_to_payload=False,
+                             # skip_infer_table_types=["pdf", "ppt", "pptx", "doc", "docx", "xls", "xlsx"])
+                             skip_infer_table_types=["pdf", "jpg", "png", "heic", "doc", "docx"])
+        prev_page_number = 0
+        table_idx = 1
+        for el in elements:
+            # print(f"{el.category=}")
+            # print(f"{el.text=}")
+            # print(f"{el.metadata.page_number=}")
+            page_number = el.metadata.page_number
+            if prev_page_number != page_number:
+                prev_page_number = page_number
+                table_idx = 1
+            # print(f"{type(el.category)=}")
+            if el.category == "Table":
+                table_id = f"page_{page_number}_table_{table_idx}"
+                print(f"{table_id=}")
+                print(f"{page_table_documents=}")
+                if page_table_documents:
+                    page_table_document = get_dict_value(page_table_documents, table_id)
+                    print(f"{page_table_document=}")
+                    if page_table_document:
+                        page_content = get_dict_value(page_table_document, "page_content")
+                        table_to_markdown = get_dict_value(page_table_document, "table_to_markdown")
+                        if page_content and table_to_markdown:
+                            print(f"Before: {el.text=}")
+                            el.text = page_content + "\n" + table_to_markdown + "\n"
+                            print(f"After: {el.text=}")
+                table_idx += 1
+            for element in elements:
+                # Convert element.text to string to avoid TypeError with LOB objects
+                element.text = str(element.text).replace('\x0b', '\n')
+            doc_data = " \n".join([str(element.text) for element in elements])
 
     chunks_overlap = int(float(chunks_max_size) * (float(chunks_overlap_size) / 100))
     text_splitter = RecursiveCharacterTextSplitter(
@@ -2142,19 +2121,7 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
         chunk_overlap=chunks_overlap
     )
 
-    for element in elements:
-        element.text = element.text.replace('\x0b', '\n')
-        element.text = fix_json_format(element.text)
-    # unstructured_chunks = chunk_by_title(
-    #     elements,
-    #     include_orig_elements=True,
-    #     max_characters=int(chunks_max_size),
-    #     multipage_sections=True,
-    #     new_after_n_chars=int(chunks_max_size),
-    #     overlap=int(float(chunks_max_size) * (float(chunks_overlap_size) / 100)),
-    #     overlap_all=True
-    # )
-    unstructured_chunks = text_splitter.split_text(" \n".join([element.text for element in elements]))
+    unstructured_chunks = text_splitter.split_text(doc_data)
 
     chunks = process_text_chunks(unstructured_chunks)
     chunks_dataframe = pd.DataFrame(chunks)
@@ -3223,20 +3190,20 @@ async def chat_document(
         gr.Warning("検索結果が見つかりませんでした。設定もしくはクエリを変更して再度ご確認ください。")
     if has_error:
         yield (
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            ""
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value="")
         )
         return
 
@@ -3436,20 +3403,20 @@ async def chat_document(
         claude_3_sonnet_response += sonnet
         claude_3_haiku_response += haiku
         yield (
-            command_a_response,
-            command_r_response,
-            command_r_plus_response,
-            llama_4_maverick_response,
-            llama_4_scout_response,
-            llama_3_3_70b_response,
-            llama_3_2_90b_vision_response,
-            openai_gpt4o_response,
-            openai_gpt4_response,
-            azure_openai_gpt4o_response,
-            azure_openai_gpt4_response,
-            claude_3_opus_response,
-            claude_3_sonnet_response,
-            claude_3_haiku_response
+            gr.Markdown(value=command_a_response),
+            gr.Markdown(value=command_r_response),
+            gr.Markdown(value=command_r_plus_response),
+            gr.Markdown(value=llama_4_maverick_response),
+            gr.Markdown(value=llama_4_scout_response),
+            gr.Markdown(value=llama_3_3_70b_response),
+            gr.Markdown(value=llama_3_2_90b_vision_response),
+            gr.Markdown(value=openai_gpt4o_response),
+            gr.Markdown(value=openai_gpt4_response),
+            gr.Markdown(value=azure_openai_gpt4o_response),
+            gr.Markdown(value=azure_openai_gpt4_response),
+            gr.Markdown(value=claude_3_opus_response),
+            gr.Markdown(value=claude_3_sonnet_response),
+            gr.Markdown(value=claude_3_haiku_response)
         )
 
 
@@ -3487,39 +3454,39 @@ async def append_citation(
         # gr.Warning("検索結果が見つかりませんでした。設定もしくはクエリを変更して再度ご確認ください。")
     if has_error:
         yield (
-            command_a_answer_text,
-            command_r_answer_text,
-            command_r_plus_answer_text,
-            llama_4_maverick_answer_text,
-            llama_4_scout_answer_text,
-            llama_3_3_70b_answer_text,
-            llama_3_2_90b_vision_answer_text,
-            openai_gpt4o_answer_text,
-            openai_gpt4_answer_text,
-            azure_openai_gpt4o_answer_text,
-            azure_openai_gpt4_answer_text,
-            claude_3_opus_answer_text,
-            claude_3_sonnet_answer_text,
-            claude_3_haiku_answer_text
+            gr.Markdown(value=command_a_answer_text),
+            gr.Markdown(value=command_r_answer_text),
+            gr.Markdown(value=command_r_plus_answer_text),
+            gr.Markdown(value=llama_4_maverick_answer_text),
+            gr.Markdown(value=llama_4_scout_answer_text),
+            gr.Markdown(value=llama_3_3_70b_answer_text),
+            gr.Markdown(value=llama_3_2_90b_vision_answer_text),
+            gr.Markdown(value=openai_gpt4o_answer_text),
+            gr.Markdown(value=openai_gpt4_answer_text),
+            gr.Markdown(value=azure_openai_gpt4o_answer_text),
+            gr.Markdown(value=azure_openai_gpt4_answer_text),
+            gr.Markdown(value=claude_3_opus_answer_text),
+            gr.Markdown(value=claude_3_sonnet_answer_text),
+            gr.Markdown(value=claude_3_haiku_answer_text)
         )
         return
 
     if not include_citation:
         yield (
-            command_a_answer_text,
-            command_r_answer_text,
-            command_r_plus_answer_text,
-            llama_4_maverick_answer_text,
-            llama_4_scout_answer_text,
-            llama_3_3_70b_answer_text,
-            llama_3_2_90b_vision_answer_text,
-            openai_gpt4o_answer_text,
-            openai_gpt4_answer_text,
-            azure_openai_gpt4o_answer_text,
-            azure_openai_gpt4_answer_text,
-            claude_3_opus_answer_text,
-            claude_3_sonnet_answer_text,
-            claude_3_haiku_answer_text
+            gr.Markdown(value=command_a_answer_text),
+            gr.Markdown(value=command_r_answer_text),
+            gr.Markdown(value=command_r_plus_answer_text),
+            gr.Markdown(value=llama_4_maverick_answer_text),
+            gr.Markdown(value=llama_4_scout_answer_text),
+            gr.Markdown(value=llama_3_3_70b_answer_text),
+            gr.Markdown(value=llama_3_2_90b_vision_answer_text),
+            gr.Markdown(value=openai_gpt4o_answer_text),
+            gr.Markdown(value=openai_gpt4_answer_text),
+            gr.Markdown(value=azure_openai_gpt4o_answer_text),
+            gr.Markdown(value=azure_openai_gpt4_answer_text),
+            gr.Markdown(value=claude_3_opus_answer_text),
+            gr.Markdown(value=claude_3_sonnet_answer_text),
+            gr.Markdown(value=claude_3_haiku_answer_text)
         )
         return
 
@@ -3553,20 +3520,20 @@ async def append_citation(
         claude_3_haiku_answer_text = extract_and_format(claude_3_haiku_answer_text, search_result)
 
     yield (
-        command_a_answer_text,
-        command_r_answer_text,
-        command_r_plus_answer_text,
-        llama_4_maverick_answer_text,
-        llama_4_scout_answer_text,
-        llama_3_3_70b_answer_text,
-        llama_3_2_90b_vision_answer_text,
-        openai_gpt4o_answer_text,
-        openai_gpt4_answer_text,
-        azure_openai_gpt4o_answer_text,
-        azure_openai_gpt4_answer_text,
-        claude_3_opus_answer_text,
-        claude_3_sonnet_answer_text,
-        claude_3_haiku_answer_text
+        gr.Markdown(value=command_a_answer_text),
+        gr.Markdown(value=command_r_answer_text),
+        gr.Markdown(value=command_r_plus_answer_text),
+        gr.Markdown(value=llama_4_maverick_answer_text),
+        gr.Markdown(value=llama_4_scout_answer_text),
+        gr.Markdown(value=llama_3_3_70b_answer_text),
+        gr.Markdown(value=llama_3_2_90b_vision_answer_text),
+        gr.Markdown(value=openai_gpt4o_answer_text),
+        gr.Markdown(value=openai_gpt4_answer_text),
+        gr.Markdown(value=azure_openai_gpt4o_answer_text),
+        gr.Markdown(value=azure_openai_gpt4_answer_text),
+        gr.Markdown(value=claude_3_opus_answer_text),
+        gr.Markdown(value=claude_3_sonnet_answer_text),
+        gr.Markdown(value=claude_3_haiku_answer_text)
     )
     return
 
@@ -3616,20 +3583,20 @@ async def eval_by_ragas(
         gr.Warning("LLM 評価をオンにする場合、LLM 評価の標準回答を入力してください")
     if has_error:
         yield (
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            ""
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value="")
         )
         return
 
@@ -3649,20 +3616,20 @@ async def eval_by_ragas(
     print(f"{llm_evaluation_checkbox=}")
     if not llm_evaluation_checkbox:
         yield (
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            ""
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value="")
         )
     else:
         command_a_checkbox = False
@@ -3852,6 +3819,8 @@ async def eval_by_ragas(
         eval_command_a_response = ""
         eval_command_r_response = ""
         eval_command_r_plus_response = ""
+        eval_llama_4_maverick_response = ""
+        eval_llama_4_scout_response = ""
         eval_llama_3_3_70b_response = ""
         eval_llama_3_2_90b_vision_response = ""
         eval_openai_gpt4o_response = ""
@@ -3911,20 +3880,20 @@ async def eval_by_ragas(
             eval_claude_3_sonnet_response += sonnet
             eval_claude_3_haiku_response += haiku
             yield (
-                eval_command_a_response,
-                eval_command_r_response,
-                eval_command_r_plus_response,
-                eval_llama_4_maverick_response,
-                eval_llama_4_scout_response,
-                eval_llama_3_3_70b_response,
-                eval_llama_3_2_90b_vision_response,
-                eval_openai_gpt4o_response,
-                eval_openai_gpt4_response,
-                eval_azure_openai_gpt4o_response,
-                eval_azure_openai_gpt4_response,
-                eval_claude_3_opus_response,
-                eval_claude_3_sonnet_response,
-                eval_claude_3_haiku_response
+                gr.Markdown(value=eval_command_a_response),
+                gr.Markdown(value=eval_command_r_response),
+                gr.Markdown(value=eval_command_r_plus_response),
+                gr.Markdown(value=eval_llama_4_maverick_response),
+                gr.Markdown(value=eval_llama_4_scout_response),
+                gr.Markdown(value=eval_llama_3_3_70b_response),
+                gr.Markdown(value=eval_llama_3_2_90b_vision_response),
+                gr.Markdown(value=eval_openai_gpt4o_response),
+                gr.Markdown(value=eval_openai_gpt4_response),
+                gr.Markdown(value=eval_azure_openai_gpt4o_response),
+                gr.Markdown(value=eval_azure_openai_gpt4_response),
+                gr.Markdown(value=eval_claude_3_opus_response),
+                gr.Markdown(value=eval_claude_3_sonnet_response),
+                gr.Markdown(value=eval_claude_3_haiku_response)
             )
 
 
@@ -5074,176 +5043,154 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_command_a_accordion:
-                    tab_chat_with_command_a_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_with_command_a_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                 with gr.Accordion(
                         label="Command-R メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_command_r_accordion:
-                    tab_chat_with_command_r_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_with_command_r_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                 with gr.Accordion(
                         label="Command-R+ メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_command_r_plus_accordion:
-                    tab_chat_with_command_r_plus_answer_text = gr.Textbox(
-                        label="LLM メッセージ", show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_with_command_r_plus_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                 with gr.Accordion(
                         label="Llama 4 Maverick 17b メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_llama_4_maverick_accordion:
-                    tab_chat_with_llama_4_maverick_answer_text = gr.Textbox(
-                        label="LLM メッセージ", show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_with_llama_4_maverick_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                 with gr.Accordion(
                         label="Llama 4 Scout 17b メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_llama_4_scout_accordion:
-                    tab_chat_with_llama_4_scout_answer_text = gr.Textbox(
-                        label="LLM メッセージ", show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_with_llama_4_scout_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                 with gr.Accordion(
                         label="Llama 3.3 70b メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_llama_3_3_70b_accordion:
-                    tab_chat_with_llama_3_3_70b_answer_text = gr.Textbox(
-                        label="LLM メッセージ", show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_with_llama_3_3_70b_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                 with gr.Accordion(
                         label="Llama 3.2 90b Vision メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_llama_3_2_90b_vision_accordion:
-                    tab_chat_with_llama_3_2_90b_vision_answer_text = gr.Textbox(
-                        label="LLM メッセージ", show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_with_llama_3_2_90b_vision_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                 with gr.Accordion(
                         label="OpenAI gpt-4o メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_openai_gpt4o_accordion:
-                    tab_chat_with_openai_gpt4o_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_with_openai_gpt4o_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                 with gr.Accordion(
                         label="OpenAI gpt-4 メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_openai_gpt4_accordion:
-                    tab_chat_with_openai_gpt4_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_with_openai_gpt4_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                 with gr.Accordion(
                         label="Azure OpenAI gpt-4o メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_azure_openai_gpt4o_accordion:
-                    tab_chat_with_azure_openai_gpt4o_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_with_azure_openai_gpt4o_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                 with gr.Accordion(
                         label="Azure OpenAI gpt-4 メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_azure_openai_gpt4_accordion:
-                    tab_chat_with_azure_openai_gpt4_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_with_azure_openai_gpt4_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                 with gr.Accordion(
                         label="Claude 3 Opus メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_claude_3_opus_accordion:
-                    tab_chat_with_claude_3_opus_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_with_claude_3_opus_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                 with gr.Accordion(
                         label="Claude 3.5 Sonnet メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_claude_3_sonnet_accordion:
-                    tab_chat_with_claude_3_sonnet_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_with_claude_3_sonnet_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                 with gr.Accordion(
                         label="Claude 3 Haiku メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_claude_3_haiku_accordion:
-                    tab_chat_with_claude_3_haiku_answer_text = gr.Textbox(
-                        label="LLM メッセージ", show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_with_claude_3_haiku_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                 with gr.Accordion(open=False, label="システム・メッセージ"):
                     #                     tab_chat_with_llm_system_text = gr.Textbox(label="システム・メッセージ*", show_label=False, lines=5,
@@ -5919,13 +5866,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         visible=False,
                         open=True
                 ) as tab_chat_document_llm_command_a_accordion:
-                    tab_chat_document_command_a_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_document_command_a_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                     with gr.Accordion(
                             label="Human 評価",
@@ -5964,26 +5909,22 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_command_a_evaluation_accordion:
-                        tab_chat_document_command_a_evaluation_text = gr.Textbox(
-                            label="LLM 評価結果",
-                            show_label=False,
-                            lines=2,
-                            autoscroll=True,
-                            interactive=False,
-                            show_copy_button=True
+                        tab_chat_document_command_a_evaluation_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=200,
+                            min_height=200,
+                            max_height=300
                         )
                 with gr.Accordion(
                         label="Command-R メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_document_llm_command_r_accordion:
-                    tab_chat_document_command_r_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_document_command_r_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                     with gr.Accordion(
                             label="Human 評価",
@@ -6022,26 +5963,22 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_command_r_evaluation_accordion:
-                        tab_chat_document_command_r_evaluation_text = gr.Textbox(
-                            label="LLM 評価結果",
-                            show_label=False,
-                            lines=2,
-                            autoscroll=True,
-                            interactive=False,
-                            show_copy_button=True
+                        tab_chat_document_command_r_evaluation_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=200,
+                            min_height=200,
+                            max_height=300
                         )
                 with gr.Accordion(
                         label="Command-R+ メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_document_llm_command_r_plus_accordion:
-                    tab_chat_document_command_r_plus_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_document_command_r_plus_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                     with gr.Accordion(
                             label="Human 評価",
@@ -6080,26 +6017,22 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_command_r_plus_evaluation_accordion:
-                        tab_chat_document_command_r_plus_evaluation_text = gr.Textbox(
-                            label="LLM 評価結果",
-                            show_label=False,
-                            lines=2,
-                            autoscroll=True,
-                            interactive=False,
-                            show_copy_button=True
+                        tab_chat_document_command_r_plus_evaluation_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=200,
+                            min_height=200,
+                            max_height=300
                         )
                 with gr.Accordion(
                         label="Llama 4 Maverick 17b メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_document_llm_llama_4_maverick_accordion:
-                    tab_chat_document_llama_4_maverick_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_document_llama_4_maverick_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                     with gr.Accordion(
                             label="Human 評価",
@@ -6138,26 +6071,22 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_llama_4_maverick_evaluation_accordion:
-                        tab_chat_document_llama_4_maverick_evaluation_text = gr.Textbox(
-                            label="LLM 評価結果",
-                            show_label=False,
-                            lines=2,
-                            autoscroll=True,
-                            interactive=False,
-                            show_copy_button=True
+                        tab_chat_document_llama_4_maverick_evaluation_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=200,
+                            min_height=200,
+                            max_height=300
                         )
                 with gr.Accordion(
                         label="Llama 4 Scout 17b メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_document_llm_llama_4_scout_accordion:
-                    tab_chat_document_llama_4_scout_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_document_llama_4_scout_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                     with gr.Accordion(
                             label="Human 評価",
@@ -6196,26 +6125,22 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_llama_4_scout_evaluation_accordion:
-                        tab_chat_document_llama_4_scout_evaluation_text = gr.Textbox(
-                            label="LLM 評価結果",
-                            show_label=False,
-                            lines=2,
-                            autoscroll=True,
-                            interactive=False,
-                            show_copy_button=True
+                        tab_chat_document_llama_4_scout_evaluation_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=200,
+                            min_height=200,
+                            max_height=300
                         )
                 with gr.Accordion(
                         label="Llama 3.3 70b メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_document_llm_llama_3_3_70b_accordion:
-                    tab_chat_document_llama_3_3_70b_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_document_llama_3_3_70b_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                     with gr.Accordion(
                             label="Human 評価",
@@ -6254,26 +6179,22 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_llama_3_3_70b_evaluation_accordion:
-                        tab_chat_document_llama_3_3_70b_evaluation_text = gr.Textbox(
-                            label="LLM 評価結果",
-                            show_label=False,
-                            lines=2,
-                            autoscroll=True,
-                            interactive=False,
-                            show_copy_button=True
+                        tab_chat_document_llama_3_3_70b_evaluation_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=200,
+                            min_height=200,
+                            max_height=300
                         )
                 with gr.Accordion(
                         label="Llama 3.2 90b Vision メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_document_llm_llama_3_2_90b_vision_accordion:
-                    tab_chat_document_llama_3_2_90b_vision_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_document_llama_3_2_90b_vision_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                     with gr.Accordion(
                             label="Human 評価",
@@ -6312,24 +6233,21 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_llama_3_2_90b_vision_evaluation_accordion:
-                        tab_chat_document_llama_3_2_90b_vision_evaluation_text = gr.Textbox(
-                            label="LLM 評価結果",
-                            show_label=False,
-                            lines=2,
-                            autoscroll=True,
-                            interactive=False,
-                            show_copy_button=True
+                        tab_chat_document_llama_3_2_90b_vision_evaluation_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=200,
+                            min_height=200,
+                            max_height=300
                         )
                 with gr.Accordion(label="OpenAI gpt-4o メッセージ",
                                   visible=False,
                                   open=True) as tab_chat_document_llm_openai_gpt4o_accordion:
-                    tab_chat_document_openai_gpt4o_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True)
+                    tab_chat_document_openai_gpt4o_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
+                    )
                     with gr.Accordion(
                             label="Human 評価",
                             visible=True,
@@ -6367,26 +6285,22 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_openai_gpt4o_evaluation_accordion:
-                        tab_chat_document_openai_gpt4o_evaluation_text = gr.Textbox(
-                            label="LLM 評価結果",
-                            show_label=False,
-                            lines=2,
-                            autoscroll=True,
-                            interactive=False,
-                            show_copy_button=True
+                        tab_chat_document_openai_gpt4o_evaluation_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=200,
+                            min_height=200,
+                            max_height=300
                         )
                 with gr.Accordion(
                         label="OpenAI gpt-4 メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_document_llm_openai_gpt4_accordion:
-                    tab_chat_document_openai_gpt4_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_document_openai_gpt4_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                     with gr.Accordion(
                             label="Human 評価",
@@ -6425,26 +6339,22 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_openai_gpt4_evaluation_accordion:
-                        tab_chat_document_openai_gpt4_evaluation_text = gr.Textbox(
-                            label="LLM 評価結果",
-                            show_label=False,
-                            lines=2,
-                            autoscroll=True,
-                            interactive=False,
-                            show_copy_button=True
+                        tab_chat_document_openai_gpt4_evaluation_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=200,
+                            min_height=200,
+                            max_height=300
                         )
                 with gr.Accordion(
                         label="Azure OpenAI gpt-4o メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_document_llm_azure_openai_gpt4o_accordion:
-                    tab_chat_document_azure_openai_gpt4o_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_document_azure_openai_gpt4o_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                     with gr.Accordion(
                             label="Human 評価",
@@ -6483,26 +6393,22 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_azure_openai_gpt4o_evaluation_accordion:
-                        tab_chat_document_azure_openai_gpt4o_evaluation_text = gr.Textbox(
-                            label="LLM 評価結果",
-                            show_label=False,
-                            lines=2,
-                            autoscroll=True,
-                            interactive=False,
-                            show_copy_button=True
+                        tab_chat_document_azure_openai_gpt4o_evaluation_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=200,
+                            min_height=200,
+                            max_height=300
                         )
                 with gr.Accordion(
                         label="Azure OpenAI gpt-4 メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_document_llm_azure_openai_gpt4_accordion:
-                    tab_chat_document_azure_openai_gpt4_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_document_azure_openai_gpt4_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                     with gr.Accordion(
                             label="Human 評価",
@@ -6541,26 +6447,22 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_azure_openai_gpt4_evaluation_accordion:
-                        tab_chat_document_azure_openai_gpt4_evaluation_text = gr.Textbox(
-                            label="LLM 評価結果",
-                            show_label=False,
-                            lines=2,
-                            autoscroll=True,
-                            interactive=False,
-                            show_copy_button=True
+                        tab_chat_document_azure_openai_gpt4_evaluation_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=200,
+                            min_height=200,
+                            max_height=300
                         )
                 with gr.Accordion(
                         label="Claude 3 Opus メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_document_llm_claude_3_opus_accordion:
-                    tab_chat_document_claude_3_opus_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_document_claude_3_opus_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                     with gr.Accordion(
                             label="Human 評価",
@@ -6599,26 +6501,22 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_claude_3_opus_evaluation_accordion:
-                        tab_chat_document_claude_3_opus_evaluation_text = gr.Textbox(
-                            label="LLM 評価結果",
-                            show_label=False,
-                            lines=2,
-                            autoscroll=True,
-                            interactive=False,
-                            show_copy_button=True
+                        tab_chat_document_claude_3_opus_evaluation_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=200,
+                            min_height=200,
+                            max_height=300
                         )
                 with gr.Accordion(
                         label="Claude 3.5 Sonnet メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_document_llm_claude_3_sonnet_accordion:
-                    tab_chat_document_claude_3_sonnet_answer_text = gr.Textbox(
-                        label="LLM メッセージ",
-                        show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_document_claude_3_sonnet_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                     with gr.Accordion(
                             label="Human 評価",
@@ -6657,25 +6555,22 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_claude_3_sonnet_evaluation_accordion:
-                        tab_chat_document_claude_3_sonnet_evaluation_text = gr.Textbox(
-                            label="LLM 評価結果",
-                            show_label=False,
-                            lines=2,
-                            autoscroll=True,
-                            interactive=False,
-                            show_copy_button=True
+                        tab_chat_document_claude_3_sonnet_evaluation_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=200,
+                            min_height=200,
+                            max_height=300
                         )
                 with gr.Accordion(
                         label="Claude 3 Haiku メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_document_llm_claude_3_haiku_accordion:
-                    tab_chat_document_claude_3_haiku_answer_text = gr.Textbox(
-                        label="LLM メッセージ", show_label=False,
-                        lines=2,
-                        autoscroll=True,
-                        interactive=False,
-                        show_copy_button=True
+                    tab_chat_document_claude_3_haiku_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
                     )
                     with gr.Accordion(
                             label="Human 評価",
@@ -6714,13 +6609,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_claude_3_haiku_evaluation_accordion:
-                        tab_chat_document_claude_3_haiku_evaluation_text = gr.Textbox(
-                            label="LLM 評価結果",
-                            show_label=False,
-                            lines=2,
-                            autoscroll=True,
-                            interactive=False,
-                            show_copy_button=True
+                        tab_chat_document_claude_3_haiku_evaluation_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=200,
+                            min_height=200,
+                            max_height=300
                         )
 
             with gr.TabItem(label="Step-5.評価レポートの取得") as tab_download_eval_result:
@@ -7691,5 +7584,5 @@ if __name__ == "__main__":
         server_port=args.port,
         max_threads=200,
         show_api=False,
-        auth=do_auth,
+        # auth=do_auth,
     )
