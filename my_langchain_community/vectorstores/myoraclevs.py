@@ -225,7 +225,8 @@ def _create_table(client: Connection, collection_name: str, embedding_dim: int) 
         "embed_id": "NUMBER",
         "embed_data": "VARCHAR2(2000)",
         "embed_vector": f"vector({embedding_dim}, FLOAT32)",
-        "cmetadata": "CLOB"
+        "cmetadata": "CLOB",
+        "img_id": "VARCHAR2(200)"
     }
 
     if not _table_exists(client, collection_name + "_embedding"):
@@ -259,6 +260,7 @@ def _create_table(client: Connection, collection_name: str, embedding_dim: int) 
         # doc_id = str(uuid.uuid4())
         print(f"{kwargs=}")
         doc_id = kwargs.get("doc_id", str(uuid.uuid4()))
+        img_id = kwargs.get("img_id", None)  # 画像IDを取得、デフォルトはNone
         embed_datas = list(embed_datas)
         # Generate new ids if none are provided
         processed_ids = [i for i in range(1, len(embed_datas) + 1)]
@@ -267,7 +269,7 @@ def _create_table(client: Connection, collection_name: str, embedding_dim: int) 
         if not metadatas:
             metadatas = [{} for _ in embed_datas]
         docs = [
-            (doc_id, embed_id, embed_data, json.dumps(metadata), array.array("f", embedding))
+            (doc_id, embed_id, embed_data, json.dumps(metadata), array.array("f", embedding), img_id)
             for embed_id, embed_data, metadata, embedding in zip(
                 processed_ids, embed_datas, metadatas, embeddings
             )
@@ -276,7 +278,7 @@ def _create_table(client: Connection, collection_name: str, embedding_dim: int) 
         with self.client.cursor() as cursor:
             cursor.executemany(
                 f"INSERT INTO {self.collection_name}_embedding (doc_id, embed_id, embed_data, cmetadata, "
-                f"embed_vector) VALUES (:1, :2, :3, :4, :5)",
+                f"embed_vector, img_id) VALUES (:1, :2, :3, :4, :5, :6)",
                 docs,
             )
             self.client.commit()
@@ -321,7 +323,7 @@ def _create_table(client: Connection, collection_name: str, embedding_dim: int) 
         inputsizes_parameters = {"query_embedding": oracledb.DB_TYPE_VECTOR}
         keyword_parameters = {"query_embedding": embedding}
         similarity_threshold = kwargs.get("similarity_threshold", 0.95)
-        query = f"""( 
+        query = f"""(
             SELECT embed_id,
               embed_data,
               cmetadata,
@@ -329,7 +331,7 @@ def _create_table(client: Connection, collection_name: str, embedding_dim: int) 
               {_get_distance_function(self.distance_strategy)}) as distance,
               doc_id
             FROM {self.collection_name}_embedding
-            WHERE vector_distance(embed_vector, :query_embedding, 
+            WHERE vector_distance(embed_vector, :query_embedding,
               {_get_distance_function(self.distance_strategy)}) <= {similarity_threshold} )
             ORDER BY distance
             FETCH APPROX FIRST {k} ROWS ONLY """

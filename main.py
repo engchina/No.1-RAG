@@ -1553,24 +1553,26 @@ def create_table():
                            """
 
     drop_preference_plsql = """
-                            -- Drop Preference
-                            BEGIN
-  CTX_DDL.DROP_PREFERENCE
-                            ('world_lexer');
-                            END; \
-                            """
+-- Drop Preference
+BEGIN
+  CTX_DDL.DROP_PREFERENCE('world_lexer');
+END; \
+"""
 
     create_preference_plsql = """
-                              -- Create Preference
-                              BEGIN
-  CTX_DDL.CREATE_PREFERENCE
-                              ('world_lexer','WORLD_LEXER');
-                              END; \
-                              """
+-- Create Preference
+BEGIN
+  CTX_DDL.CREATE_PREFERENCE('world_lexer','WORLD_LEXER');
+END; \
+"""
 
     # Drop the index if it exists
     check_index_sql = f"""
 SELECT INDEX_NAME FROM USER_INDEXES WHERE INDEX_NAME = '{DEFAULT_COLLECTION_NAME.upper()}_EMBED_DATA_IDX'
+"""
+
+    check_image_index_sql = f"""
+SELECT INDEX_NAME FROM USER_INDEXES WHERE INDEX_NAME = '{DEFAULT_COLLECTION_NAME.upper()}_IMAGE_EMBED_DATA_IDX'
 """
 
     drop_index_sql = f"""
@@ -1578,10 +1580,20 @@ SELECT INDEX_NAME FROM USER_INDEXES WHERE INDEX_NAME = '{DEFAULT_COLLECTION_NAME
 DROP INDEX {DEFAULT_COLLECTION_NAME.upper()}_EMBED_DATA_IDX
 """
 
+    drop_image_index_sql = f"""
+-- Drop Image Index
+DROP INDEX {DEFAULT_COLLECTION_NAME.upper()}_IMAGE_EMBED_DATA_IDX
+"""
+
     create_index_sql = f"""
 -- Create Index
 -- CREATE INDEX {DEFAULT_COLLECTION_NAME}_embed_data_idx ON {DEFAULT_COLLECTION_NAME}_embedding(embed_data) INDEXTYPE IS CTXSYS.CONTEXT PARAMETERS ('LEXER world_lexer sync (on commit)')
 CREATE INDEX {DEFAULT_COLLECTION_NAME}_embed_data_idx ON {DEFAULT_COLLECTION_NAME}_embedding(embed_data) INDEXTYPE IS CTXSYS.CONTEXT PARAMETERS ('LEXER world_lexer sync (every "freq=minutely; interval=1")')
+"""
+
+    create_image_index_sql = f"""
+-- Create Image Index
+CREATE INDEX {DEFAULT_COLLECTION_NAME}_image_embed_data_idx ON {DEFAULT_COLLECTION_NAME}_image_embedding(embed_data) INDEXTYPE IS CTXSYS.CONTEXT PARAMETERS ('LEXER world_lexer sync (every "freq=minutely; interval=1")')
 """
 
     output_sql_text = f"""
@@ -1593,127 +1605,115 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_collection (
 );
 """
 
-    output_sql_text += f"""
--- Create Embedding Table
-CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_embedding (
-    doc_id VARCHAR2(200),
-    embed_id NUMBER,
-    embed_data VARCHAR2(4000),
-    embed_vector VECTOR(embedding_dim, FLOAT32),
-    cmetadata CLOB
-);
-"""
-
-    drop_rag_qa_result_sql = """
-                             DROP TABLE IF EXISTS RAG_QA_RESULT \
-                             """
-
-    create_rag_qa_result_sql = """
-                               CREATE TABLE IF NOT EXISTS RAG_QA_RESULT
-                               (
-                                   id
-                                   NUMBER
-                                   GENERATED
-                                   ALWAYS AS
-                                   IDENTITY
-                                   PRIMARY
-                                   KEY,
-                                   query_id
-                                   VARCHAR2
-                               (
-                                   100
-                               ),
-                                   query VARCHAR2
-                               (
-                                   4000
-                               ),
-                                   standard_answer VARCHAR2
-                               (
-                                   30000
-                               ),
-                                   sql CLOB,
-                                   created_date TIMESTAMP DEFAULT TO_TIMESTAMP
-                               (
-                                   TO_CHAR
-                               (
-                                   SYSTIMESTAMP,
-                                   'YYYY-MM-DD HH24:MI:SS'
-                               ), 'YYYY-MM-DD HH24:MI:SS')
-                                   ) \
-                               """
-
-    drop_rag_qa_feedback_sql = """
-                               DROP TABLE IF EXISTS RAG_QA_FEEDBACK \
-                               """
-
-    create_rag_qa_feedback_sql = """
-                                 CREATE TABLE IF NOT EXISTS RAG_QA_FEEDBACK
-                                 (
-                                     id
-                                     NUMBER
-                                     GENERATED
-                                     ALWAYS AS
-                                     IDENTITY
-                                     PRIMARY
-                                     KEY,
-                                     query_id
-                                     VARCHAR2
-                                 (
-                                     100
-                                 ),
-                                     llm_name VARCHAR2
-                                 (
-                                     100
-                                 ),
-                                     llm_answer VARCHAR2
-                                 (
-                                     30000
-                                 ),
-                                     ragas_evaluation_result VARCHAR2
-                                 (
-                                     30000
-                                 ),
-                                     human_evaluation_result VARCHAR2
-                                 (
-                                     20
-                                 ),
-                                     user_comment VARCHAR2
-                                 (
-                                     30000
-                                 ),
-                                     created_date TIMESTAMP DEFAULT TO_TIMESTAMP
-                                 (
-                                     TO_CHAR
-                                 (
-                                     SYSTIMESTAMP,
-                                     'YYYY-MM-DD HH24:MI:SS'
-                                 ), 'YYYY-MM-DD HH24:MI:SS')
-                                     ) \
-                                 """
-
-    output_sql_text += "\n" + create_preference_plsql.strip() + "\n"
-    output_sql_text += "\n" + drop_rag_qa_result_sql.strip() + ";"
-    output_sql_text += "\n" + drop_rag_qa_feedback_sql.strip() + ";"
-    output_sql_text += "\n" + create_index_sql.strip() + ";"
-    output_sql_text += "\n" + create_rag_qa_result_sql.strip() + ";"
-    output_sql_text += "\n" + create_rag_qa_feedback_sql.strip() + ";"
-
+    # Get embedding function and dimension first
     region = get_region()
-    # Default config file and profile
     embed = OCIGenAIEmbeddings(
         model_id=os.environ["OCI_COHERE_EMBED_MODEL"],
         service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
         compartment_id=os.environ["OCI_COMPARTMENT_OCID"]
     )
 
-    # Initialize OracleVS
-    MyOracleVS(
-        client=pool.acquire(),
-        embedding_function=embed,
-        collection_name=DEFAULT_COLLECTION_NAME,
-        distance_strategy=DistanceStrategy.COSINE,
-        params={"pre_delete_collection": True}
-    )
+    # Get embedding dimension by creating a test embedding
+    test_embedding = embed.embed_query("test")
+    embedding_dim = len(test_embedding)
+
+    output_sql_text += f"""
+-- Create Embedding Table
+CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_embedding (
+    doc_id VARCHAR2(200),
+    embed_id NUMBER,
+    embed_data VARCHAR2(4000),
+    embed_vector VECTOR({embedding_dim}, FLOAT32),
+    cmetadata CLOB,
+    img_id VARCHAR2(200)
+);
+"""
+
+    output_sql_text += f"""
+-- Create Image Table
+CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_image (
+    doc_id VARCHAR2(200),
+    img_id VARCHAR2(200),
+    text_data CLOB,
+    vlm_data CLOB,
+    base64_data CLOB
+);
+"""
+
+    output_sql_text += f"""
+-- Create Image Embedding Table
+CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_image_embedding (
+    doc_id VARCHAR2(200),
+    embed_id NUMBER,
+    embed_data VARCHAR2(4000),
+    embed_vector VECTOR({embedding_dim}, FLOAT32),
+    cmetadata CLOB,
+    img_id VARCHAR2(200)
+);
+"""
+
+    drop_rag_qa_result_sql = """DROP TABLE IF EXISTS RAG_QA_RESULT"""
+
+    create_rag_qa_result_sql = """CREATE TABLE IF NOT EXISTS RAG_QA_RESULT (
+    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    query_id VARCHAR2(100),
+    query VARCHAR2(4000),
+    standard_answer VARCHAR2(30000),
+    sql CLOB,
+    created_date TIMESTAMP DEFAULT TO_TIMESTAMP(TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS')
+)"""
+
+    drop_rag_qa_feedback_sql = """DROP TABLE IF EXISTS RAG_QA_FEEDBACK"""
+
+    create_rag_qa_feedback_sql = """CREATE TABLE IF NOT EXISTS RAG_QA_FEEDBACK (
+    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    query_id VARCHAR2(100),
+    llm_name VARCHAR2(100),
+    llm_answer VARCHAR2(30000),
+    ragas_evaluation_result VARCHAR2(30000),
+    human_evaluation_result VARCHAR2(20),
+    user_comment VARCHAR2(30000),
+    created_date TIMESTAMP DEFAULT TO_TIMESTAMP(TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS')
+)"""
+
+    output_sql_text += "\n" + create_preference_plsql.strip() + "\n"
+    output_sql_text += "\n" + drop_rag_qa_result_sql.strip() + ";"
+    output_sql_text += "\n" + drop_rag_qa_feedback_sql.strip() + ";"
+    output_sql_text += f"\n-- Drop Indexes\nDROP INDEX IF EXISTS {DEFAULT_COLLECTION_NAME}_embed_data_idx;"
+    output_sql_text += f"\nDROP INDEX IF EXISTS {DEFAULT_COLLECTION_NAME}_image_embed_data_idx;"
+    output_sql_text += "\n" + create_index_sql.strip() + ";"
+    output_sql_text += "\n" + create_image_index_sql.strip() + ";"
+    output_sql_text += "\n" + create_rag_qa_result_sql.strip() + ";"
+    output_sql_text += "\n" + create_rag_qa_feedback_sql.strip() + ";"
+
+
+
+    # Drop and Create table SQLs for image and image_embedding tables
+    drop_image_table_sql = f"DROP TABLE {DEFAULT_COLLECTION_NAME}_image PURGE"
+    drop_image_embedding_table_sql = f"DROP TABLE {DEFAULT_COLLECTION_NAME}_image_embedding PURGE"
+
+    create_image_table_sql = f"""CREATE TABLE {DEFAULT_COLLECTION_NAME}_image (
+    doc_id VARCHAR2(200),
+    img_id VARCHAR2(200),
+    text_data CLOB,
+    vlm_data CLOB,
+    base64_data CLOB
+)"""
+
+    create_image_embedding_table_sql = f"""CREATE TABLE {DEFAULT_COLLECTION_NAME}_image_embedding (
+    doc_id VARCHAR2(200),
+    embed_id NUMBER,
+    embed_data VARCHAR2(4000),
+    embed_vector VECTOR({embedding_dim}, FLOAT32),
+    cmetadata CLOB,
+    img_id VARCHAR2(200)
+)"""
+
+    # Add drop and create statements to output SQL text
+    output_sql_text += f"\n-- Drop Image Tables\n{drop_image_table_sql};"
+    output_sql_text += f"\n{drop_image_embedding_table_sql};"
+    output_sql_text += f"\n-- Create Image Tables\n{create_image_table_sql};"
+    output_sql_text += f"\n{create_image_embedding_table_sql};"
 
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
@@ -1724,12 +1724,74 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_embedding (
                 print("Preference 'WORLD_LEXER' does not exist.")
             cursor.execute(create_preference_plsql)
 
-            # cursor.execute(check_index_sql)
-            # if cursor.fetchone():
-            #     cursor.execute(drop_index_sql)
-            # else:
-            #     print(f"Index '{DEFAULT_COLLECTION_NAME.upper()}_EMBED_DATA_IDX' does not exist.")
-            cursor.execute(create_index_sql)
+            # Drop and recreate image tables with existence check
+            # Check and drop image table
+            try:
+                cursor.execute(f"SELECT COUNT(*) FROM {DEFAULT_COLLECTION_NAME}_image")
+                # Table exists, drop it
+                cursor.execute(drop_image_table_sql)
+                print(f"テーブル {DEFAULT_COLLECTION_NAME}_image を削除しました")
+            except DatabaseError as e:
+                if e.args[0].code == 942:  # Table or view does not exist
+                    print(f"テーブル {DEFAULT_COLLECTION_NAME}_image は存在しません")
+                else:
+                    print(f"テーブル {DEFAULT_COLLECTION_NAME}_image の削除エラー: {e}")
+
+            # Check and drop image_embedding table
+            try:
+                cursor.execute(f"SELECT COUNT(*) FROM {DEFAULT_COLLECTION_NAME}_image_embedding")
+                # Table exists, drop it
+                cursor.execute(drop_image_embedding_table_sql)
+                print(f"テーブル {DEFAULT_COLLECTION_NAME}_image_embedding を削除しました")
+            except DatabaseError as e:
+                if e.args[0].code == 942:  # Table or view does not exist
+                    print(f"テーブル {DEFAULT_COLLECTION_NAME}_image_embedding は存在しません")
+                else:
+                    print(f"テーブル {DEFAULT_COLLECTION_NAME}_image_embedding の削除エラー: {e}")
+
+            # Create image table
+            try:
+                cursor.execute(create_image_table_sql)
+                print(f"テーブル {DEFAULT_COLLECTION_NAME}_image を作成しました")
+            except DatabaseError as e:
+                print(f"テーブル {DEFAULT_COLLECTION_NAME}_image の作成エラー: {e}")
+
+            # Create image_embedding table
+            try:
+                cursor.execute(create_image_embedding_table_sql)
+                print(f"テーブル {DEFAULT_COLLECTION_NAME}_image_embedding を作成しました")
+            except DatabaseError as e:
+                print(f"テーブル {DEFAULT_COLLECTION_NAME}_image_embedding の作成エラー: {e}")
+
+            # Drop and create indexes with existence check
+            try:
+                cursor.execute(f"SELECT COUNT(*) FROM USER_INDEXES WHERE INDEX_NAME = '{DEFAULT_COLLECTION_NAME.upper()}_EMBED_DATA_IDX'")
+                if cursor.fetchone()[0] > 0:
+                    cursor.execute(f"DROP INDEX {DEFAULT_COLLECTION_NAME}_embed_data_idx")
+                    print(f"インデックス {DEFAULT_COLLECTION_NAME}_embed_data_idx を削除しました")
+            except DatabaseError as e:
+                print(f"インデックス {DEFAULT_COLLECTION_NAME}_embed_data_idx の削除エラー: {e}")
+
+            try:
+                cursor.execute(f"SELECT COUNT(*) FROM USER_INDEXES WHERE INDEX_NAME = '{DEFAULT_COLLECTION_NAME.upper()}_IMAGE_EMBED_DATA_IDX'")
+                if cursor.fetchone()[0] > 0:
+                    cursor.execute(f"DROP INDEX {DEFAULT_COLLECTION_NAME}_image_embed_data_idx")
+                    print(f"インデックス {DEFAULT_COLLECTION_NAME}_image_embed_data_idx を削除しました")
+            except DatabaseError as e:
+                print(f"インデックス {DEFAULT_COLLECTION_NAME}_image_embed_data_idx の削除エラー: {e}")
+
+            # Create indexes
+            try:
+                cursor.execute(create_index_sql)
+                print(f"インデックス {DEFAULT_COLLECTION_NAME}_embed_data_idx を作成しました")
+            except DatabaseError as e:
+                print(f"インデックス {DEFAULT_COLLECTION_NAME}_embed_data_idx の作成エラー: {e}")
+
+            try:
+                cursor.execute(create_image_index_sql)
+                print(f"インデックス {DEFAULT_COLLECTION_NAME}_image_embed_data_idx を作成しました")
+            except DatabaseError as e:
+                print(f"インデックス {DEFAULT_COLLECTION_NAME}_image_embed_data_idx の作成エラー: {e}")
 
             try:
                 cursor.execute(drop_rag_qa_result_sql)
@@ -2140,13 +2202,17 @@ DELETE FROM {DEFAULT_COLLECTION_NAME}_embedding WHERE doc_id = :doc_id """
 INSERT INTO {DEFAULT_COLLECTION_NAME}_embedding (
 doc_id,
 embed_id,
-embed_data
+embed_data,
+img_id
 )
-VALUES (:doc_id, :embed_id, :embed_data) """
-            output_sql += "\n" + save_chunks_sql.replace(':doc_id', "'" + str(doc_id) + "'") + ";"
+VALUES (:doc_id, :embed_id, :embed_data, :img_id) """
+            output_sql += "\n" + save_chunks_sql.replace(':doc_id', "'" + str(doc_id) + "'"
+                                                           ).replace(':embed_id', "'...'"
+                                                                     ).replace(':embed_data', "'...'"
+                                                                               ).replace(':img_id', "NULL") + ";"
             print(f"{output_sql=}")
-            # 准备批量插入的数据
-            data_to_insert = [(doc_id, chunk['CHUNK_ID'], chunk['CHUNK_DATA']) for chunk in chunks]
+            # 准備批量插入的数据（img_idはNULLに設定）
+            data_to_insert = [(doc_id, chunk['CHUNK_ID'], chunk['CHUNK_DATA'], None) for chunk in chunks]
 
             # 执行批量插入
             cursor.executemany(save_chunks_sql, data_to_insert)
@@ -2384,7 +2450,7 @@ def generate_query(query_text, generate_query_radio):
         region = get_region()
         select_multi_step_query_sql = f"""
                 SELECT json_value(dc.cmetadata, '$.file_name') name, de.embed_id embed_id, de.embed_data embed_data, de.doc_id doc_id
-                FROM {DEFAULT_COLLECTION_NAME}_embedding dc, {DEFAULT_COLLECTION_NAME}_collection dc
+                FROM {DEFAULT_COLLECTION_NAME}_embedding de, {DEFAULT_COLLECTION_NAME}_collection dc
                 WHERE de.doc_id = dc.id
                 ORDER BY vector_distance(de.embed_vector , (
                         SELECT to_vector(et.embed_vector) embed_vector
