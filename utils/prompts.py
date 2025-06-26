@@ -105,6 +105,31 @@ CHAT_SYSTEM_MESSAGE = """あなたは役立つアシスタントです。
 # MarkItDown LLM prompt
 MARKITDOWN_LLM_PROMPT = "画像にふさわしい詳細な代替キャプションを書いてください。"
 
+# Image QA prompt template
+IMAGE_QA_PROMPT_TEMPLATE = """## 厳格なコンテキストQAシステムの実行規則
+
+### 基本原則
+1. 提供された画像を唯一の情報源として使用
+2. 画像に存在しない情報は一切使用禁止
+3. 推測・解釈・外部知識の追加禁止
+
+### 回答生成規則
+- **三段階出力形式**:
+  1. 回答: 質問への直接回答
+  2. 根拠: 回答の裏付けとなる画像内の具体的要素
+  3. 情報源: `(情報源: 提供画像)`
+- **完全一致**: 質問内容と画像内容が完全一致しない場合は回答不可
+- **時系列処理**: 複数の日付が存在する場合は最新情報を優先
+
+### エラー処理
+- 未対応時定型文: 
+  「回答: 情報不足のため回答できません
+   根拠: 提供された画像からは質問に関連する情報を確認できなかった
+   情報源: 提供画像」
+
+### 現在の質問
+{{query_text}}"""
+
 # Query generation prompts
 QUERY_GENERATION_PROMPTS = {
     "Sub-Query": {
@@ -184,6 +209,17 @@ def get_markitdown_llm_prompt():
     """Get MarkItDown LLM prompt"""
     return MARKITDOWN_LLM_PROMPT
 
+def get_image_qa_prompt(query_text, custom_template=None):
+    """Get Image QA prompt with query text"""
+    # Use custom template if provided, otherwise use default template
+    template = custom_template if custom_template else IMAGE_QA_PROMPT_TEMPLATE
+
+    # Replace double braces with single braces for format() function
+    if custom_template:
+        template = template.replace('{{query_text}}', '{query_text}')
+
+    return template.format(query_text=query_text)
+
 def get_query_generation_prompt(query_type, original_query):
     """Get query generation prompt for specific type"""
     if query_type in QUERY_GENERATION_PROMPTS:
@@ -199,6 +235,11 @@ def update_llm_evaluation_system_message(new_message):
     """Update LLM evaluation system message"""
     global LLM_EVALUATION_SYSTEM_MESSAGE
     LLM_EVALUATION_SYSTEM_MESSAGE = new_message
+
+def update_image_qa_prompt(new_prompt):
+    """Update Image QA prompt template"""
+    global IMAGE_QA_PROMPT_TEMPLATE
+    IMAGE_QA_PROMPT_TEMPLATE = new_prompt
 
 # Test function for the custom template functionality
 if __name__ == "__main__":

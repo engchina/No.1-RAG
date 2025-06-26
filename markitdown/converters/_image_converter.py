@@ -2,7 +2,7 @@ import base64
 import mimetypes
 from typing import Union
 
-from langchain_community.chat_models import ChatOCIGenAI
+from my_langchain_community.chat_models import ChatOCIGenAI
 from langchain_core.messages import HumanMessage
 
 from ._base import DocumentConverter, DocumentConverterResult

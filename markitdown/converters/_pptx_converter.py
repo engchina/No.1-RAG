@@ -4,7 +4,7 @@ import re
 from typing import Union
 
 import pptx
-from langchain_community.chat_models import ChatOCIGenAI
+from my_langchain_community.chat_models import ChatOCIGenAI
 from langchain_core.messages import HumanMessage
 
 from ._base import DocumentConverterResult, DocumentConverter
@@ -24,12 +24,14 @@ class PptxConverter(HtmlConverter):
     def _get_llm_description(
             self, llm_client, llm_model, image_blob, content_type, prompt=None
     ):
+        print("in get_llm_description()...")
         if prompt is None or prompt.strip() == "":
             prompt = "Write a detailed alt text for this image with less than 50 words."
 
         image_base64 = base64.b64encode(image_blob).decode("utf-8")
         data_uri = f"data:{content_type};base64,{image_base64}"
         if isinstance(llm_client, ChatOCIGenAI):
+            print("llm_client is instance of ChatOCIGenAI")
             human_message = HumanMessage(content=[
                 {"type": "text", "text": prompt},
                 {
@@ -39,8 +41,10 @@ class PptxConverter(HtmlConverter):
             ], )
             messages = [human_message]
             response = llm_client.invoke(messages)
+            print(f"{response=}")
             return response.content
         else:
+            print("llm_client is not instance of ChatOCIGenAI")
             messages = [
                 {
                     "role": "user",
@@ -59,6 +63,7 @@ class PptxConverter(HtmlConverter):
             response = llm_client.chat.completions.create(
                 model=llm_model, messages=messages
             )
+            print(f"{response=}")
             return response.choices[0].message.content
 
     def convert(self, local_path, **kwargs) -> Union[None, DocumentConverterResult]:
@@ -87,6 +92,8 @@ class PptxConverter(HtmlConverter):
 
                     llm_client = kwargs.get("llm_client")
                     llm_model = kwargs.get("llm_model")
+                    print(f"{llm_client=}")
+                    print(f"{llm_model=}")
                     if llm_client is not None and llm_model is not None:
                         try:
                             llm_description = self._get_llm_description(

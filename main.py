@@ -31,6 +31,7 @@ from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langfuse.callback import CallbackHandler
 from oracledb import DatabaseError
 from unstructured.partition.auto import partition
+import logging
 
 from markitdown import MarkItDown
 from my_langchain_community.vectorstores import MyOracleVS
@@ -42,7 +43,7 @@ from utils.prompts import (
     get_sub_query_prompt, get_rag_fusion_prompt, get_hyde_prompt, get_step_back_prompt,
     get_langgpt_rag_prompt, get_llm_evaluation_system_message, get_chat_system_message,
     get_markitdown_llm_prompt, get_query_generation_prompt, update_langgpt_rag_prompt,
-    update_llm_evaluation_system_message
+    update_llm_evaluation_system_message, get_image_qa_prompt, update_image_qa_prompt
 )
 
 # read local .env file
@@ -50,15 +51,113 @@ load_dotenv(find_dotenv())
 
 DEFAULT_COLLECTION_NAME = os.environ["DEFAULT_COLLECTION_NAME"]
 
+# ログ設定
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
+
+
+def check_langfuse_availability():
+    """
+    Langfuse サービスの可用性を事前に確認する
+
+    Returns:
+        bool: Langfuse サービスが利用可能な場合は True、そうでなければ False
+    """
+    try:
+        # 環境変数の存在確認
+        required_env_vars = ["LANGFUSE_SECRET_KEY", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_HOST"]
+        for var in required_env_vars:
+            if not os.environ.get(var):
+                logger.warning(f"Langfuse 環境変数 {var} が設定されていません")
+                return False
+
+        # Langfuse クライアントの初期化テスト
+        import requests
+        from urllib.parse import urljoin
+
+        host = os.environ["LANGFUSE_HOST"].rstrip('/')
+
+        # ヘルスチェックエンドポイントを試行
+        health_url = urljoin(host, "/api/public/health")
+
+        try:
+            response = requests.get(health_url, timeout=5)
+            if response.status_code == 200:
+                logger.info("Langfuse サービスが利用可能です")
+                return True
+            else:
+                logger.warning(f"Langfuse ヘルスチェック失敗: HTTP {response.status_code}")
+                return False
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Langfuse サービスへの接続に失敗しました: {e}")
+            return False
+
+    except Exception as e:
+        logger.warning(f"Langfuse 可用性チェック中にエラーが発生しました: {e}")
+        return False
+
+
+def create_safe_langfuse_handler():
+    """
+    安全なlangfuse handlerを作成する
+    エラーが発生してもstream処理を中断しないようにする
+
+    Returns:
+        CallbackHandler or None: 正常に作成できた場合はCallbackHandler、エラーの場合はNone
+    """
+    try:
+        # 事前にLangfuseサービスの可用性をチェック
+        if not check_langfuse_availability():
+            logger.warning("Langfuse サービスが利用できないため、callback を無効にします")
+            return None
+
+        return CallbackHandler(
+            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+            host=os.environ["LANGFUSE_HOST"],
+        )
+    except Exception as e:
+        logger.warning(f"Langfuse handlerの作成に失敗しました: {e}")
+        return None
+
+
+def get_safe_stream_config(model_name=None):
+    """
+    安全なstream設定を取得する
+    langfuse handlerが利用できない場合は空の設定を返す
+
+    Args:
+        model_name: モデル名（メタデータ用）
+
+    Returns:
+        dict: stream設定
+    """
+    try:
+        langfuse_handler = create_safe_langfuse_handler()
+        if langfuse_handler is None:
+            logger.info(f"Langfuse が利用できないため、{model_name} のストリーミングは callback なしで実行されます")
+            return {}
+
+        config = {"callbacks": [langfuse_handler]}
+        if model_name:
+            config["metadata"] = {"ls_model_name": model_name}
+        logger.info(f"Langfuse callback が有効になりました: {model_name}")
+        return config
+    except Exception as e:
+        logger.warning(f"Stream設定の作成に失敗しました: {e}")
+        return {}
+
 if platform.system() == 'Linux':
     oracledb.init_oracle_client(lib_dir=os.environ["ORACLE_CLIENT_LIB_DIR"])
 
-# 初始化一个数据库连接
+# 初期化一个数据库连接池（增加连接数以避免阻塞）
 pool = oracledb.create_pool(
     dsn=os.environ["ORACLE_23AI_CONNECTION_STRING"],
-    min=2,
-    max=5,
-    increment=1
+    min=5,
+    max=20,
+    increment=2,
+    timeout=30,  # 连接超时30秒
+    getmode=oracledb.POOL_GETMODE_WAIT  # 等待可用连接
 )
 
 
@@ -77,6 +176,24 @@ def get_region():
     oci_config_path = find_dotenv("/root/.oci/config")
     region = get_key(oci_config_path, "region")
     return region
+
+
+def check_database_pool_health():
+    """
+    データベース接続プールの健康状態をチェックする
+
+    Returns:
+        bool: プールが正常な場合True、問題がある場合False
+    """
+    try:
+        with pool.acquire() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT 1 FROM DUAL")
+                result = cursor.fetchone()
+                return result is not None
+    except Exception as e:
+        logger.error(f"データベース接続プールの健康チェックに失敗しました: {e}")
+        return False
 
 
 def generate_embedding_response(inputs: List[str]):
@@ -268,15 +385,17 @@ async def command_a_task(system_text, query_text, command_a_checkbox):
             ]
         start_time = time.time()
         print(f"{start_time=}")
-        langfuse_handler = CallbackHandler(
-            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-            host=os.environ["LANGFUSE_HOST"],
-        )
-        async for chunk in command_a.astream(messages, config={"callbacks": [langfuse_handler],
-                                                               "metadata": {
-                                                                   "ls_model_name": "cohere.command-a-03-2025"}}):
-            yield chunk.content
+
+        # 安全なlangfuse設定を取得
+        stream_config = get_safe_stream_config("cohere.command-a-03-2025")
+
+        try:
+            async for chunk in command_a.astream(messages, config=stream_config):
+                yield chunk.content
+        except Exception as e:
+            logger.error(f"Command-A stream処理中にエラーが発生しました: {e}")
+            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
@@ -388,15 +507,17 @@ async def xai_grok_3_task(system_text, query_text, xai_grok_3_checkbox):
             ]
         start_time = time.time()
         print(f"{start_time=}")
-        langfuse_handler = CallbackHandler(
-            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-            host=os.environ["LANGFUSE_HOST"],
-        )
-        async for chunk in xai_grok_3.astream(messages, config={"callbacks": [langfuse_handler],
-                                                                "metadata": {
-                                                                    "ls_model_name": "xai.grok-3"}}):
-            yield chunk.content
+
+        # 安全なlangfuse設定を取得
+        stream_config = get_safe_stream_config("xai.grok-3")
+
+        try:
+            async for chunk in xai_grok_3.astream(messages, config=stream_config):
+                yield chunk.content
+        except Exception as e:
+            logger.error(f"XAI Grok-3 stream処理中にエラーが発生しました: {e}")
+            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
@@ -428,15 +549,17 @@ async def llama_3_3_70b_task(system_text, query_text, llama_3_3_70b_checkbox):
             ]
         start_time = time.time()
         print(f"{start_time=}")
-        langfuse_handler = CallbackHandler(
-            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-            host=os.environ["LANGFUSE_HOST"],
-        )
-        async for chunk in llama_3_3_70b.astream(messages, config={"callbacks": [langfuse_handler],
-                                                                   "metadata": {
-                                                                       "ls_model_name": "meta.llama-3.3-70b-instruct"}}):
-            yield chunk.content
+
+        # 安全なlangfuse設定を取得
+        stream_config = get_safe_stream_config("meta.llama-3.3-70b-instruct")
+
+        try:
+            async for chunk in llama_3_3_70b.astream(messages, config=stream_config):
+                yield chunk.content
+        except Exception as e:
+            logger.error(f"Llama-3.3-70B stream処理中にエラーが発生しました: {e}")
+            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
@@ -459,7 +582,7 @@ async def llama_3_2_90b_vision_task(system_text, query_image, query_text, llama_
             provider="meta",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42, "presence_penalty": 2, "frequency_penalty": 2},
         )
         if query_image:
             base64_image = encode_image(query_image)
@@ -484,15 +607,17 @@ async def llama_3_2_90b_vision_task(system_text, query_image, query_text, llama_
             ]
         start_time = time.time()
         print(f"{start_time=}")
-        langfuse_handler = CallbackHandler(
-            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-            host=os.environ["LANGFUSE_HOST"],
-        )
-        async for chunk in llama_3_2_90b_vision.astream(messages, config={"callbacks": [langfuse_handler],
-                                                                          "metadata": {
-                                                                              "ls_model_name": "meta.llama-3.2-90b-vision-instruct"}}):
-            yield chunk.content
+
+        # 安全なlangfuse設定を取得
+        stream_config = get_safe_stream_config("meta.llama-3.2-90b-vision-instruct")
+
+        try:
+            async for chunk in llama_3_2_90b_vision.astream(messages, config=stream_config):
+                yield chunk.content
+        except Exception as e:
+            logger.error(f"Llama-3.2-90B-Vision stream処理中にエラーが発生しました: {e}")
+            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
@@ -540,15 +665,17 @@ async def llama_4_maverick_task(system_text, query_image, query_text, llama_4_ma
             ]
         start_time = time.time()
         print(f"{start_time=}")
-        langfuse_handler = CallbackHandler(
-            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-            host=os.environ["LANGFUSE_HOST"],
-        )
-        async for chunk in llama_4_maverick.astream(messages, config={"callbacks": [langfuse_handler],
-                                                                      "metadata": {
-                                                                          "ls_model_name": "meta.llama-4-maverick-17b-128e-instruct-fp8"}}):
-            yield chunk.content
+
+        # 安全なlangfuse設定を取得
+        stream_config = get_safe_stream_config("meta.llama-4-maverick-17b-128e-instruct-fp8")
+
+        try:
+            async for chunk in llama_4_maverick.astream(messages, config=stream_config):
+                yield chunk.content
+        except Exception as e:
+            logger.error(f"Llama-4-Maverick stream処理中にエラーが発生しました: {e}")
+            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
@@ -596,15 +723,18 @@ async def llama_4_scout_task(system_text, query_image, query_text, llama_4_scout
             ]
         start_time = time.time()
         print(f"{start_time=}")
-        langfuse_handler = CallbackHandler(
-            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-            host=os.environ["LANGFUSE_HOST"],
-        )
-        async for chunk in llama_4_scout.astream(messages, config={"callbacks": [langfuse_handler],
-                                                                   "metadata": {
-                                                                       "ls_model_name": "meta.llama-4-scout-17b-16e-instruct"}}):
-            yield chunk.content
+
+        # 安全なlangfuse設定を取得
+        stream_config = get_safe_stream_config("meta.llama-4-scout-17b-16e-instruct")
+        print(f"{stream_config=}")
+
+        try:
+            async for chunk in llama_4_scout.astream(messages, config=stream_config):
+                yield chunk.content
+        except Exception as e:
+            logger.error(f"Llama-4-Scout stream処理中にエラーが発生しました: {e}")
+            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
@@ -639,13 +769,17 @@ async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
             ]
         start_time = time.time()
         print(f"{start_time=}")
-        langfuse_handler = CallbackHandler(
-            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-            host=os.environ["LANGFUSE_HOST"],
-        )
-        async for chunk in openai_gpt4o.astream(messages, config={"callbacks": [langfuse_handler]}):
-            yield chunk.content
+
+        # 安全なlangfuse設定を取得
+        stream_config = get_safe_stream_config("gpt-4o")
+
+        try:
+            async for chunk in openai_gpt4o.astream(messages, config=stream_config):
+                yield chunk.content
+        except Exception as e:
+            logger.error(f"OpenAI GPT-4o stream処理中にエラーが発生しました: {e}")
+            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
@@ -680,13 +814,17 @@ async def openai_gpt4_task(system_text, query_text, openai_gpt4_checkbox):
             ]
         start_time = time.time()
         print(f"{start_time=}")
-        langfuse_handler = CallbackHandler(
-            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-            host=os.environ["LANGFUSE_HOST"],
-        )
-        async for chunk in openai_gpt4.astream(messages, config={"callbacks": [langfuse_handler]}):
-            yield chunk.content
+
+        # 安全なlangfuse設定を取得
+        stream_config = get_safe_stream_config("gpt-4")
+
+        try:
+            async for chunk in openai_gpt4.astream(messages, config=stream_config):
+                yield chunk.content
+        except Exception as e:
+            logger.error(f"OpenAI GPT-4 stream処理中にエラーが発生しました: {e}")
+            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
@@ -722,13 +860,17 @@ async def azure_openai_gpt4o_task(system_text, query_text, azure_openai_gpt4o_ch
             ]
         start_time = time.time()
         print(f"{start_time=}")
-        langfuse_handler = CallbackHandler(
-            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-            host=os.environ["LANGFUSE_HOST"],
-        )
-        async for chunk in azure_openai_gpt4o.astream(messages, config={"callbacks": [langfuse_handler]}):
-            yield chunk.content
+
+        # 安全なlangfuse設定を取得
+        stream_config = get_safe_stream_config("azure-gpt-4o")
+
+        try:
+            async for chunk in azure_openai_gpt4o.astream(messages, config=stream_config):
+                yield chunk.content
+        except Exception as e:
+            logger.error(f"Azure OpenAI GPT-4o stream処理中にエラーが発生しました: {e}")
+            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
@@ -764,13 +906,17 @@ async def azure_openai_gpt4_task(system_text, query_text, azure_openai_gpt4_chec
             ]
         start_time = time.time()
         print(f"{start_time=}")
-        langfuse_handler = CallbackHandler(
-            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-            host=os.environ["LANGFUSE_HOST"],
-        )
-        async for chunk in azure_openai_gpt4.astream(messages, config={"callbacks": [langfuse_handler]}):
-            yield chunk.content
+
+        # 安全なlangfuse設定を取得
+        stream_config = get_safe_stream_config("azure-gpt-4")
+
+        try:
+            async for chunk in azure_openai_gpt4.astream(messages, config=stream_config):
+                yield chunk.content
+        except Exception as e:
+            logger.error(f"Azure OpenAI GPT-4 stream処理中にエラーが発生しました: {e}")
+            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
@@ -802,13 +948,17 @@ async def claude_3_opus_task(system_text, query_text, claude_3_opus_checkbox):
             ]
         start_time = time.time()
         print(f"{start_time=}")
-        langfuse_handler = CallbackHandler(
-            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-            host=os.environ["LANGFUSE_HOST"],
-        )
-        async for chunk in claude_3_opus.astream(messages, config={"callbacks": [langfuse_handler]}):
-            yield chunk.content
+
+        # 安全なlangfuse設定を取得
+        stream_config = get_safe_stream_config("claude-3-opus")
+
+        try:
+            async for chunk in claude_3_opus.astream(messages, config=stream_config):
+                yield chunk.content
+        except Exception as e:
+            logger.error(f"Claude-3-Opus stream処理中にエラーが発生しました: {e}")
+            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
@@ -840,13 +990,17 @@ async def claude_3_sonnet_task(system_text, query_text, claude_3_sonnet_checkbox
             ]
         start_time = time.time()
         print(f"{start_time=}")
-        langfuse_handler = CallbackHandler(
-            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-            host=os.environ["LANGFUSE_HOST"],
-        )
-        async for chunk in claude_3_sonnet.astream(messages, config={"callbacks": [langfuse_handler]}):
-            yield chunk.content
+
+        # 安全なlangfuse設定を取得
+        stream_config = get_safe_stream_config("claude-3-5-sonnet")
+
+        try:
+            async for chunk in claude_3_sonnet.astream(messages, config=stream_config):
+                yield chunk.content
+        except Exception as e:
+            logger.error(f"Claude-3-Sonnet stream処理中にエラーが発生しました: {e}")
+            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
@@ -878,13 +1032,17 @@ async def claude_3_haiku_task(system_text, query_text, claude_3_haiku_checkbox):
             ]
         start_time = time.time()
         print(f"{start_time=}")
-        langfuse_handler = CallbackHandler(
-            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-            host=os.environ["LANGFUSE_HOST"],
-        )
-        async for chunk in claude_3_haiku.astream(messages, config={"callbacks": [langfuse_handler]}):
-            yield chunk.content
+
+        # 安全なlangfuse設定を取得
+        stream_config = get_safe_stream_config("claude-3-haiku")
+
+        try:
+            async for chunk in claude_3_haiku.astream(messages, config=stream_config):
+                yield chunk.content
+        except Exception as e:
+            logger.error(f"Claude-3-Haiku stream処理中にエラーが発生しました: {e}")
+            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
@@ -1082,18 +1240,44 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
         gr.Accordion(visible=xai_grok_3_evaluation_visible),
         gr.Accordion(visible=command_a_evaluation_visible),
         gr.Accordion(visible=command_r_evaluation_visible),
-            gr.Accordion(visible=command_r_plus_evaluation_visible),
-            gr.Accordion(visible=llama_4_maverick_evaluation_visible),
-            gr.Accordion(visible=llama_4_scout_evaluation_visible),
-            gr.Accordion(visible=llama_3_3_70b_evaluation_visible),
-            gr.Accordion(visible=llama_3_2_90b_vision_evaluation_visible),
-            gr.Accordion(visible=openai_gpt4o_evaluation_visible),
-            gr.Accordion(visible=openai_gpt4_evaluation_visible),
-            gr.Accordion(visible=azure_openai_gpt4o_evaluation_visible),
-            gr.Accordion(visible=azure_openai_gpt4_evaluation_visible),
-            gr.Accordion(visible=claude_3_opus_evaluation_visible),
-            gr.Accordion(visible=claude_3_sonnet_evaluation_visible),
-            gr.Accordion(visible=claude_3_haiku_evaluation_visible)
+        gr.Accordion(visible=command_r_plus_evaluation_visible),
+        gr.Accordion(visible=llama_4_maverick_evaluation_visible),
+        gr.Accordion(visible=llama_4_scout_evaluation_visible),
+        gr.Accordion(visible=llama_3_3_70b_evaluation_visible),
+        gr.Accordion(visible=llama_3_2_90b_vision_evaluation_visible),
+        gr.Accordion(visible=openai_gpt4o_evaluation_visible),
+        gr.Accordion(visible=openai_gpt4_evaluation_visible),
+        gr.Accordion(visible=azure_openai_gpt4o_evaluation_visible),
+        gr.Accordion(visible=azure_openai_gpt4_evaluation_visible),
+        gr.Accordion(visible=claude_3_opus_evaluation_visible),
+        gr.Accordion(visible=claude_3_sonnet_evaluation_visible),
+        gr.Accordion(visible=claude_3_haiku_evaluation_visible)
+    )
+
+
+def set_image_answer_visibility(llm_answer_checkbox, use_image):
+    """
+    画像回答の可視性を制御する関数
+    選択されたLLMモデルと「画像を使って回答」の状態に基づいて、
+    対象の3つのモデルの画像回答Accordionの可視性を決定する
+    """
+    llama_4_maverick_image_visible = False
+    llama_4_scout_image_visible = False
+    llama_3_2_90b_vision_image_visible = False
+
+    # 画像を使って回答がオンで、かつ対応するモデルが選択されている場合のみ表示
+    if use_image:
+        if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox:
+            llama_4_maverick_image_visible = True
+        if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
+            llama_4_scout_image_visible = True
+        if "meta/llama-3-2-90b-vision" in llm_answer_checkbox:
+            llama_3_2_90b_vision_image_visible = True
+
+    return (
+        gr.Accordion(visible=llama_4_maverick_image_visible),
+        gr.Accordion(visible=llama_4_scout_image_visible),
+        gr.Accordion(visible=llama_3_2_90b_vision_image_visible)
     )
 
 
@@ -1614,18 +1798,20 @@ def create_table():
                            """
 
     drop_preference_plsql = """
--- Drop Preference
-BEGIN
-  CTX_DDL.DROP_PREFERENCE('world_lexer');
-END; \
-"""
+                            -- Drop Preference
+                            BEGIN
+  CTX_DDL.DROP_PREFERENCE
+                            ('world_lexer');
+                            END; \
+                            """
 
     create_preference_plsql = """
--- Create Preference
-BEGIN
-  CTX_DDL.CREATE_PREFERENCE('world_lexer','WORLD_LEXER');
-END; \
-"""
+                              -- Create Preference
+                              BEGIN
+  CTX_DDL.CREATE_PREFERENCE
+                              ('world_lexer','WORLD_LEXER');
+                              END; \
+                              """
 
     # Drop the index if it exists
     check_index_sql = f"""
@@ -1714,27 +1900,76 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_image_embedding (
 
     drop_rag_qa_result_sql = """DROP TABLE IF EXISTS RAG_QA_RESULT"""
 
-    create_rag_qa_result_sql = """CREATE TABLE IF NOT EXISTS RAG_QA_RESULT (
-    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    query_id VARCHAR2(100),
-    query VARCHAR2(4000),
-    standard_answer VARCHAR2(30000),
-    sql CLOB,
-    created_date TIMESTAMP DEFAULT TO_TIMESTAMP(TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS')
-)"""
+    create_rag_qa_result_sql = """CREATE TABLE IF NOT EXISTS RAG_QA_RESULT
+    (
+        id
+        NUMBER
+        GENERATED
+        ALWAYS AS
+        IDENTITY
+        PRIMARY
+        KEY,
+        query_id
+        VARCHAR2
+                                  (
+        100
+                                  ),
+        query VARCHAR2
+                                  (
+                                      4000
+                                  ),
+        standard_answer VARCHAR2
+                                  (
+                                      30000
+                                  ),
+        sql CLOB,
+        created_date TIMESTAMP DEFAULT TO_TIMESTAMP
+                                  (
+                                      TO_CHAR
+                                  (
+                                      SYSTIMESTAMP,
+                                      'YYYY-MM-DD HH24:MI:SS'
+                                  ), 'YYYY-MM-DD HH24:MI:SS')
+        )"""
 
     drop_rag_qa_feedback_sql = """DROP TABLE IF EXISTS RAG_QA_FEEDBACK"""
 
-    create_rag_qa_feedback_sql = """CREATE TABLE IF NOT EXISTS RAG_QA_FEEDBACK (
-    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    query_id VARCHAR2(100),
-    llm_name VARCHAR2(100),
-    llm_answer VARCHAR2(30000),
-    ragas_evaluation_result VARCHAR2(30000),
-    human_evaluation_result VARCHAR2(20),
-    user_comment VARCHAR2(30000),
-    created_date TIMESTAMP DEFAULT TO_TIMESTAMP(TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'), 'YYYY-MM-DD HH24:MI:SS')
-)"""
+    create_rag_qa_feedback_sql = """CREATE TABLE IF NOT EXISTS RAG_QA_FEEDBACK
+    (
+        id
+        NUMBER
+        GENERATED
+        ALWAYS AS
+        IDENTITY
+        PRIMARY
+        KEY,
+        query_id
+        VARCHAR2
+                                    (
+        100
+                                    ),
+        llm_name VARCHAR2
+                                    (
+                                        100
+                                    ),
+        llm_answer CLOB,
+        ragas_evaluation_result CLOB,
+        human_evaluation_result VARCHAR2
+                                    (
+                                        20
+                                    ),
+        user_comment VARCHAR2
+                                    (
+                                        30000
+                                    ),
+        created_date TIMESTAMP DEFAULT TO_TIMESTAMP
+                                    (
+                                        TO_CHAR
+                                    (
+                                        SYSTIMESTAMP,
+                                        'YYYY-MM-DD HH24:MI:SS'
+                                    ), 'YYYY-MM-DD HH24:MI:SS')
+        )"""
 
     output_sql_text += "\n" + create_preference_plsql.strip() + "\n"
     output_sql_text += "\n" + drop_rag_qa_result_sql.strip() + ";"
@@ -1745,8 +1980,6 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_image_embedding (
     output_sql_text += "\n" + create_image_index_sql.strip() + ";"
     output_sql_text += "\n" + create_rag_qa_result_sql.strip() + ";"
     output_sql_text += "\n" + create_rag_qa_feedback_sql.strip() + ";"
-
-
 
     # Drop and Create table SQLs for image and image_embedding tables
     drop_image_table_sql = f"DROP TABLE {DEFAULT_COLLECTION_NAME}_image PURGE"
@@ -1825,7 +2058,8 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_image_embedding (
 
             # Drop and create indexes with existence check
             try:
-                cursor.execute(f"SELECT COUNT(*) FROM USER_INDEXES WHERE INDEX_NAME = '{DEFAULT_COLLECTION_NAME.upper()}_EMBED_DATA_IDX'")
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM USER_INDEXES WHERE INDEX_NAME = '{DEFAULT_COLLECTION_NAME.upper()}_EMBED_DATA_IDX'")
                 if cursor.fetchone()[0] > 0:
                     cursor.execute(f"DROP INDEX {DEFAULT_COLLECTION_NAME}_embed_data_idx")
                     print(f"インデックス {DEFAULT_COLLECTION_NAME}_embed_data_idx を削除しました")
@@ -1833,7 +2067,8 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_image_embedding (
                 print(f"インデックス {DEFAULT_COLLECTION_NAME}_embed_data_idx の削除エラー: {e}")
 
             try:
-                cursor.execute(f"SELECT COUNT(*) FROM USER_INDEXES WHERE INDEX_NAME = '{DEFAULT_COLLECTION_NAME.upper()}_IMAGE_EMBED_DATA_IDX'")
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM USER_INDEXES WHERE INDEX_NAME = '{DEFAULT_COLLECTION_NAME.upper()}_IMAGE_EMBED_DATA_IDX'")
                 if cursor.fetchone()[0] > 0:
                     cursor.execute(f"DROP INDEX {DEFAULT_COLLECTION_NAME}_image_embed_data_idx")
                     print(f"インデックス {DEFAULT_COLLECTION_NAME}_image_embed_data_idx を削除しました")
@@ -1964,6 +2199,9 @@ def convert_to_markdown_document(file_path, use_llm, llm_prompt):
     file_extension = os.path.splitext(file_path.name)[-1].lower()
     if file_extension in ['.jpg', '.jpeg', '.png', '.ppt', '.pptx'] and use_llm:
         region = get_region()
+        model_id = "meta.llama-3.2-90b-vision-instruct"
+        if region == "us-chicago-1":
+            model_id = "meta.llama-4-scout-17b-16e-instruct"
         client = ChatOCIGenAI(
             model_id="meta.llama-3.2-90b-vision-instruct",
             provider="meta",
@@ -2192,15 +2430,19 @@ INSERT INTO {DEFAULT_COLLECTION_NAME}_image (
             img_id = 1
             for image_block in image_blocks:
                 # OCRコンテンツを抽出
-                text_data_match = re.search(r'<!-- image_ocr_content_begin -->(.*?)<!-- image_ocr_content_end -->', image_block, re.DOTALL)
+                text_data_match = re.search(r'<!-- image_ocr_content_begin -->(.*?)<!-- image_ocr_content_end -->',
+                                            image_block, re.DOTALL)
                 text_data = text_data_match.group(1).strip() if text_data_match else ""
 
                 # VLM説明を抽出
-                vlm_data_match = re.search(r'<!-- image_vlm_description_begin -->(.*?)<!-- image_vlm_description_end -->', image_block, re.DOTALL)
+                vlm_data_match = re.search(
+                    r'<!-- image_vlm_description_begin -->(.*?)<!-- image_vlm_description_end -->', image_block,
+                    re.DOTALL)
                 vlm_data = vlm_data_match.group(1).strip() if vlm_data_match else ""
 
                 # Base64データを抽出
-                base64_data_match = re.search(r'<!-- image_base64_begin -->(.*?)<!-- image_base64_end -->', image_block, re.DOTALL)
+                base64_data_match = re.search(r'<!-- image_base64_begin -->(.*?)<!-- image_base64_end -->', image_block,
+                                              re.DOTALL)
                 base64_data = base64_data_match.group(1).strip() if base64_data_match else ""
 
                 # base64_dataから前後のHTMLコメント記号を除去
@@ -2318,7 +2560,8 @@ INSERT INTO {DEFAULT_COLLECTION_NAME}_image_embedding (
                             'img_id': img_id
                         })
 
-                        print(f"画像text_data embeddingデータを保存しました: doc_id={doc_id}, img_id={img_id}, embed_id={text_embed_id}")
+                        print(
+                            f"画像text_data embeddingデータを保存しました: doc_id={doc_id}, img_id={img_id}, embed_id={text_embed_id}")
                         text_embed_id += 1
                         total_chunks += 1
 
@@ -2352,7 +2595,8 @@ INSERT INTO {DEFAULT_COLLECTION_NAME}_image_embedding (
                             'img_id': img_id
                         })
 
-                        print(f"画像vlm_data embeddingデータを保存しました: doc_id={doc_id}, img_id={img_id}, embed_id={vlm_embed_id}")
+                        print(
+                            f"画像vlm_data embeddingデータを保存しました: doc_id={doc_id}, img_id={img_id}, embed_id={vlm_embed_id}")
                         vlm_embed_id += 1
                         total_chunks += 1
 
@@ -2371,10 +2615,10 @@ def reset_document_chunks_result_detail():
 
 
 def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
-                                    chunks_overlap_size,
-                                    chunks_split_by, chunks_split_by_custom,
-                                    chunks_language, chunks_normalize,
-                                    chunks_normalize_options):
+                                   chunks_overlap_size,
+                                   chunks_split_by, chunks_split_by_custom,
+                                   chunks_language, chunks_normalize,
+                                   chunks_normalize_options):
     has_error = False
     if not doc_id:
         has_error = True
@@ -2404,17 +2648,17 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
 
         # Check if doc_data contains image blocks and extract OCR content if needed
         if re.search(r'<!-- image_begin -->.*?<!-- image_end -->', doc_data, re.DOTALL):
-
             # Extract all OCR content blocks
-            text_contexts = re.findall(r'<!-- image_ocr_content_begin -->(.*?)<!-- image_ocr_content_end -->', doc_data, re.DOTALL)
+            text_contexts = re.findall(r'<!-- image_ocr_content_begin -->(.*?)<!-- image_ocr_content_end -->', doc_data,
+                                       re.DOTALL)
             doc_data = "\n".join(ocr.strip() for ocr in text_contexts if ocr.strip())
     else:
         # If we can't get data from database, fall back to reading the file
         elements = partition(filename=server_path, strategy='fast',
-                            languages=["jpn", "eng", "chi_sim"],
-                            extract_image_block_types=["Table"],
-                            extract_image_block_to_payload=False,
-                            skip_infer_table_types=["pdf", "jpg", "png", "heic", "doc", "docx"])
+                             languages=["jpn", "eng", "chi_sim"],
+                             extract_image_block_types=["Table"],
+                             extract_image_block_to_payload=False,
+                             skip_infer_table_types=["pdf", "jpg", "png", "heic", "doc", "docx"])
         # Use claude to get table data
         # page_table_documents = parser_pdf(server_path)
         page_table_documents = {}
@@ -2483,9 +2727,9 @@ embed_data
 )
 VALUES (:doc_id, :embed_id, :embed_data) """
             output_sql += "\n" + save_chunks_sql.replace(':doc_id', "'" + str(doc_id) + "'"
-                                                           ).replace(':embed_id', "'...'"
-                                                                     ).replace(':embed_data', "'...'"
-                                                                               ) + ";"
+                                                         ).replace(':embed_id', "'...'"
+                                                                   ).replace(':embed_data', "'...'"
+                                                                             ) + ";"
             print(f"{output_sql=}")
             # 准備批量插入的数据
             data_to_insert = [(doc_id, chunk['CHUNK_ID'], chunk['CHUNK_DATA']) for chunk in chunks]
@@ -2587,8 +2831,8 @@ def embed_save_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
         # Check if doc_data contains image blocks and process them
         if re.search(r'<!-- image_begin -->.*?<!-- image_end -->', doc_data, re.DOTALL):
             process_image_blocks(doc_id, doc_data,
-                               chunk_size=chunks_max_size - chunks_overlap,
-                               chunk_overlap=chunks_overlap)
+                                 chunk_size=chunks_max_size - chunks_overlap,
+                                 chunk_overlap=chunks_overlap)
 
     output_sql = ""
     with pool.acquire() as conn:
@@ -2645,13 +2889,22 @@ def generate_query(query_text, generate_query_radio):
         return gr.Textbox(value=generate_query1), gr.Textbox(value=generate_query2), gr.Textbox(value=generate_query3)
 
     region = get_region()
-    chat_llm = ChatOCIGenAI(
-        model_id="xai.grok-3",
-        provider="xai",
-        service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
-        compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-        model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 600, "seed": 42},
-    )
+    if region == "us-chicago-1":
+        chat_llm = ChatOCIGenAI(
+            model_id="xai.grok-3",
+            provider="xai",
+            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 600, "seed": 42},
+        )
+    else:
+        chat_llm = ChatOCIGenAI(
+            model_id="cohere.command-a-03-2025",
+            provider="cohere",
+            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 600, "seed": 42},
+        )
 
     # RAG-Fusion
     if generate_query_radio == "Sub-Query":
@@ -3644,9 +3897,6 @@ def extract_citation(input_str):
 #     return prompt.strip()
 
 
-
-
-
 async def chat_document(
         search_result,
         llm_answer_checkbox,
@@ -4033,115 +4283,232 @@ async def append_citation(
     return
 
 
-def process_image_with_selected_llms(image_url, query_text, llm_answer_checkbox_group, target_models, image_index, doc_id, img_id):
+async def process_single_image_streaming(image_url, query_text, llm_answer_checkbox_group, target_models, image_index,
+                                         doc_id, img_id, custom_image_prompt=None):
     """
-    選択されたLLMモデルで画像を処理し、回答を返す
+    単一画像を選択されたLLMモデルで処理し、ストリーミング形式で回答を返す
+
+    Args:
+        image_url: 画像のURL
+        query_text: クエリテキスト
+        llm_answer_checkbox_group: 選択されたLLMモデルのリスト
+        target_models: 対象モデルのリスト
+        image_index: 画像のインデックス
+        doc_id: ドキュメントID
+        img_id: 画像ID
+        custom_image_prompt: カスタム画像プロンプトテンプレート
+
+    Yields:
+        dict: 各モデルの部分的な回答を含む辞書
     """
+    if custom_image_prompt:
+        custom_image_prompt = custom_image_prompt.replace('{{query_text}}', '{query_text}')
+
+    region = get_region()
+
+    # 各モデルのタスクジェネレーターを作成
+    async def create_model_task(model):
+        if model not in llm_answer_checkbox_group:
+            # 選択されていないモデルは即座に完了を通知
+            yield "TASK_DONE"
+            return
+
+        print(f"\n=== 画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) - {model} での処理 ===")
+
+        try:
+            if model == "meta/llama-4-maverick-17b-128e-instruct-fp8":
+                llm = ChatOCIGenAI(
+                    model_id="meta.llama-4-maverick-17b-128e-instruct-fp8",
+                    provider="meta",
+                    service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+                    compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+                )
+            elif model == "meta/llama-4-scout-17b-16e-instruct":
+                llm = ChatOCIGenAI(
+                    model_id="meta.llama-4-scout-17b-16e-instruct",
+                    provider="meta",
+                    service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+                    compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+                )
+            elif model == "meta/llama-3-2-90b-vision":
+                llm = ChatOCIGenAI(
+                    model_id="meta.llama-3.2-90b-vision-instruct",
+                    provider="meta",
+                    service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+                    compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+                )
+            else:
+                # 未対応のモデルは即座に完了を通知
+                yield "TASK_DONE"
+                return
+
+            # メッセージを作成
+            prompt_text = get_image_qa_prompt(query_text, custom_image_prompt)
+            human_message = HumanMessage(content=[
+                {
+                    "type": "text",
+                    "text": prompt_text
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {"url": image_url},
+                },
+            ])
+            messages = [human_message]
+
+            # LLMに送信して回答を取得
+            start_time = time.time()
+            # langfuse_handler = CallbackHandler(
+            #     secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+            #     public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+            #     host=os.environ["LANGFUSE_HOST"],
+            # )
+
+            # ヘッダー情報を最初にyield（画像も含む）
+            # header_text = f"\n\n**画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) による回答：**\n\n![画像]({image_url})\n\n"
+            header_text = f"\n\n**画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) による回答：**\n\n"
+            yield header_text
+
+            # ストリーミングで回答を取得
+            # Avoid for: Error uploading media: HTTPConnectionPool(host='minio', port=9000)
+            # async for chunk in llm.astream(messages, config={"callbacks": [langfuse_handler],
+            #                                                  "metadata": {"ls_model_name": model}}):
+            async for chunk in llm.astream(messages):
+                if chunk.content:
+                    print(chunk.content, end="", flush=True)
+                    yield chunk.content
+
+            end_time = time.time()
+            inference_time = end_time - start_time
+            print(f"\n\n推論時間: {inference_time:.2f}秒")
+            print(f"=== {model} での処理完了 ===\n")
+
+            # 推論時間を追加
+            yield f"\n\n推論時間: {inference_time:.2f}秒\n\n"
+            yield "TASK_DONE"
+
+        except Exception as e:
+            print(f"エラーが発生しました ({model}): {e}")
+            # error_text = f"\n\n**画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) による回答：**\n\n![画像]({image_url})\n\nエラーが発生しました: {e}\n\n"
+            error_text = f"\n\n**画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) による回答：**\n\nエラーが発生しました: {e}\n\n"
+            yield error_text
+            yield "TASK_DONE"
+
+    # 各モデルのジェネレーターを作成
+    llama_4_maverick_gen = create_model_task("meta/llama-4-maverick-17b-128e-instruct-fp8")
+    llama_4_scout_gen = create_model_task("meta/llama-4-scout-17b-16e-instruct")
+    llama_3_2_90b_vision_gen = create_model_task("meta/llama-3-2-90b-vision")
+
+    # 各モデルの応答を蓄積
+    llama_4_maverick_response = ""
+    llama_4_scout_response = ""
+    llama_3_2_90b_vision_response = ""
+
+    # 各モデルの状態を追跡
+    responses_status = ["", "", ""]
+
+    # タイムアウト設定（最大5分）
     import asyncio
+    timeout_seconds = 300
+    start_time = time.time()
 
-    async def async_process():
-        region = get_region()
-        results = {}
+    while True:
+        # タイムアウトチェック
+        if time.time() - start_time > timeout_seconds:
+            print(f"画像処理がタイムアウトしました（{timeout_seconds}秒）")
+            break
 
-        for model in target_models:
-            if model in llm_answer_checkbox_group:
-                print(f"\n=== 画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) - {model} での処理 ===")
+        responses = ["", "", ""]
+        generators = [llama_4_maverick_gen, llama_4_scout_gen, llama_3_2_90b_vision_gen]
 
-                try:
-                    if model == "meta/llama-4-maverick-17b-128e-instruct-fp8":
-                        llm = ChatOCIGenAI(
-                            model_id="meta.llama-4-maverick-17b-128e-instruct-fp8",
-                            provider="meta",
-                            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
-                            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-                            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
-                        )
-                    elif model == "meta/llama-4-scout-17b-16e-instruct":
-                        llm = ChatOCIGenAI(
-                            model_id="meta.llama-4-scout-17b-16e-instruct",
-                            provider="meta",
-                            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
-                            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-                            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
-                        )
-                    elif model == "meta/llama-3-2-90b-vision":
-                        llm = ChatOCIGenAI(
-                            model_id="meta.llama-3.2-90b-vision-instruct",
-                            provider="meta",
-                            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
-                            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-                            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
-                        )
+        for i, gen in enumerate(generators):
+            if responses_status[i] == "TASK_DONE":
+                continue
+
+            try:
+                # タイムアウト付きでanextを実行
+                response = await asyncio.wait_for(anext(gen), timeout=30.0)
+                if response:
+                    if response == "TASK_DONE":
+                        responses_status[i] = response
                     else:
-                        continue
+                        responses[i] = response
+            except StopAsyncIteration:
+                responses_status[i] = "TASK_DONE"
+            except asyncio.TimeoutError:
+                print(f"モデル {i} の処理がタイムアウトしました")
+                responses_status[i] = "TASK_DONE"
+            except Exception as e:
+                print(f"モデル {i} の処理中にエラーが発生しました: {e}")
+                responses_status[i] = "TASK_DONE"
 
-                    # メッセージを作成（llama_3_2_90b_visionの実装を参考）
-                    human_message = HumanMessage(content=[
-                        {"type": "text", "text": f"あなたは画像分析の専門家です。与えられた画像を詳しく分析し、ユーザーの質問に正確に答えてください。質問：\n\n{query_text}\n\n"},
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": image_url},
-                        },
-                    ])
+        # 応答を蓄積
+        llama_4_maverick_response += responses[0]
+        llama_4_scout_response += responses[1]
+        llama_3_2_90b_vision_response += responses[2]
 
-                    messages = [human_message]
+        # 現在の状態をyield
+        yield {
+            "meta/llama-4-maverick-17b-128e-instruct-fp8": llama_4_maverick_response,
+            "meta/llama-4-scout-17b-16e-instruct": llama_4_scout_response,
+            "meta/llama-3-2-90b-vision": llama_3_2_90b_vision_response
+        }
 
-                    # LLMに送信して回答を取得
-                    start_time = time.time()
-                    print(f"LLM処理開始時間: {start_time}")
-
-                    langfuse_handler = CallbackHandler(
-                        secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-                        public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-                        host=os.environ["LANGFUSE_HOST"],
-                    )
-
-                    response_text = ""
-                    async for chunk in llm.astream(messages, config={"callbacks": [langfuse_handler],
-                                                                      "metadata": {"ls_model_name": model}}):
-                        response_text += chunk.content
-                        print(chunk.content, end="", flush=True)
-
-                    end_time = time.time()
-                    inference_time = end_time - start_time
-                    print(f"\n\n推論時間: {inference_time:.2f}秒")
-                    print(f"=== {model} での処理完了 ===\n")
-
-                    # 結果を保存
-                    results[model] = f"\n\n--- 画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) - {model} ---\n\n{response_text}\n\n推論時間: {inference_time:.2f}秒\n\n"
-
-                except Exception as e:
-                    print(f"エラーが発生しました ({model}): {e}")
-                    results[model] = f"\n\n--- 画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) - {model} ---\n\nエラーが発生しました: {e}\n\n"
-
-        return results
-
-    # 同期関数内で非同期処理を実行
-    return asyncio.run(async_process())
+        # すべてのタスクが完了したかチェック
+        if all(response_status == "TASK_DONE" for response_status in responses_status):
+            print("All image processing tasks completed")
+            break
 
 
-def print_base64_data_for_selected_models(
+async def process_image_answers_streaming(
         search_result,
         use_image,
         llm_answer_checkbox_group,
         query_text,
-        llama_4_maverick_answer_text,
-        llama_4_scout_answer_text,
-        llama_3_2_90b_vision_answer_text
+        llama_4_maverick_image_answer_text,
+        llama_4_scout_image_answer_text,
+        llama_3_2_90b_vision_image_answer_text,
+        custom_image_prompt=None
 ):
     """
-    画像を使って回答がオンで、検索結果が空でなく、指定されたLLMモデルがチェックされている場合、
-    検索結果のdistinct base64_dataを取得して、各画像に対してLLMで処理し、回答を出力する
+    画像を使って回答がオンの場合、検索結果から画像データを取得し、
+    選択されたLLMモデルで画像処理を行い、ストリーミング形式で回答を出力する
+
+    Args:
+        search_result: 検索結果
+        use_image: 画像を使って回答するかどうか
+        llm_answer_checkbox_group: 選択されたLLMモデルのリスト
+        query_text: クエリテキスト
+        llama_4_maverick_image_answer_text: Llama 4 Maverick の画像回答テキスト
+        llama_4_scout_image_answer_text: Llama 4 Scout の画像回答テキスト
+        llama_3_2_90b_vision_image_answer_text: Llama 3.2 90B Vision の画像回答テキスト
+        custom_image_prompt: カスタム画像プロンプトテンプレート
+
+    Yields:
+        tuple: 各モデルの更新された画像回答を含むGradio Markdownコンポーネントのタプル
     """
-    print("print_base64_data_for_selected_models() 開始...")
+    print("process_image_answers_streaming() 開始...")
+
+    # データベース接続プールの健康状態をチェック
+    if not check_database_pool_health():
+        print("データベース接続プールに問題があります")
+        yield (
+            gr.Markdown(value=llama_4_maverick_image_answer_text),
+            gr.Markdown(value=llama_4_scout_image_answer_text),
+            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text)
+        )
+        return
 
     # 画像を使って回答がオフの場合は何もしない
     if not use_image:
         print("画像を使って回答がオフのため、base64_data取得をスキップします")
         yield (
-            gr.Markdown(value=llama_4_maverick_answer_text),
-            gr.Markdown(value=llama_4_scout_answer_text),
-            gr.Markdown(value=llama_3_2_90b_vision_answer_text)
+            gr.Markdown(value=llama_4_maverick_image_answer_text),
+            gr.Markdown(value=llama_4_scout_image_answer_text),
+            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text)
         )
         return
 
@@ -4149,9 +4516,9 @@ def print_base64_data_for_selected_models(
     if search_result.empty or (len(search_result) > 0 and search_result.iloc[0]['CONTENT'] == ''):
         print("検索結果が空のため、base64_data取得をスキップします")
         yield (
-            gr.Markdown(value=llama_4_maverick_answer_text),
-            gr.Markdown(value=llama_4_scout_answer_text),
-            gr.Markdown(value=llama_3_2_90b_vision_answer_text)
+            gr.Markdown(value=llama_4_maverick_image_answer_text),
+            gr.Markdown(value=llama_4_scout_image_answer_text),
+            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text)
         )
         return
 
@@ -4166,11 +4533,12 @@ def print_base64_data_for_selected_models(
     has_target_model = any(model in llm_answer_checkbox_group for model in target_models)
 
     if not has_target_model:
-        print("対象のLLMモデル（llama-4-maverick, llama-4-scout, llama-3-2-90b-vision）がチェックされていないため、base64_data取得をスキップします")
+        print(
+            "対象のLLMモデル（llama-4-maverick, llama-4-scout, llama-3-2-90b-vision）がチェックされていないため、base64_data取得をスキップします")
         yield (
-            gr.Markdown(value=llama_4_maverick_answer_text),
-            gr.Markdown(value=llama_4_scout_answer_text),
-            gr.Markdown(value=llama_3_2_90b_vision_answer_text)
+            gr.Markdown(value=llama_4_maverick_image_answer_text),
+            gr.Markdown(value=llama_4_scout_image_answer_text),
+            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text)
         )
         return
 
@@ -4191,9 +4559,9 @@ def print_base64_data_for_selected_models(
         if not doc_embed_pairs:
             print("検索結果からdoc_idとembed_idを取得できませんでした")
             yield (
-                gr.Markdown(value=llama_4_maverick_answer_text),
-                gr.Markdown(value=llama_4_scout_answer_text),
-                gr.Markdown(value=llama_3_2_90b_vision_answer_text)
+                gr.Markdown(value=llama_4_maverick_image_answer_text),
+                gr.Markdown(value=llama_4_scout_image_answer_text),
+                gr.Markdown(value=llama_3_2_90b_vision_image_answer_text)
             )
             return
 
@@ -4201,138 +4569,181 @@ def print_base64_data_for_selected_models(
         print(f"最初の5ペア: {doc_embed_pairs[:5]}")
 
         # データベースからdistinct base64_dataを取得
-        with pool.acquire() as conn:
-            with conn.cursor() as cursor:
-                # まず_image_embeddingテーブルからimg_idを取得
-                embed_where_conditions = []
-                for doc_id, embed_id in doc_embed_pairs:
-                    embed_where_conditions.append(f"(doc_id = '{doc_id}' AND embed_id = {embed_id})")
+        try:
+            with pool.acquire() as conn:
+                with conn.cursor() as cursor:
+                    # まず_image_embeddingテーブルからimg_idを取得
+                    embed_where_conditions = []
+                    for doc_id, embed_id in doc_embed_pairs:
+                        embed_where_conditions.append(f"(doc_id = '{doc_id}' AND embed_id = {embed_id})")
 
-                embed_where_clause = " OR ".join(embed_where_conditions)
+                    embed_where_clause = " OR ".join(embed_where_conditions)
 
-                # _image_embeddingテーブルからimg_idを取得
-                get_img_ids_sql = f"""
-                SELECT DISTINCT doc_id, embed_id, img_id
-                FROM {DEFAULT_COLLECTION_NAME}_image_embedding
-                WHERE ({embed_where_clause})
-                AND img_id IS NOT NULL
-                """
+                    # _image_embeddingテーブルからimg_idを取得
+                    get_img_ids_sql = f"""
+                    SELECT DISTINCT doc_id, embed_id, img_id
+                    FROM {DEFAULT_COLLECTION_NAME}_image_embedding
+                    WHERE ({embed_where_clause})
+                    AND img_id IS NOT NULL
+                    """
 
-                print(f"img_id取得SQL: {get_img_ids_sql}")
-                cursor.execute(get_img_ids_sql)
+                    print(f"img_id取得SQL: {get_img_ids_sql}")
+                    cursor.execute(get_img_ids_sql)
 
-                doc_img_pairs = []
-                for row in cursor:
-                    doc_id = row[0]
-                    embed_id = row[1]
-                    img_id = row[2]
-                    doc_img_pair = (doc_id, img_id)
-                    if doc_img_pair not in doc_img_pairs:
-                        doc_img_pairs.append(doc_img_pair)
-                        print(f"見つかったペア: doc_id={doc_id}, embed_id={embed_id}, img_id={img_id}")
-
-                if not doc_img_pairs:
-                    print("_image_embeddingテーブルからimg_idを取得できませんでした")
-                    yield (
-                        gr.Markdown(value=llama_4_maverick_answer_text),
-                        gr.Markdown(value=llama_4_scout_answer_text),
-                        gr.Markdown(value=llama_3_2_90b_vision_answer_text)
-                    )
-                    return
-
-                print(f"取得したdoc_id, img_idペア数: {len(doc_img_pairs)}")
-
-                # 次に_imageテーブルからbase64_dataを取得
-                img_where_conditions = []
-                for doc_id, img_id in doc_img_pairs:
-                    img_where_conditions.append(f"(doc_id = '{doc_id}' AND img_id = {img_id})")
-
-                img_where_clause = " OR ".join(img_where_conditions)
-
-                # Oracle不允许对CLOB字段使用DISTINCT，所以直接获取前20条记录（因为可能有重复）
-                select_sql = f"""
-                SELECT base64_data, doc_id, img_id
-                FROM {DEFAULT_COLLECTION_NAME}_image
-                WHERE ({img_where_clause})
-                AND base64_data IS NOT NULL
-                AND ROWNUM <= 20
-                """
-
-                print(f"実行するSQL: {select_sql}")
-                cursor.execute(select_sql)
-
-                base64_data_set = set()  # 重複を避けるためにsetを使用
-                base64_data_list = []
-
-                for row in cursor:
-                    if row[0] is not None:
-                        # CLOBオブジェクトの場合はread()メソッドを使用
-                        base64_string = row[0].read() if hasattr(row[0], 'read') else str(row[0])
-                        doc_id = row[1]
+                    doc_img_pairs = []
+                    for row in cursor:
+                        doc_id = row[0]
+                        embed_id = row[1]
                         img_id = row[2]
+                        doc_img_pair = (doc_id, img_id)
+                        if doc_img_pair not in doc_img_pairs:
+                            doc_img_pairs.append(doc_img_pair)
+                            print(f"見つかったペア: doc_id={doc_id}, embed_id={embed_id}, img_id={img_id}")
 
-                        # 重複チェック（最初の100文字で判定）
-                        base64_prefix = base64_string[:100] if len(base64_string) > 100 else base64_string
-                        if base64_prefix not in base64_data_set:
-                            base64_data_set.add(base64_prefix)
-                            base64_data_list.append((base64_string, doc_id, img_id))
+                    if not doc_img_pairs:
+                        print("_image_embeddingテーブルからimg_idを取得できませんでした")
+                        yield (
+                            gr.Markdown(value=llama_4_maverick_image_answer_text),
+                            gr.Markdown(value=llama_4_scout_image_answer_text),
+                            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text)
+                        )
+                        return
 
-                            # 10個に達したら終了
-                            if len(base64_data_list) >= 10:
-                                break
+                    print(f"取得したdoc_id, img_idペア数: {len(doc_img_pairs)}")
 
-                print(f"取得したdistinct base64_dataの数: {len(base64_data_list)}")
+                    # 次に_imageテーブルからbase64_dataを取得
+                    img_where_conditions = []
+                    for doc_id, img_id in doc_img_pairs:
+                        img_where_conditions.append(f"(doc_id = '{doc_id}' AND img_id = {img_id})")
 
-                # 初期化：現在のLLM回答テキストを保持
-                current_llama_4_maverick_text = llama_4_maverick_answer_text
-                current_llama_4_scout_text = llama_4_scout_answer_text
-                current_llama_3_2_90b_vision_text = llama_3_2_90b_vision_answer_text
+                    img_where_clause = " OR ".join(img_where_conditions)
 
-                # 各base64_dataに対してLLMで処理
-                for i, (base64_data, doc_id, img_id) in enumerate(base64_data_list, 1):
-                    print(f"画像 {i} (doc_id: {doc_id}, img_id: {img_id}) を処理中...")
+                    # Oracle不允许对CLOB字段使用DISTINCT，所以直接获取前20条记录（因为可能有重复）
+                    select_sql = f"""
+                    SELECT base64_data, doc_id, img_id
+                    FROM {DEFAULT_COLLECTION_NAME}_image
+                    WHERE ({img_where_clause})
+                    AND base64_data IS NOT NULL
+                    AND ROWNUM <= 20
+                    """
 
-                    # base64データをdata:image/png;base64,{base64_data}形式に変換
-                    image_url = f"data:image/png;base64,{base64_data}"
+                    print(f"実行するSQL: {select_sql}")
+                    cursor.execute(select_sql)
 
-                    # 選択されたLLMモデルに対して処理を実行し、結果を取得
-                    llm_results = process_image_with_selected_llms(
-                        image_url,
-                        query_text,
-                        llm_answer_checkbox_group,
-                        target_models,
-                        i,
-                        doc_id,
-                        img_id
-                    )
+                    base64_data_set = set()  # 重複を避けるためにsetを使用
+                    base64_data_list = []
 
-                    # 各LLMの結果を対応するテキストにappend
-                    if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_results:
-                        current_llama_4_maverick_text += llm_results["meta/llama-4-maverick-17b-128e-instruct-fp8"]
+                    for row in cursor:
+                        if row[0] is not None:
+                            try:
+                                # CLOBオブジェクトの場合はread()メソッドを使用（安全な読み取り）
+                                if hasattr(row[0], 'read'):
+                                    # CLOB読み取りを安全に実行
+                                    try:
+                                        base64_string = row[0].read()
+                                        # 非常に大きなデータの場合は制限
+                                        if len(base64_string) > 10 * 1024 * 1024:  # 10MB制限
+                                            print(f"Base64データが大きすぎます（{len(base64_string)}文字）、スキップします")
+                                            continue
+                                    except Exception as clob_e:
+                                        print(f"CLOB読み取りエラー: {clob_e}")
+                                        continue
+                                else:
+                                    base64_string = str(row[0])
 
-                    if "meta/llama-4-scout-17b-16e-instruct" in llm_results:
-                        current_llama_4_scout_text += llm_results["meta/llama-4-scout-17b-16e-instruct"]
+                                doc_id = row[1]
+                                img_id = row[2]
 
-                    if "meta/llama-3-2-90b-vision" in llm_results:
-                        current_llama_3_2_90b_vision_text += llm_results["meta/llama-3-2-90b-vision"]
+                                # 重複チェック（最初の100文字で判定）
+                                base64_prefix = base64_string[:100] if len(base64_string) > 100 else base64_string
+                                if base64_prefix not in base64_data_set:
+                                    base64_data_set.add(base64_prefix)
+                                base64_data_list.append((base64_string, doc_id, img_id))
 
-                    # 更新された結果をyield
-                    yield (
-                        gr.Markdown(value=current_llama_4_maverick_text),
-                        gr.Markdown(value=current_llama_4_scout_text),
-                        gr.Markdown(value=current_llama_3_2_90b_vision_text)
-                    )
+                                # 10個に達したら終了
+                                if len(base64_data_list) >= 10:
+                                    break
+                            except (TimeoutError, Exception) as e:
+                                print(f"CLOB読み取り中にエラーが発生しました: {e}")
+                                continue
+
+                    print(f"取得したdistinct base64_dataの数: {len(base64_data_list)}")
+
+                    # 初期化：現在の画像回答テキストを保持（累積用）
+                    accumulated_llama_4_maverick_text = llama_4_maverick_image_answer_text
+                    accumulated_llama_4_scout_text = llama_4_scout_image_answer_text
+                    accumulated_llama_3_2_90b_vision_text = llama_3_2_90b_vision_image_answer_text
+
+                    # 各base64_dataに対してLLMで処理
+                    for i, (base64_data, doc_id, img_id) in enumerate(base64_data_list, 1):
+                        print(f"画像 {i} (doc_id: {doc_id}, img_id: {img_id}) を処理中...")
+
+                        # base64データをdata:image/png;base64,{base64_data}形式に変換
+                        image_url = f"data:image/png;base64,{base64_data}"
+
+                        # 各モデルの現在の画像に対する回答を保持
+                        current_image_llama_4_maverick = ""
+                        current_image_llama_4_scout = ""
+                        current_image_llama_3_2_90b_vision = ""
+
+                        # 選択されたLLMモデルに対して処理を実行し、結果をストリーミングで取得
+                        async for llm_results in process_single_image_streaming(
+                            image_url,
+                            query_text,
+                            llm_answer_checkbox_group,
+                            target_models,
+                            i,
+                            doc_id,
+                            img_id,
+                            custom_image_prompt
+                        ):
+                            # 各LLMの結果を現在の画像の回答として更新
+                            if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_results:
+                                current_image_llama_4_maverick = llm_results["meta/llama-4-maverick-17b-128e-instruct-fp8"]
+
+                            if "meta/llama-4-scout-17b-16e-instruct" in llm_results:
+                                current_image_llama_4_scout = llm_results["meta/llama-4-scout-17b-16e-instruct"]
+
+                            if "meta/llama-3-2-90b-vision" in llm_results:
+                                current_image_llama_3_2_90b_vision = llm_results["meta/llama-3-2-90b-vision"]
+
+                            # 累積テキストと現在の画像の回答を結合して表示
+                            current_llama_4_maverick_text = accumulated_llama_4_maverick_text + current_image_llama_4_maverick
+                            current_llama_4_scout_text = accumulated_llama_4_scout_text + current_image_llama_4_scout
+                            current_llama_3_2_90b_vision_text = accumulated_llama_3_2_90b_vision_text + current_image_llama_3_2_90b_vision
+
+                            # 更新された画像回答結果をyield
+                            yield (
+                                gr.Markdown(value=current_llama_4_maverick_text),
+                                gr.Markdown(value=current_llama_4_scout_text),
+                                gr.Markdown(value=current_llama_3_2_90b_vision_text)
+                            )
+
+                        # 現在の画像の処理が完了したら、累積テキストに追加
+                        accumulated_llama_4_maverick_text += current_image_llama_4_maverick
+                        accumulated_llama_4_scout_text += current_image_llama_4_scout
+                        accumulated_llama_3_2_90b_vision_text += current_image_llama_3_2_90b_vision
+
+        except Exception as db_e:
+            print(f"データベース操作中にエラーが発生しました: {db_e}")
+            # データベースエラー時も現在の状態をyield
+            yield (
+                gr.Markdown(value=llama_4_maverick_image_answer_text),
+                gr.Markdown(value=llama_4_scout_image_answer_text),
+                gr.Markdown(value=llama_3_2_90b_vision_image_answer_text)
+            )
+            return
 
     except Exception as e:
         print(f"base64_data取得中にエラーが発生しました: {e}")
         # エラー時も現在の状態をyield
         yield (
-            gr.Markdown(value=llama_4_maverick_answer_text),
-            gr.Markdown(value=llama_4_scout_answer_text),
-            gr.Markdown(value=llama_3_2_90b_vision_answer_text)
+            gr.Markdown(value=llama_4_maverick_image_answer_text),
+            gr.Markdown(value=llama_4_scout_image_answer_text),
+            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text)
         )
 
-    print("print_base64_data_for_selected_models() 完了")
+    print("process_image_answers_streaming() 完了")
 
 
 async def eval_by_ragas(
@@ -4829,7 +5240,8 @@ def generate_download_file(
         llama_4_maverick_response = llama_4_maverick_response
         llama_4_maverick_referenced_contexts = ""
         if include_citation:
-            llama_4_maverick_response, llama_4_maverick_referenced_contexts = extract_citation(llama_4_maverick_response)
+            llama_4_maverick_response, llama_4_maverick_referenced_contexts = extract_citation(
+                llama_4_maverick_response)
         if llm_evaluation_checkbox:
             llama_4_maverick_evaluation = llama_4_maverick_evaluation
         else:
@@ -5204,7 +5616,7 @@ def insert_query_result(
                                  :3,
                                  :4) \
                          """
-            cursor.setinputsizes(None, None, oracledb.CLOB)
+            cursor.setinputsizes(None, None, None, oracledb.CLOB)
             cursor.execute(
                 insert_sql,
                 [
@@ -5232,7 +5644,7 @@ def insert_query_result(
                                      :3,
                                      :4) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
@@ -5260,7 +5672,7 @@ def insert_query_result(
                                      :3,
                                      :4) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
@@ -5288,7 +5700,7 @@ def insert_query_result(
                                      :3,
                                      :4) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
@@ -5316,7 +5728,7 @@ def insert_query_result(
                                      :3,
                                      :4) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
@@ -5344,7 +5756,7 @@ def insert_query_result(
                                      :3,
                                      :4) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
@@ -5372,7 +5784,7 @@ def insert_query_result(
                                      :3,
                                      :4) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
@@ -5400,7 +5812,7 @@ def insert_query_result(
                                      :3,
                                      :4) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
@@ -5428,7 +5840,7 @@ def insert_query_result(
                                      :3,
                                      :4) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
@@ -5456,7 +5868,7 @@ def insert_query_result(
                                      :3,
                                      :4) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
@@ -5484,7 +5896,7 @@ def insert_query_result(
                                      :3,
                                      :4) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
@@ -5512,7 +5924,7 @@ def insert_query_result(
                                      :3,
                                      :4) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
@@ -5540,7 +5952,7 @@ def insert_query_result(
                                      :3,
                                      :4) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
@@ -5568,7 +5980,7 @@ def insert_query_result(
                                      :3,
                                      :4) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
@@ -5596,7 +6008,7 @@ def insert_query_result(
                                      :3,
                                      :4) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
@@ -5624,7 +6036,7 @@ def insert_query_result(
                                      :3,
                                      :4) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
@@ -6517,6 +6929,31 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             )
                         with gr.Column():
                             gr.Markdown("&nbsp;")
+                    with gr.Accordion(label="画像 Prompt 設定", open=False, visible=False) as tab_chat_document_image_prompt_accordion:
+                        with gr.Row():
+                            with gr.Column():
+                                tab_chat_document_image_prompt_text = gr.Textbox(
+                                    label="画像 Prompt テンプレート",
+                                    lines=15,
+                                    max_lines=25,
+                                    interactive=True,
+                                    show_copy_button=True,
+                                    value=get_image_qa_prompt("{{query_text}}"),
+                                    info="画像処理で使用されるpromptテンプレートです。{{query_text}}は実行時に置換されます。"
+                                )
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                tab_chat_document_image_prompt_reset_button = gr.Button(
+                                    value="デフォルトに戻す",
+                                    variant="secondary"
+                                )
+                            with gr.Column(scale=1):
+                                gr.Markdown("&nbsp;")
+                                # tab_chat_document_image_prompt_save_button = gr.Button(
+                                #     value="保存",
+                                #     variant="primary",
+                                #     visible=False,
+                                # )
                     with gr.Row():
                         with gr.Column():
                             tab_chat_document_answer_by_one_checkbox = gr.Checkbox(
@@ -6769,8 +7206,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 ) as tab_chat_document_llm_xai_grok_3_accordion:
                     tab_chat_document_xai_grok_3_answer_text = gr.Markdown(
                         show_copy_button=True,
-                        height=200,
-                        min_height=200,
+                        height=300,
+                        min_height=300,
                         max_height=300
                     )
                     with gr.Accordion(
@@ -6823,8 +7260,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 ) as tab_chat_document_llm_command_a_accordion:
                     tab_chat_document_command_a_answer_text = gr.Markdown(
                         show_copy_button=True,
-                        height=200,
-                        min_height=200,
+                        height=300,
+                        min_height=300,
                         max_height=300
                     )
                     with gr.Accordion(
@@ -6877,8 +7314,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 ) as tab_chat_document_llm_command_r_accordion:
                     tab_chat_document_command_r_answer_text = gr.Markdown(
                         show_copy_button=True,
-                        height=200,
-                        min_height=200,
+                        height=300,
+                        min_height=300,
                         max_height=300
                     )
                     with gr.Accordion(
@@ -6931,8 +7368,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 ) as tab_chat_document_llm_command_r_plus_accordion:
                     tab_chat_document_command_r_plus_answer_text = gr.Markdown(
                         show_copy_button=True,
-                        height=200,
-                        min_height=200,
+                        height=300,
+                        min_height=300,
                         max_height=300
                     )
                     with gr.Accordion(
@@ -6985,10 +7422,21 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 ) as tab_chat_document_llm_llama_4_maverick_accordion:
                     tab_chat_document_llama_4_maverick_answer_text = gr.Markdown(
                         show_copy_button=True,
-                        height=200,
-                        min_height=200,
+                        height=300,
+                        min_height=300,
                         max_height=300
                     )
+                    with gr.Accordion(
+                            label="画像回答",
+                            visible=False,
+                            open=True
+                    ) as tab_chat_document_llm_llama_4_maverick_image_accordion:
+                        tab_chat_document_llama_4_maverick_image_answer_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=300,
+                            min_height=300,
+                            max_height=300
+                        )
                     with gr.Accordion(
                             label="Human 評価",
                             visible=True,
@@ -7039,10 +7487,21 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 ) as tab_chat_document_llm_llama_4_scout_accordion:
                     tab_chat_document_llama_4_scout_answer_text = gr.Markdown(
                         show_copy_button=True,
-                        height=200,
-                        min_height=200,
+                        height=300,
+                        min_height=300,
                         max_height=300
                     )
+                    with gr.Accordion(
+                            label="画像回答",
+                            visible=False,
+                            open=True
+                    ) as tab_chat_document_llm_llama_4_scout_image_accordion:
+                        tab_chat_document_llama_4_scout_image_answer_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=300,
+                            min_height=300,
+                            max_height=300
+                        )
                     with gr.Accordion(
                             label="Human 評価",
                             visible=True,
@@ -7093,8 +7552,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 ) as tab_chat_document_llm_llama_3_3_70b_accordion:
                     tab_chat_document_llama_3_3_70b_answer_text = gr.Markdown(
                         show_copy_button=True,
-                        height=200,
-                        min_height=200,
+                        height=300,
+                        min_height=300,
                         max_height=300
                     )
                     with gr.Accordion(
@@ -7147,10 +7606,21 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 ) as tab_chat_document_llm_llama_3_2_90b_vision_accordion:
                     tab_chat_document_llama_3_2_90b_vision_answer_text = gr.Markdown(
                         show_copy_button=True,
-                        height=200,
-                        min_height=200,
+                        height=300,
+                        min_height=300,
                         max_height=300
                     )
+                    with gr.Accordion(
+                            label="画像回答",
+                            visible=False,
+                            open=True
+                    ) as tab_chat_document_llm_llama_3_2_90b_vision_image_accordion:
+                        tab_chat_document_llama_3_2_90b_vision_image_answer_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=300,
+                            min_height=300,
+                            max_height=300
+                        )
                     with gr.Accordion(
                             label="Human 評価",
                             visible=True,
@@ -7199,8 +7669,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                   open=True) as tab_chat_document_llm_openai_gpt4o_accordion:
                     tab_chat_document_openai_gpt4o_answer_text = gr.Markdown(
                         show_copy_button=True,
-                        height=200,
-                        min_height=200,
+                        height=300,
+                        min_height=300,
                         max_height=300
                     )
                     with gr.Accordion(
@@ -7253,8 +7723,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 ) as tab_chat_document_llm_openai_gpt4_accordion:
                     tab_chat_document_openai_gpt4_answer_text = gr.Markdown(
                         show_copy_button=True,
-                        height=200,
-                        min_height=200,
+                        height=300,
+                        min_height=300,
                         max_height=300
                     )
                     with gr.Accordion(
@@ -7307,8 +7777,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 ) as tab_chat_document_llm_azure_openai_gpt4o_accordion:
                     tab_chat_document_azure_openai_gpt4o_answer_text = gr.Markdown(
                         show_copy_button=True,
-                        height=200,
-                        min_height=200,
+                        height=300,
+                        min_height=300,
                         max_height=300
                     )
                     with gr.Accordion(
@@ -7361,8 +7831,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 ) as tab_chat_document_llm_azure_openai_gpt4_accordion:
                     tab_chat_document_azure_openai_gpt4_answer_text = gr.Markdown(
                         show_copy_button=True,
-                        height=200,
-                        min_height=200,
+                        height=300,
+                        min_height=300,
                         max_height=300
                     )
                     with gr.Accordion(
@@ -7415,8 +7885,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 ) as tab_chat_document_llm_claude_3_opus_accordion:
                     tab_chat_document_claude_3_opus_answer_text = gr.Markdown(
                         show_copy_button=True,
-                        height=200,
-                        min_height=200,
+                        height=300,
+                        min_height=300,
                         max_height=300
                     )
                     with gr.Accordion(
@@ -7469,8 +7939,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 ) as tab_chat_document_llm_claude_3_sonnet_accordion:
                     tab_chat_document_claude_3_sonnet_answer_text = gr.Markdown(
                         show_copy_button=True,
-                        height=200,
-                        min_height=200,
+                        height=300,
+                        min_height=300,
                         max_height=300
                     )
                     with gr.Accordion(
@@ -7523,8 +7993,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 ) as tab_chat_document_llm_claude_3_haiku_accordion:
                     tab_chat_document_claude_3_haiku_answer_text = gr.Markdown(
                         show_copy_button=True,
-                        height=200,
-                        min_height=200,
+                        height=300,
+                        min_height=300,
                         max_height=300
                     )
                     with gr.Accordion(
@@ -7965,6 +8435,17 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_claude_3_sonnet_accordion,
             tab_chat_document_llm_claude_3_haiku_accordion
         ]
+    ).then(
+        set_image_answer_visibility,
+        inputs=[
+            tab_chat_document_llm_answer_checkbox_group,
+            tab_chat_document_use_image_checkbox
+        ],
+        outputs=[
+            tab_chat_document_llm_llama_4_maverick_image_accordion,
+            tab_chat_document_llm_llama_4_scout_image_accordion,
+            tab_chat_document_llm_llama_3_2_90b_vision_image_accordion
+        ]
     )
     tab_chat_document_llm_evaluation_checkbox.change(
         lambda x: (
@@ -8022,21 +8503,37 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         lambda x: (
             # 画像使用時の設定
             gr.Checkbox(value=False, interactive=False),  # Highest-Ranked-One OFF、修正可能
-            gr.Slider(value=0, interactive=False),        # Extend-First-K 0、修正可能
-            gr.Slider(value=0, interactive=False)         # Extend-Around-K 2、修正可能
+            gr.Slider(value=0, interactive=False),  # Extend-First-K 0、修正可能
+            gr.Slider(value=0, interactive=False),  # Extend-Around-K 2、修正可能
+            gr.Accordion(visible=True)  # 画像 Prompt 設定を表示
         ) if x else (
             # 通常時の設定
             gr.Checkbox(value=False, interactive=True),  # Highest-Ranked-One デフォルト
-            gr.Slider(value=0, interactive=True),        # Extend-First-K デフォルト
-            gr.Slider(value=2, interactive=True)         # Extend-Around-K デフォルト
+            gr.Slider(value=0, interactive=True),  # Extend-First-K デフォルト
+            gr.Slider(value=2, interactive=True),  # Extend-Around-K デフォルト
+            gr.Accordion(visible=False)  # 画像 Prompt 設定を非表示
         ),
         inputs=[tab_chat_document_use_image_checkbox],
         outputs=[
             tab_chat_document_answer_by_one_checkbox,
             tab_chat_document_extend_first_chunk_size,
-            tab_chat_document_extend_around_chunk_size
+            tab_chat_document_extend_around_chunk_size,
+            tab_chat_document_image_prompt_accordion
+        ]
+    ).then(
+        set_image_answer_visibility,
+        inputs=[
+            tab_chat_document_llm_answer_checkbox_group,
+            tab_chat_document_use_image_checkbox
+        ],
+        outputs=[
+            tab_chat_document_llm_llama_4_maverick_image_accordion,
+            tab_chat_document_llm_llama_4_scout_image_accordion,
+            tab_chat_document_llm_llama_3_2_90b_vision_image_accordion
         ]
     )
+
+
 
     # tab_chat_document_chat_document_button.click(
     #     check_chat_document_input,
@@ -8196,20 +8693,21 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_claude_3_haiku_answer_text,
         ]
     ).then(
-        print_base64_data_for_selected_models,
+        process_image_answers_streaming,
         inputs=[
             tab_chat_document_searched_result_dataframe,
             tab_chat_document_use_image_checkbox,
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_query_text,
-            tab_chat_document_llama_4_maverick_answer_text,
-            tab_chat_document_llama_4_scout_answer_text,
-            tab_chat_document_llama_3_2_90b_vision_answer_text
+            tab_chat_document_llama_4_maverick_image_answer_text,
+            tab_chat_document_llama_4_scout_image_answer_text,
+            tab_chat_document_llama_3_2_90b_vision_image_answer_text,
+            tab_chat_document_image_prompt_text
         ],
         outputs=[
-            tab_chat_document_llama_4_maverick_answer_text,
-            tab_chat_document_llama_4_scout_answer_text,
-            tab_chat_document_llama_3_2_90b_vision_answer_text
+            tab_chat_document_llama_4_maverick_image_answer_text,
+            tab_chat_document_llama_4_scout_image_answer_text,
+            tab_chat_document_llama_3_2_90b_vision_image_answer_text
         ]
     ).then(
         eval_by_ragas,
@@ -8570,6 +9068,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ]
     )
 
+
     # RAG Prompt 設定のイベントハンドラー
     def save_rag_prompt(prompt_text):
         """RAG promptを保存する"""
@@ -8579,11 +9078,13 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         except Exception as e:
             return gr.Warning(f"Promptの保存に失敗しました: {str(e)}")
 
+
     def reset_rag_prompt():
         """RAG promptをデフォルトに戻す"""
         default_prompt = get_langgpt_rag_prompt("{{context}}", "{{query_text}}", False, False)
         update_langgpt_rag_prompt(default_prompt)
         return default_prompt
+
 
     tab_chat_document_rag_prompt_save_button.click(
         save_rag_prompt,
@@ -8595,6 +9096,33 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         reset_rag_prompt,
         inputs=[],
         outputs=[tab_chat_document_rag_prompt_text]
+    )
+
+    # 画像 Prompt 設定のイベントハンドラー
+    def save_image_prompt(prompt_text):
+        """画像 promptを保存する"""
+        try:
+            update_image_qa_prompt(prompt_text)
+            return gr.Info("画像 Promptが保存されました。")
+        except Exception as e:
+            return gr.Warning(f"画像 Promptの保存に失敗しました: {str(e)}")
+
+    def reset_image_prompt():
+        """画像 promptをデフォルトに戻す"""
+        default_prompt = get_image_qa_prompt("{{query_text}}")
+        update_image_qa_prompt(default_prompt)
+        return default_prompt
+
+    # tab_chat_document_image_prompt_save_button.click(
+    #     save_image_prompt,
+    #     inputs=[tab_chat_document_image_prompt_text],
+    #     outputs=[]
+    # )
+
+    tab_chat_document_image_prompt_reset_button.click(
+        reset_image_prompt,
+        inputs=[],
+        outputs=[tab_chat_document_image_prompt_text]
     )
 
 app.queue()
