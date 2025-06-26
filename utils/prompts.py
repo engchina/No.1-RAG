@@ -137,7 +137,7 @@ def get_step_back_prompt():
     """Get Step-Back-Prompting template"""
     return STEP_BACK_PROMPT_TEMPLATE
 
-def get_langgpt_rag_prompt(context, query_text, include_citation=False, include_current_time=False, custom_template=None):
+def get_langgpt_rag_prompt(context, query_text, include_citation=False, include_current_time=False, use_image=False, custom_template=None):
     """Get LangGPT RAG prompt with context and query"""
     # Use custom template if provided, otherwise use default template
     template = custom_template if custom_template else LANGGPT_RAG_PROMPT_TEMPLATE

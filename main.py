@@ -19,7 +19,8 @@ import requests
 from dotenv import load_dotenv, find_dotenv, set_key, get_key
 from gradio.themes import GoogleFont
 from langchain_anthropic import ChatAnthropic
-from langchain_community.chat_models import ChatOCIGenAI
+# from langchain_community.chat_models import ChatOCIGenAI
+from my_langchain_community.chat_models import ChatOCIGenAI
 from langchain_community.embeddings import OCIGenAIEmbeddings
 from langchain_community.vectorstores.utils import DistanceStrategy
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -279,8 +280,8 @@ async def command_a_task(system_text, query_text, command_a_checkbox):
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
-        print(f"\n推論時間: {inference_time:.2f}秒")
-        yield f"\n推論時間: {inference_time:.2f}秒"
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
@@ -319,8 +320,8 @@ async def command_r_task(system_text, query_text, command_r_checkbox):
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
-        print(f"\n推論時間: {inference_time:.2f}秒")
-        yield f"\n推論時間: {inference_time:.2f}秒"
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
@@ -359,8 +360,48 @@ async def command_r_plus_task(system_text, query_text, command_r_plus_checkbox):
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
-        print(f"\n推論時間: {inference_time:.2f}秒")
-        yield f"\n推論時間: {inference_time:.2f}秒"
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
+        yield "TASK_DONE"
+    else:
+        yield "TASK_DONE"
+
+
+async def xai_grok_3_task(system_text, query_text, xai_grok_3_checkbox):
+    region = get_region()
+    if xai_grok_3_checkbox:
+        xai_grok_3 = ChatOCIGenAI(
+            model_id="xai.grok-3",
+            provider="xai",
+            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+        )
+        if system_text:
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=query_text),
+            ]
+        else:
+            messages = [
+                HumanMessage(content=query_text),
+            ]
+        start_time = time.time()
+        print(f"{start_time=}")
+        langfuse_handler = CallbackHandler(
+            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+            host=os.environ["LANGFUSE_HOST"],
+        )
+        async for chunk in xai_grok_3.astream(messages, config={"callbacks": [langfuse_handler],
+                                                                "metadata": {
+                                                                    "ls_model_name": "xai.grok-3"}}):
+            yield chunk.content
+        end_time = time.time()
+        print(f"{end_time=}")
+        inference_time = end_time - start_time
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
@@ -399,8 +440,8 @@ async def llama_3_3_70b_task(system_text, query_text, llama_3_3_70b_checkbox):
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
-        print(f"\n推論時間: {inference_time:.2f}秒")
-        yield f"\n推論時間: {inference_time:.2f}秒"
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
@@ -455,8 +496,8 @@ async def llama_3_2_90b_vision_task(system_text, query_image, query_text, llama_
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
-        print(f"\n推論時間: {inference_time:.2f}秒")
-        yield f"\n推論時間: {inference_time:.2f}秒"
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
@@ -511,8 +552,8 @@ async def llama_4_maverick_task(system_text, query_image, query_text, llama_4_ma
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
-        print(f"\n推論時間: {inference_time:.2f}秒")
-        yield f"\n推論時間: {inference_time:.2f}秒"
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
@@ -567,8 +608,8 @@ async def llama_4_scout_task(system_text, query_image, query_text, llama_4_scout
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
-        print(f"\n推論時間: {inference_time:.2f}秒")
-        yield f"\n推論時間: {inference_time:.2f}秒"
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
@@ -608,8 +649,8 @@ async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
-        print(f"\n推論時間: {inference_time:.2f}秒")
-        yield f"\n推論時間: {inference_time:.2f}秒"
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
@@ -649,8 +690,8 @@ async def openai_gpt4_task(system_text, query_text, openai_gpt4_checkbox):
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
-        print(f"\n推論時間: {inference_time:.2f}秒")
-        yield f"\n推論時間: {inference_time:.2f}秒"
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
@@ -691,8 +732,8 @@ async def azure_openai_gpt4o_task(system_text, query_text, azure_openai_gpt4o_ch
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
-        print(f"\n推論時間: {inference_time:.2f}秒")
-        yield f"\n推論時間: {inference_time:.2f}秒"
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
@@ -733,8 +774,8 @@ async def azure_openai_gpt4_task(system_text, query_text, azure_openai_gpt4_chec
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
-        print(f"\n推論時間: {inference_time:.2f}秒")
-        yield f"\n推論時間: {inference_time:.2f}秒"
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
@@ -771,8 +812,8 @@ async def claude_3_opus_task(system_text, query_text, claude_3_opus_checkbox):
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
-        print(f"\n推論時間: {inference_time:.2f}秒")
-        yield f"\n推論時間: {inference_time:.2f}秒"
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
@@ -809,8 +850,8 @@ async def claude_3_sonnet_task(system_text, query_text, claude_3_sonnet_checkbox
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
-        print(f"\n推論時間: {inference_time:.2f}秒")
-        yield f"\n推論時間: {inference_time:.2f}秒"
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
@@ -847,8 +888,8 @@ async def claude_3_haiku_task(system_text, query_text, claude_3_haiku_checkbox):
         end_time = time.time()
         print(f"{end_time=}")
         inference_time = end_time - start_time
-        print(f"\n推論時間: {inference_time:.2f}秒")
-        yield f"\n推論時間: {inference_time:.2f}秒"
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
@@ -856,6 +897,7 @@ async def claude_3_haiku_task(system_text, query_text, claude_3_haiku_checkbox):
 
 async def chat(
         system_text,
+        xai_grok_3_user_text,
         command_a_user_text,
         command_r_user_text,
         command_r_plus_user_text,
@@ -873,6 +915,7 @@ async def chat(
         claude_3_opus_user_text,
         claude_3_sonnet_user_text,
         claude_3_haiku_user_text,
+        xai_grok_3_checkbox,
         command_a_checkbox,
         command_r_checkbox,
         command_r_plus_checkbox,
@@ -888,6 +931,7 @@ async def chat(
         claude_3_sonnet_checkbox,
         claude_3_haiku_checkbox
 ):
+    xai_grok_3_gen = xai_grok_3_task(system_text, xai_grok_3_user_text, xai_grok_3_checkbox)
     command_a_gen = command_a_task(system_text, command_a_user_text, command_a_checkbox)
     command_r_gen = command_r_task(system_text, command_r_user_text, command_r_checkbox)
     command_r_plus_gen = command_r_plus_task(system_text, command_r_plus_user_text, command_r_plus_checkbox)
@@ -909,10 +953,10 @@ async def chat(
     claude_3_sonnet_gen = claude_3_sonnet_task(system_text, claude_3_sonnet_user_text, claude_3_sonnet_checkbox)
     claude_3_haiku_gen = claude_3_haiku_task(system_text, claude_3_haiku_user_text, claude_3_haiku_checkbox)
 
-    responses_status = ["", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+    responses_status = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
     while True:
-        responses = ["", "", "", "", "", "", "", "", "", "", "", "", "", ""]
-        generators = [command_a_gen, command_r_gen, command_r_plus_gen,
+        responses = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+        generators = [xai_grok_3_gen, command_a_gen, command_r_gen, command_r_plus_gen,
                       llama_4_maverick_gen, llama_4_scout_gen,
                       llama_3_3_70b_gen, llama_3_2_90b_vision_gen,
                       openai_gpt4o_gen, openai_gpt4_gen,
@@ -938,6 +982,7 @@ async def chat(
 
 
 def set_chat_llm_answer(llm_answer_checkbox):
+    xai_grok_3_answer_visible = False
     command_a_answer_visible = False
     command_r_answer_visible = False
     command_r_plus_answer_visible = False
@@ -952,6 +997,8 @@ def set_chat_llm_answer(llm_answer_checkbox):
     claude_3_opus_answer_visible = False
     claude_3_sonnet_answer_visible = False
     claude_3_haiku_answer_visible = False
+    if "xai/grok-3" in llm_answer_checkbox:
+        xai_grok_3_answer_visible = True
     if "cohere/command-a" in llm_answer_checkbox:
         command_a_answer_visible = True
     if "cohere/command-r" in llm_answer_checkbox:
@@ -981,6 +1028,7 @@ def set_chat_llm_answer(llm_answer_checkbox):
     if "claude/haiku" in llm_answer_checkbox:
         claude_3_haiku_answer_visible = True
     return (
+        gr.Accordion(visible=xai_grok_3_answer_visible),
         gr.Accordion(visible=command_a_answer_visible),
         gr.Accordion(visible=command_r_answer_visible),
         gr.Accordion(visible=command_r_plus_answer_visible),
@@ -999,6 +1047,7 @@ def set_chat_llm_answer(llm_answer_checkbox):
 
 
 def set_chat_llm_evaluation(llm_evaluation_checkbox):
+    xai_grok_3_evaluation_visible = False
     command_a_evaluation_visible = False
     command_r_evaluation_visible = False
     command_r_plus_evaluation_visible = False
@@ -1014,6 +1063,7 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
     claude_3_sonnet_evaluation_visible = False
     claude_3_haiku_evaluation_visible = False
     if llm_evaluation_checkbox:
+        xai_grok_3_evaluation_visible = True
         command_a_evaluation_visible = True
         command_r_evaluation_visible = True
         command_r_plus_evaluation_visible = True
@@ -1029,6 +1079,7 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
         claude_3_sonnet_evaluation_visible = True
         claude_3_haiku_evaluation_visible = True
     return (
+        gr.Accordion(visible=xai_grok_3_evaluation_visible),
         gr.Accordion(visible=command_a_evaluation_visible),
         gr.Accordion(visible=command_r_evaluation_visible),
             gr.Accordion(visible=command_r_plus_evaluation_visible),
@@ -1070,9 +1121,11 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             "",
             "",
             "",
+            "",
             ""
         )
         return
+    xai_grok_3_user_text = query_text
     command_a_user_text = query_text
     command_r_user_text = query_text
     command_r_plus_user_text = query_text
@@ -1091,6 +1144,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     claude_3_sonnet_user_text = query_text
     claude_3_haiku_user_text = query_text
 
+    xai_grok_3_checkbox = False
     command_a_checkbox = False
     command_r_checkbox = False
     command_r_plus_checkbox = False
@@ -1105,6 +1159,8 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     claude_3_opus_checkbox = False
     claude_3_sonnet_checkbox = False
     claude_3_haiku_checkbox = False
+    if "xai/grok-3" in llm_answer_checkbox:
+        xai_grok_3_checkbox = True
     if "cohere/command-a" in llm_answer_checkbox:
         command_a_checkbox = True
     if "cohere/command-r" in llm_answer_checkbox:
@@ -1134,6 +1190,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     if "claude/haiku" in llm_answer_checkbox:
         claude_3_haiku_checkbox = True
     # ChatOCIGenAI
+    xai_grok_3_response = ""
     command_a_response = ""
     command_r_response = ""
     command_r_plus_response = ""
@@ -1148,8 +1205,9 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     claude_3_opus_response = ""
     claude_3_sonnet_response = ""
     claude_3_haiku_response = ""
-    async for command_a, command_r, command_r_plus, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
+    async for xai_grok_3, command_a, command_r, command_r_plus, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
             system_text,
+            xai_grok_3_user_text,
             command_a_user_text,
             command_r_user_text,
             command_r_plus_user_text,
@@ -1167,6 +1225,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             claude_3_opus_user_text,
             claude_3_sonnet_user_text,
             claude_3_haiku_user_text,
+            xai_grok_3_checkbox,
             command_a_checkbox,
             command_r_checkbox,
             command_r_plus_checkbox,
@@ -1182,6 +1241,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             claude_3_sonnet_checkbox,
             claude_3_haiku_checkbox
     ):
+        xai_grok_3_response += xai_grok_3
         command_a_response += command_a
         command_r_response += command_r
         command_r_plus_response += command_r_plus
@@ -1197,6 +1257,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
         claude_3_sonnet_response += sonnet
         claude_3_haiku_response += haiku
         yield (
+            gr.Markdown(value=xai_grok_3_response),
             gr.Markdown(value=command_a_response),
             gr.Markdown(value=command_r_response),
             gr.Markdown(value=command_r_plus_response),
@@ -1624,8 +1685,7 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_embedding (
     embed_id NUMBER,
     embed_data VARCHAR2(4000),
     embed_vector VECTOR({embedding_dim}, FLOAT32),
-    cmetadata CLOB,
-    img_id VARCHAR2(200)
+    cmetadata CLOB
 );
 """
 
@@ -1633,7 +1693,7 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_embedding (
 -- Create Image Table
 CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_image (
     doc_id VARCHAR2(200),
-    img_id VARCHAR2(200),
+    img_id NUMBER,
     text_data CLOB,
     vlm_data CLOB,
     base64_data CLOB
@@ -1648,7 +1708,7 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_image_embedding (
     embed_data VARCHAR2(4000),
     embed_vector VECTOR({embedding_dim}, FLOAT32),
     cmetadata CLOB,
-    img_id VARCHAR2(200)
+    img_id NUMBER
 );
 """
 
@@ -1694,7 +1754,7 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_image_embedding (
 
     create_image_table_sql = f"""CREATE TABLE {DEFAULT_COLLECTION_NAME}_image (
     doc_id VARCHAR2(200),
-    img_id VARCHAR2(200),
+    img_id NUMBER,
     text_data CLOB,
     vlm_data CLOB,
     base64_data CLOB
@@ -1706,7 +1766,7 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_image_embedding (
     embed_data VARCHAR2(4000),
     embed_vector VECTOR({embedding_dim}, FLOAT32),
     cmetadata CLOB,
-    img_id VARCHAR2(200)
+    img_id NUMBER
 )"""
 
     # Add drop and create statements to output SQL text
@@ -2087,6 +2147,222 @@ def reset_document_chunks_result_dataframe():
     )
 
 
+def process_image_blocks(doc_id, doc_data, chunk_size=None, chunk_overlap=None):
+    """
+    画像ブロックを処理して{DEFAULT_COLLECTION_NAME}_imageテーブルに保存し、
+    text_splitterを使用してデータを分割し{DEFAULT_COLLECTION_NAME}_image_embeddingテーブルに保存する
+
+    Args:
+        doc_id: ドキュメントID
+        doc_data: ドキュメントデータ
+        chunk_size: チャンクサイズ
+        chunk_overlap: チャンクオーバーラップ
+    """
+    # 画像ブロックのパターンを検索
+    image_blocks = re.findall(r'<!-- image_begin -->(.*?)<!-- image_end -->', doc_data, re.DOTALL)
+
+    if not image_blocks:
+        return
+
+    with pool.acquire() as conn:
+        with conn.cursor() as cursor:
+            # 既存の画像データを削除
+            delete_image_sql = f"""
+DELETE FROM {DEFAULT_COLLECTION_NAME}_image WHERE doc_id = :doc_id
+"""
+            cursor.execute(delete_image_sql, [doc_id])
+
+            # 既存の画像embedding データを削除
+            delete_image_embedding_sql = f"""
+DELETE FROM {DEFAULT_COLLECTION_NAME}_image_embedding WHERE doc_id = :doc_id
+"""
+            cursor.execute(delete_image_embedding_sql, [doc_id])
+
+            # 画像データを挿入するSQL
+            insert_image_sql = f"""
+INSERT INTO {DEFAULT_COLLECTION_NAME}_image (
+    doc_id,
+    img_id,
+    text_data,
+    vlm_data,
+    base64_data
+) VALUES (:doc_id, :img_id, :text_data, :vlm_data, :base64_data)
+"""
+
+            img_id = 1
+            for image_block in image_blocks:
+                # OCRコンテンツを抽出
+                text_data_match = re.search(r'<!-- image_ocr_content_begin -->(.*?)<!-- image_ocr_content_end -->', image_block, re.DOTALL)
+                text_data = text_data_match.group(1).strip() if text_data_match else ""
+
+                # VLM説明を抽出
+                vlm_data_match = re.search(r'<!-- image_vlm_description_begin -->(.*?)<!-- image_vlm_description_end -->', image_block, re.DOTALL)
+                vlm_data = vlm_data_match.group(1).strip() if vlm_data_match else ""
+
+                # Base64データを抽出
+                base64_data_match = re.search(r'<!-- image_base64_begin -->(.*?)<!-- image_base64_end -->', image_block, re.DOTALL)
+                base64_data = base64_data_match.group(1).strip() if base64_data_match else ""
+
+                # base64_dataから前後のHTMLコメント記号を除去
+                if base64_data:
+                    # 前後の <!-- と --> を除去
+                    base64_data = re.sub(r'^<!--\s*', '', base64_data)
+                    base64_data = re.sub(r'\s*-->$', '', base64_data)
+                    base64_data = base64_data.strip()
+
+                # データベースに挿入
+                cursor.execute(insert_image_sql, {
+                    'doc_id': doc_id,
+                    'img_id': img_id,
+                    'text_data': text_data,
+                    'vlm_data': vlm_data,
+                    'base64_data': base64_data
+                })
+
+                print(f"画像データを保存しました: doc_id={doc_id}, img_id={img_id}")
+                img_id += 1
+
+            conn.commit()
+            print(f"合計 {len(image_blocks)} 個の画像ブロックを処理しました")
+
+            # 画像データのsplit処理を実行
+            _process_image_data_splitting(doc_id, cursor, chunk_size, chunk_overlap)
+            conn.commit()
+
+
+def _process_image_data_splitting(doc_id, cursor, chunk_size=None, chunk_overlap=None):
+    """
+    {DEFAULT_COLLECTION_NAME}_imageテーブルのtext_dataとvlm_dataを個別にtext_splitterで分割し、
+    {DEFAULT_COLLECTION_NAME}_image_embeddingテーブルに保存する
+
+    Args:
+        doc_id: ドキュメントID
+        cursor: データベースカーソル
+        chunk_size: チャンクサイズ
+        chunk_overlap: チャンクオーバーラップ
+    """
+    # 画像データを取得
+    select_image_sql = f"""
+SELECT img_id, text_data, vlm_data FROM {DEFAULT_COLLECTION_NAME}_image
+WHERE doc_id = :doc_id ORDER BY img_id
+"""
+    cursor.execute(select_image_sql, [doc_id])
+    image_records = cursor.fetchall()
+
+    if not image_records:
+        print(f"画像データが見つかりません: doc_id={doc_id}")
+        return
+
+    # text_splitterを初期化
+    if chunk_size is not None and chunk_overlap is not None:
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap
+        )
+    else:
+        # デフォルト設定を使用
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=256,  # デフォルトのchunk_size
+            chunk_overlap=25  # デフォルトのoverlap（約10%）
+        )
+
+    # 画像embedding データを挿入するSQL
+    insert_embedding_sql = f"""
+INSERT INTO {DEFAULT_COLLECTION_NAME}_image_embedding (
+    doc_id,
+    embed_id,
+    embed_data,
+    embed_vector,
+    cmetadata,
+    img_id
+) VALUES (:doc_id, :embed_id, :embed_data, :embed_vector, :cmetadata, :img_id)
+"""
+
+    # text_dataとvlm_dataで独立したembed_idを使用
+    text_embed_id = 1
+    vlm_embed_id = 1
+    total_chunks = 0
+
+    for img_id, text_data, vlm_data in image_records:
+        # LOBオブジェクトを文字列に変換
+        text_data_str = text_data.read() if text_data else ""
+        vlm_data_str = vlm_data.read() if vlm_data else ""
+
+        # text_dataを個別に処理
+        if text_data_str and text_data_str.strip():
+            text_chunks = text_splitter.split_text(text_data_str)
+
+            if text_chunks:
+                # text_dataのchunkに対してembeddingを生成して保存
+                text_chunk_texts = [chunk for chunk in text_chunks if chunk.strip()]
+                if text_chunk_texts:
+                    text_embed_vectors = generate_embedding_response(text_chunk_texts)
+
+                    for i, (chunk_text, embed_vector) in enumerate(zip(text_chunk_texts, text_embed_vectors)):
+                        # text_data用のメタデータを作成
+                        cmetadata = json.dumps({
+                            "img_id": img_id,
+                            "chunk_index": i,
+                            "source": "image_processing",
+                            "data_type": "text_data",
+                            "original_img_id": img_id
+                        }, ensure_ascii=False)
+
+                        cursor.setinputsizes(embed_vector=oracledb.DB_TYPE_VECTOR)
+                        cursor.execute(insert_embedding_sql, {
+                            'doc_id': doc_id,
+                            'embed_id': text_embed_id,
+                            'embed_data': chunk_text,
+                            'embed_vector': embed_vector,
+                            'cmetadata': cmetadata,
+                            'img_id': img_id
+                        })
+
+                        print(f"画像text_data embeddingデータを保存しました: doc_id={doc_id}, img_id={img_id}, embed_id={text_embed_id}")
+                        text_embed_id += 1
+                        total_chunks += 1
+
+        # vlm_dataを個別に処理
+        if vlm_data_str and vlm_data_str.strip():
+            vlm_chunks = text_splitter.split_text(vlm_data_str)
+
+            if vlm_chunks:
+                # vlm_dataのchunkに対してembeddingを生成して保存
+                vlm_chunk_texts = [chunk for chunk in vlm_chunks if chunk.strip()]
+                if vlm_chunk_texts:
+                    vlm_embed_vectors = generate_embedding_response(vlm_chunk_texts)
+
+                    for i, (chunk_text, embed_vector) in enumerate(zip(vlm_chunk_texts, vlm_embed_vectors)):
+                        # vlm_data用のメタデータを作成
+                        cmetadata = json.dumps({
+                            "img_id": img_id,
+                            "chunk_index": i,
+                            "source": "image_processing",
+                            "data_type": "vlm_data",
+                            "original_img_id": img_id
+                        }, ensure_ascii=False)
+
+                        cursor.setinputsizes(embed_vector=oracledb.DB_TYPE_VECTOR)
+                        cursor.execute(insert_embedding_sql, {
+                            'doc_id': doc_id,
+                            'embed_id': vlm_embed_id,
+                            'embed_data': chunk_text,
+                            'embed_vector': embed_vector,
+                            'cmetadata': cmetadata,
+                            'img_id': img_id
+                        })
+
+                        print(f"画像vlm_data embeddingデータを保存しました: doc_id={doc_id}, img_id={img_id}, embed_id={vlm_embed_id}")
+                        vlm_embed_id += 1
+                        total_chunks += 1
+
+        # 両方のデータが空の場合の警告
+        if (not text_data_str or not text_data_str.strip()) and (not vlm_data_str or not vlm_data_str.strip()):
+            print(f"画像 {img_id} にtext_dataとvlm_dataの両方が空です")
+
+    print(f"画像データの分割処理が完了しました: 合計 {total_chunks} 個のchunkを生成")
+
+
 def reset_document_chunks_result_detail():
     return (
         gr.Textbox(value=""),
@@ -2113,6 +2389,12 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
     output_sql = ""
     server_path = get_server_path(doc_id)
 
+    chunks_overlap = int(float(chunks_max_size) * (float(chunks_overlap_size) / 100))
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunks_max_size - chunks_overlap,
+        chunk_overlap=chunks_overlap
+    )
+
     # Check if it's a .md file and get content from database instead of reading the file
     doc_data = ""
     if server_path.lower().endswith('.md'):
@@ -2122,9 +2404,10 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
 
         # Check if doc_data contains image blocks and extract OCR content if needed
         if re.search(r'<!-- image_begin -->.*?<!-- image_end -->', doc_data, re.DOTALL):
+
             # Extract all OCR content blocks
-            ocr_contents = re.findall(r'<!-- image_ocr_content_begin -->(.*?)<!-- image_ocr_content_end -->', doc_data, re.DOTALL)
-            doc_data = "\n".join(ocr.strip() for ocr in ocr_contents if ocr.strip())
+            text_contexts = re.findall(r'<!-- image_ocr_content_begin -->(.*?)<!-- image_ocr_content_end -->', doc_data, re.DOTALL)
+            doc_data = "\n".join(ocr.strip() for ocr in text_contexts if ocr.strip())
     else:
         # If we can't get data from database, fall back to reading the file
         elements = partition(filename=server_path, strategy='fast',
@@ -2177,12 +2460,6 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
                 element.text = str(element.text).replace('\x0b', '\n')
             doc_data = " \n".join([str(element.text) for element in elements])
 
-    chunks_overlap = int(float(chunks_max_size) * (float(chunks_overlap_size) / 100))
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunks_max_size - chunks_overlap,
-        chunk_overlap=chunks_overlap
-    )
-
     unstructured_chunks = text_splitter.split_text(doc_data)
 
     chunks = process_text_chunks(unstructured_chunks)
@@ -2202,17 +2479,16 @@ DELETE FROM {DEFAULT_COLLECTION_NAME}_embedding WHERE doc_id = :doc_id """
 INSERT INTO {DEFAULT_COLLECTION_NAME}_embedding (
 doc_id,
 embed_id,
-embed_data,
-img_id
+embed_data
 )
-VALUES (:doc_id, :embed_id, :embed_data, :img_id) """
+VALUES (:doc_id, :embed_id, :embed_data) """
             output_sql += "\n" + save_chunks_sql.replace(':doc_id', "'" + str(doc_id) + "'"
                                                            ).replace(':embed_id', "'...'"
                                                                      ).replace(':embed_data', "'...'"
-                                                                               ).replace(':img_id', "NULL") + ";"
+                                                                               ) + ";"
             print(f"{output_sql=}")
-            # 准備批量插入的数据（img_idはNULLに設定）
-            data_to_insert = [(doc_id, chunk['CHUNK_ID'], chunk['CHUNK_DATA'], None) for chunk in chunks]
+            # 准備批量插入的数据
+            data_to_insert = [(doc_id, chunk['CHUNK_ID'], chunk['CHUNK_DATA']) for chunk in chunks]
 
             # 执行批量插入
             cursor.executemany(save_chunks_sql, data_to_insert)
@@ -2298,6 +2574,22 @@ def embed_save_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
             gr.Dataframe(value=None, row_count=(1, "fixed"))
         )
 
+    # 画像ブロックを処理して{DEFAULT_COLLECTION_NAME}_imageテーブルに保存
+    server_path = get_server_path(doc_id)
+    chunks_overlap = int(float(chunks_max_size) * (float(chunks_overlap_size) / 100))
+
+    # Check if it's a .md file and get content to process image blocks
+    if server_path.lower().endswith('.md'):
+        loader = TextLoader(server_path)
+        documents = loader.load()
+        doc_data = "\n".join(doc.page_content for doc in documents)
+
+        # Check if doc_data contains image blocks and process them
+        if re.search(r'<!-- image_begin -->.*?<!-- image_end -->', doc_data, re.DOTALL):
+            process_image_blocks(doc_id, doc_data,
+                               chunk_size=chunks_max_size - chunks_overlap,
+                               chunk_overlap=chunks_overlap)
+
     output_sql = ""
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
@@ -2354,8 +2646,8 @@ def generate_query(query_text, generate_query_radio):
 
     region = get_region()
     chat_llm = ChatOCIGenAI(
-        model_id="cohere.command-a-03-2025",
-        provider="cohere",
+        model_id="xai.grok-3",
+        provider="xai",
         service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
         compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
         model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 600, "seed": 42},
@@ -2523,7 +2815,8 @@ def search_document(
         partition_by_k_slider_input,
         answer_by_one_checkbox_input,
         extend_first_chunk_size_input,
-        extend_around_chunk_size_input
+        extend_around_chunk_size_input,
+        use_image
 ):
     """
     Retrieve relevant splits for any question using similarity search.
@@ -2650,49 +2943,95 @@ def search_document(
             where_metadata_sql = " AND (" + " AND ".join(metadata_conditions) + ") "
         print(f"{where_metadata_sql=}")
 
-    where_threshold_sql = f"""
-                    AND vector_distance(de.embed_vector, (
-                            SELECT to_vector(et.embed_vector) embed_vector
-                            FROM
-                                dbms_vector_chain.utl_to_embeddings(
-                                        :query_text,
-                                        JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
-                                JSON_TABLE ( t.column_value, '$[*]'
-                                        COLUMNS (
-                                            embed_id NUMBER PATH '$.embed_id',
-                                            embed_data VARCHAR2 ( 4000 ) PATH '$.embed_data',
-                                            embed_vector CLOB PATH '$.embed_vector'
-                                        )
-                                    )
-                                et), COSINE
-                            ) <= :threshold_value """
-    if not doc_id_all_checkbox_input:
-        where_sql += """
-                    AND de.doc_id IN (
-                        SELECT TRIM(BOTH '''' FROM REGEXP_SUBSTR(:doc_ids, '''[^'']+''', 1, LEVEL)) AS doc_id
-                        FROM DUAL
-                        CONNECT BY REGEXP_SUBSTR(:doc_ids, '''[^'']+''', 1, LEVEL) IS NOT NULL
-                    ) """
+    # 注意：where_threshold_sql和where_sql现在在base_sql中直接构建，因为需要根据use_image使用不同的表别名
     # v4
     region = get_region()
-    base_sql = f"""
-                    SELECT de.doc_id doc_id, de.embed_id embed_id, vector_distance(de.embed_vector, (
-                            SELECT to_vector(et.embed_vector) embed_vector
-                            FROM
-                                dbms_vector_chain.utl_to_embeddings(
-                                        :query_text,
-                                        JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
-                                JSON_TABLE ( t.column_value, '$[*]'
-                                        COLUMNS (
-                                            embed_id NUMBER PATH '$.embed_id',
-                                            embed_data VARCHAR2 ( 4000 ) PATH '$.embed_data',
-                                            embed_vector CLOB PATH '$.embed_vector'
+
+    # 画像を使って回答がオンの場合、image_embeddingテーブルを使用、オフの場合はembeddingテーブルを使用
+    if use_image:
+        # 画像を使って回答がオンの場合、image_embeddingテーブルのみを使用
+        base_sql = f"""
+                        SELECT ie.doc_id doc_id, ie.embed_id embed_id, vector_distance(ie.embed_vector, (
+                                SELECT to_vector(et.embed_vector) embed_vector
+                                FROM
+                                    dbms_vector_chain.utl_to_embeddings(
+                                            :query_text,
+                                            JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
+                                    JSON_TABLE ( t.column_value, '$[*]'
+                                            COLUMNS (
+                                                embed_id NUMBER PATH '$.embed_id',
+                                                embed_data VARCHAR2 ( 4000 ) PATH '$.embed_data',
+                                                embed_vector CLOB PATH '$.embed_vector'
+                                            )
                                         )
-                                    )
-                                et), COSINE
-                            ) vector_distance
-                    FROM {DEFAULT_COLLECTION_NAME}_embedding de, {DEFAULT_COLLECTION_NAME}_collection dc """ + where_sql + where_metadata_sql + where_threshold_sql + """
-                    ORDER BY vector_distance """
+                                    et), COSINE
+                                ) vector_distance
+                        FROM {DEFAULT_COLLECTION_NAME}_image_embedding ie, {DEFAULT_COLLECTION_NAME}_collection dc
+                        WHERE 1 = 1
+                        AND ie.doc_id = dc.id """ + ("""
+                        AND ie.doc_id IN (
+                            SELECT TRIM(BOTH '''' FROM REGEXP_SUBSTR(:doc_ids, '''[^'']+''', 1, LEVEL)) AS doc_id
+                            FROM DUAL
+                            CONNECT BY REGEXP_SUBSTR(:doc_ids, '''[^'']+''', 1, LEVEL) IS NOT NULL
+                        ) """ if not doc_id_all_checkbox_input else "") + where_metadata_sql + f"""
+                        AND vector_distance(ie.embed_vector, (
+                                SELECT to_vector(et.embed_vector) embed_vector
+                                FROM
+                                    dbms_vector_chain.utl_to_embeddings(
+                                            :query_text,
+                                            JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
+                                    JSON_TABLE ( t.column_value, '$[*]'
+                                            COLUMNS (
+                                                embed_id NUMBER PATH '$.embed_id',
+                                                embed_data VARCHAR2 ( 4000 ) PATH '$.embed_data',
+                                                embed_vector CLOB PATH '$.embed_vector'
+                                            )
+                                        )
+                                    et), COSINE
+                                ) <= :threshold_value
+                        ORDER BY vector_distance """
+    else:
+        # 画像を使って回答がオフの場合、embeddingテーブルのみを使用
+        base_sql = f"""
+                        SELECT de.doc_id doc_id, de.embed_id embed_id, vector_distance(de.embed_vector, (
+                                SELECT to_vector(et.embed_vector) embed_vector
+                                FROM
+                                    dbms_vector_chain.utl_to_embeddings(
+                                            :query_text,
+                                            JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
+                                    JSON_TABLE ( t.column_value, '$[*]'
+                                            COLUMNS (
+                                                embed_id NUMBER PATH '$.embed_id',
+                                                embed_data VARCHAR2 ( 4000 ) PATH '$.embed_data',
+                                                embed_vector CLOB PATH '$.embed_vector'
+                                            )
+                                        )
+                                    et), COSINE
+                                ) vector_distance
+                        FROM {DEFAULT_COLLECTION_NAME}_embedding de, {DEFAULT_COLLECTION_NAME}_collection dc
+                        WHERE 1 = 1
+                        AND de.doc_id = dc.id """ + ("""
+                        AND de.doc_id IN (
+                            SELECT TRIM(BOTH '''' FROM REGEXP_SUBSTR(:doc_ids, '''[^'']+''', 1, LEVEL)) AS doc_id
+                            FROM DUAL
+                            CONNECT BY REGEXP_SUBSTR(:doc_ids, '''[^'']+''', 1, LEVEL) IS NOT NULL
+                        ) """ if not doc_id_all_checkbox_input else "") + where_metadata_sql + f"""
+                        AND vector_distance(de.embed_vector, (
+                                SELECT to_vector(et.embed_vector) embed_vector
+                                FROM
+                                    dbms_vector_chain.utl_to_embeddings(
+                                            :query_text,
+                                            JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
+                                    JSON_TABLE ( t.column_value, '$[*]'
+                                            COLUMNS (
+                                                embed_id NUMBER PATH '$.embed_id',
+                                                embed_data VARCHAR2 ( 4000 ) PATH '$.embed_data',
+                                                embed_vector CLOB PATH '$.embed_vector'
+                                            )
+                                        )
+                                    et), COSINE
+                                ) <= :threshold_value
+                        ORDER BY vector_distance """
     base_sql += """
                     FETCH FIRST :partition_by PARTITIONS BY doc_id, :top_k ROWS ONLY
     """ if partition_by_k_slider_input > 0 else """
@@ -2712,14 +3051,28 @@ def search_document(
             FROM selected_embed_id_doc_ids s1
             LEFT JOIN selected_embed_ids s2
             ON s1.adjusted_embed_id = s2.embed_id AND s1.doc_id = s2.doc_id
-    ),
+    ),"""
+    if use_image:
+        # 画像を使って回答がオンの場合、image_embeddingテーブルを使用
+        select_sql += f"""
+    aggregated_results AS
+    (
+            SELECT json_value(dc.cmetadata, '$.file_name') name, ie.embed_id embed_id, ie.embed_data embed_data, ie.doc_id doc_id, MIN(s.vector_distance) vector_distance
+            FROM selected_results s, {DEFAULT_COLLECTION_NAME}_image_embedding ie, {DEFAULT_COLLECTION_NAME}_collection dc
+            WHERE s.adjusted_embed_id = ie.embed_id AND s.doc_id = dc.id and ie.doc_id = dc.id
+            GROUP BY ie.doc_id, name, ie.embed_id, ie.embed_data"""
+    else:
+        # 画像を使って回答がオフの場合、embeddingテーブルを使用
+        select_sql += f"""
     aggregated_results AS
     (
             SELECT json_value(dc.cmetadata, '$.file_name') name, de.embed_id embed_id, de.embed_data embed_data, de.doc_id doc_id, MIN(s.vector_distance) vector_distance
             FROM selected_results s, {DEFAULT_COLLECTION_NAME}_embedding de, {DEFAULT_COLLECTION_NAME}_collection dc
             WHERE s.adjusted_embed_id = de.embed_id AND s.doc_id = dc.id and de.doc_id = dc.id
-            GROUP BY de.doc_id, name, de.embed_id, de.embed_data
-            ORDER BY vector_distance, de.doc_id, de.embed_id
+            GROUP BY de.doc_id, name, de.embed_id, de.embed_data"""
+
+    select_sql += """
+            ORDER BY vector_distance
     ),
     ranked_data AS (
         SELECT
@@ -2806,28 +3159,65 @@ def search_document(
         if len(search_text) > 0:
             # where_sql += """
             #             AND (""" + search_text + """) """
-            where_sql += """
-                        AND CONTAINS(de.embed_data, :search_texts, 1) > 0
-                        ORDER BY SCORE(1) DESC FETCH FIRST :top_k ROWS ONLY
-                    """
+            # 注意：这里的where_sql会在不同的表查询中使用，所以不能硬编码表别名
+            # 这部分逻辑将在full_text_search_sql中处理
             region = get_region()
-            full_text_search_sql = f"""
-                        SELECT de.doc_id doc_id, de.embed_id embed_id, vector_distance(de.embed_vector, (
-                                SELECT to_vector(et.embed_vector) embed_vector
-                                FROM
-                                    dbms_vector_chain.utl_to_embeddings(
-                                            :query_text,
-                                            JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
-                                    JSON_TABLE ( t.column_value, '$[*]'
-                                            COLUMNS (
-                                                embed_id NUMBER PATH '$.embed_id',
-                                                embed_data VARCHAR2 ( 4000 ) PATH '$.embed_data',
-                                                embed_vector CLOB PATH '$.embed_vector'
+            if use_image:
+                # 画像を使って回答がオンの場合、image_embeddingテーブルのみを使用
+                full_text_search_sql = f"""
+                            SELECT ie.doc_id doc_id, ie.embed_id embed_id, vector_distance(ie.embed_vector, (
+                                    SELECT to_vector(et.embed_vector) embed_vector
+                                    FROM
+                                        dbms_vector_chain.utl_to_embeddings(
+                                                :query_text,
+                                                JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
+                                        JSON_TABLE ( t.column_value, '$[*]'
+                                                COLUMNS (
+                                                    embed_id NUMBER PATH '$.embed_id',
+                                                    embed_data VARCHAR2 ( 4000 ) PATH '$.embed_data',
+                                                    embed_vector CLOB PATH '$.embed_vector'
+                                                )
                                             )
-                                        )
-                                    et), COSINE
-                                ) vector_distance
-                        FROM {DEFAULT_COLLECTION_NAME}_embedding de, {DEFAULT_COLLECTION_NAME}_collection dc """ + where_sql + where_metadata_sql
+                                        et), COSINE
+                                    ) vector_distance
+                            FROM {DEFAULT_COLLECTION_NAME}_image_embedding ie, {DEFAULT_COLLECTION_NAME}_collection dc
+                            WHERE 1 = 1
+                            AND ie.doc_id = dc.id
+                            AND CONTAINS(ie.embed_data, :search_texts, 1) > 0 """ + ("""
+                            AND ie.doc_id IN (
+                                SELECT TRIM(BOTH '''' FROM REGEXP_SUBSTR(:doc_ids, '''[^'']+''', 1, LEVEL)) AS doc_id
+                                FROM DUAL
+                                CONNECT BY REGEXP_SUBSTR(:doc_ids, '''[^'']+''', 1, LEVEL) IS NOT NULL
+                            ) """ if not doc_id_all_checkbox_input else "") + where_metadata_sql + """
+                            ORDER BY SCORE(1) DESC FETCH FIRST :top_k ROWS ONLY """
+            else:
+                # 画像を使って回答がオフの場合、embeddingテーブルのみを使用
+                full_text_search_sql = f"""
+                            SELECT de.doc_id doc_id, de.embed_id embed_id, vector_distance(de.embed_vector, (
+                                    SELECT to_vector(et.embed_vector) embed_vector
+                                    FROM
+                                        dbms_vector_chain.utl_to_embeddings(
+                                                :query_text,
+                                                JSON('{{"provider": "ocigenai", "credential_name": "OCI_CRED", "url": "https://inference.generativeai.{region}.oci.oraclecloud.com/20231130/actions/embedText", "model": "cohere.embed-multilingual-v3.0"}}')) t,
+                                        JSON_TABLE ( t.column_value, '$[*]'
+                                                COLUMNS (
+                                                    embed_id NUMBER PATH '$.embed_id',
+                                                    embed_data VARCHAR2 ( 4000 ) PATH '$.embed_data',
+                                                    embed_vector CLOB PATH '$.embed_vector'
+                                                )
+                                            )
+                                        et), COSINE
+                                    ) vector_distance
+                            FROM {DEFAULT_COLLECTION_NAME}_embedding de, {DEFAULT_COLLECTION_NAME}_collection dc
+                            WHERE 1 = 1
+                            AND de.doc_id = dc.id
+                            AND CONTAINS(de.embed_data, :search_texts, 1) > 0 """ + ("""
+                            AND de.doc_id IN (
+                                SELECT TRIM(BOTH '''' FROM REGEXP_SUBSTR(:doc_ids, '''[^'']+''', 1, LEVEL)) AS doc_id
+                                FROM DUAL
+                                CONNECT BY REGEXP_SUBSTR(:doc_ids, '''[^'']+''', 1, LEVEL) IS NOT NULL
+                            ) """ if not doc_id_all_checkbox_input else "") + where_metadata_sql + """
+                            ORDER BY SCORE(1) DESC FETCH FIRST :top_k ROWS ONLY """
             complete_sql = (with_sql + """
                 UNION
         """.join(
@@ -2967,7 +3357,30 @@ def search_document(
                 filtered_doc_ids = "'" + "','".join(
                     [source.split(':')[0] for source in docs_dataframe['SOURCE'].tolist()]) + "'"
                 print(f"{filtered_doc_ids=}")
-                select_extend_first_chunk_sql = f"""
+                # 画像を使って回答の設定に応じて適切なテーブルを選択
+                if use_image:
+                    # 画像を使って回答がオンの場合、image_embeddingテーブルを使用
+                    select_extend_first_chunk_sql = f"""
+SELECT
+        json_value(dc.cmetadata, '$.file_name') name,
+        MIN(ie.embed_id) embed_id,
+        RTRIM(XMLCAST(XMLAGG(XMLELEMENT(e, ie.embed_data || ',') ORDER BY ie.embed_id) AS CLOB), ',') AS embed_data,
+        ie.doc_id doc_id,
+        '999999.0' vector_distance
+FROM
+        {DEFAULT_COLLECTION_NAME}_image_embedding ie, {DEFAULT_COLLECTION_NAME}_collection dc
+WHERE
+        ie.doc_id = dc.id AND
+        ie.doc_id IN (:filtered_doc_ids) AND
+        ie.embed_id <= :extend_first_chunk_size
+GROUP BY
+        ie.doc_id, name
+ORDER
+        BY ie.doc_id
+            """
+                else:
+                    # 画像を使って回答がオフの場合、embeddingテーブルを使用
+                    select_extend_first_chunk_sql = f"""
 SELECT
         json_value(dc.cmetadata, '$.file_name') name,
         MIN(de.embed_id) embed_id,
@@ -3239,6 +3652,7 @@ async def chat_document(
         llm_answer_checkbox,
         include_citation,
         include_current_time,
+        use_image,
         query_text,
         doc_id_all_checkbox_input,
         doc_id_checkbox_group_input,
@@ -3275,6 +3689,7 @@ async def chat_document(
 
     query_text = query_text.strip()
 
+    xai_grok_3_response = ""
     command_a_response = ""
     command_r_response = ""
     command_r_plus_response = ""
@@ -3290,6 +3705,7 @@ async def chat_document(
     claude_3_sonnet_response = ""
     claude_3_haiku_response = ""
 
+    xai_grok_3_checkbox = False
     command_a_checkbox = False
     command_r_checkbox = False
     command_r_plus_checkbox = False
@@ -3304,6 +3720,8 @@ async def chat_document(
     claude_3_opus_checkbox = False
     claude_3_sonnet_checkbox = False
     claude_3_haiku_checkbox = False
+    if "xai/grok-3" in llm_answer_checkbox:
+        xai_grok_3_checkbox = True
     if "cohere/command-a" in llm_answer_checkbox:
         command_a_checkbox = True
     if "cohere/command-r" in llm_answer_checkbox:
@@ -3405,6 +3823,7 @@ async def chat_document(
     system_text = ""
     user_text = get_langgpt_rag_prompt(context, query_text, include_citation, include_current_time, rag_prompt_template)
 
+    xai_grok_3_user_text = user_text
     command_a_user_text = user_text
     command_r_user_text = user_text
     command_r_plus_user_text = user_text
@@ -3420,8 +3839,9 @@ async def chat_document(
     claude_3_sonnet_user_text = user_text
     claude_3_haiku_user_text = user_text
 
-    async for command_a, command_r, command_r_plus, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
+    async for xai_grok_3, command_a, command_r, command_r_plus, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
             system_text,
+            xai_grok_3_user_text,
             command_a_user_text,
             command_r_user_text,
             command_r_plus_user_text,
@@ -3439,6 +3859,7 @@ async def chat_document(
             claude_3_opus_user_text,
             claude_3_sonnet_user_text,
             claude_3_haiku_user_text,
+            xai_grok_3_checkbox,
             command_a_checkbox,
             command_r_checkbox,
             command_r_plus_checkbox,
@@ -3454,6 +3875,7 @@ async def chat_document(
             claude_3_sonnet_checkbox,
             claude_3_haiku_checkbox
     ):
+        xai_grok_3_response += xai_grok_3
         command_a_response += command_a
         command_r_response += command_r
         command_r_plus_response += command_r_plus
@@ -3469,6 +3891,7 @@ async def chat_document(
         claude_3_sonnet_response += sonnet
         claude_3_haiku_response += haiku
         yield (
+            gr.Markdown(value=xai_grok_3_response),
             gr.Markdown(value=command_a_response),
             gr.Markdown(value=command_r_response),
             gr.Markdown(value=command_r_plus_response),
@@ -3493,6 +3916,7 @@ async def append_citation(
         query_text,
         doc_id_all_checkbox_input,
         doc_id_checkbox_group_input,
+        xai_grok_3_answer_text,
         command_a_answer_text,
         command_r_answer_text,
         command_r_plus_answer_text,
@@ -3520,6 +3944,7 @@ async def append_citation(
         # gr.Warning("検索結果が見つかりませんでした。設定もしくはクエリを変更して再度ご確認ください。")
     if has_error:
         yield (
+            gr.Markdown(value=xai_grok_3_answer_text),
             gr.Markdown(value=command_a_answer_text),
             gr.Markdown(value=command_r_answer_text),
             gr.Markdown(value=command_r_plus_answer_text),
@@ -3539,6 +3964,7 @@ async def append_citation(
 
     if not include_citation:
         yield (
+            gr.Markdown(value=xai_grok_3_answer_text),
             gr.Markdown(value=command_a_answer_text),
             gr.Markdown(value=command_r_answer_text),
             gr.Markdown(value=command_r_plus_answer_text),
@@ -3556,6 +3982,8 @@ async def append_citation(
         )
         return
 
+    if "xai/grok-3" in llm_answer_checkbox:
+        xai_grok_3_answer_text = extract_and_format(xai_grok_3_answer_text, search_result)
     if "cohere/command-a" in llm_answer_checkbox:
         command_a_answer_text = extract_and_format(command_a_answer_text, search_result)
     if "cohere/command-r" in llm_answer_checkbox:
@@ -3586,6 +4014,7 @@ async def append_citation(
         claude_3_haiku_answer_text = extract_and_format(claude_3_haiku_answer_text, search_result)
 
     yield (
+        gr.Markdown(value=xai_grok_3_answer_text),
         gr.Markdown(value=command_a_answer_text),
         gr.Markdown(value=command_r_answer_text),
         gr.Markdown(value=command_r_plus_answer_text),
@@ -3604,6 +4033,308 @@ async def append_citation(
     return
 
 
+def process_image_with_selected_llms(image_url, query_text, llm_answer_checkbox_group, target_models, image_index, doc_id, img_id):
+    """
+    選択されたLLMモデルで画像を処理し、回答を返す
+    """
+    import asyncio
+
+    async def async_process():
+        region = get_region()
+        results = {}
+
+        for model in target_models:
+            if model in llm_answer_checkbox_group:
+                print(f"\n=== 画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) - {model} での処理 ===")
+
+                try:
+                    if model == "meta/llama-4-maverick-17b-128e-instruct-fp8":
+                        llm = ChatOCIGenAI(
+                            model_id="meta.llama-4-maverick-17b-128e-instruct-fp8",
+                            provider="meta",
+                            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+                            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+                            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+                        )
+                    elif model == "meta/llama-4-scout-17b-16e-instruct":
+                        llm = ChatOCIGenAI(
+                            model_id="meta.llama-4-scout-17b-16e-instruct",
+                            provider="meta",
+                            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+                            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+                            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+                        )
+                    elif model == "meta/llama-3-2-90b-vision":
+                        llm = ChatOCIGenAI(
+                            model_id="meta.llama-3.2-90b-vision-instruct",
+                            provider="meta",
+                            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+                            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+                            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+                        )
+                    else:
+                        continue
+
+                    # メッセージを作成（llama_3_2_90b_visionの実装を参考）
+                    human_message = HumanMessage(content=[
+                        {"type": "text", "text": f"あなたは画像分析の専門家です。与えられた画像を詳しく分析し、ユーザーの質問に正確に答えてください。質問：\n\n{query_text}\n\n"},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": image_url},
+                        },
+                    ])
+
+                    messages = [human_message]
+
+                    # LLMに送信して回答を取得
+                    start_time = time.time()
+                    print(f"LLM処理開始時間: {start_time}")
+
+                    langfuse_handler = CallbackHandler(
+                        secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+                        public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+                        host=os.environ["LANGFUSE_HOST"],
+                    )
+
+                    response_text = ""
+                    async for chunk in llm.astream(messages, config={"callbacks": [langfuse_handler],
+                                                                      "metadata": {"ls_model_name": model}}):
+                        response_text += chunk.content
+                        print(chunk.content, end="", flush=True)
+
+                    end_time = time.time()
+                    inference_time = end_time - start_time
+                    print(f"\n\n推論時間: {inference_time:.2f}秒")
+                    print(f"=== {model} での処理完了 ===\n")
+
+                    # 結果を保存
+                    results[model] = f"\n\n--- 画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) - {model} ---\n\n{response_text}\n\n推論時間: {inference_time:.2f}秒\n\n"
+
+                except Exception as e:
+                    print(f"エラーが発生しました ({model}): {e}")
+                    results[model] = f"\n\n--- 画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) - {model} ---\n\nエラーが発生しました: {e}\n\n"
+
+        return results
+
+    # 同期関数内で非同期処理を実行
+    return asyncio.run(async_process())
+
+
+def print_base64_data_for_selected_models(
+        search_result,
+        use_image,
+        llm_answer_checkbox_group,
+        query_text,
+        llama_4_maverick_answer_text,
+        llama_4_scout_answer_text,
+        llama_3_2_90b_vision_answer_text
+):
+    """
+    画像を使って回答がオンで、検索結果が空でなく、指定されたLLMモデルがチェックされている場合、
+    検索結果のdistinct base64_dataを取得して、各画像に対してLLMで処理し、回答を出力する
+    """
+    print("print_base64_data_for_selected_models() 開始...")
+
+    # 画像を使って回答がオフの場合は何もしない
+    if not use_image:
+        print("画像を使って回答がオフのため、base64_data取得をスキップします")
+        yield (
+            gr.Markdown(value=llama_4_maverick_answer_text),
+            gr.Markdown(value=llama_4_scout_answer_text),
+            gr.Markdown(value=llama_3_2_90b_vision_answer_text)
+        )
+        return
+
+    # 検索結果が空の場合は何もしない
+    if search_result.empty or (len(search_result) > 0 and search_result.iloc[0]['CONTENT'] == ''):
+        print("検索結果が空のため、base64_data取得をスキップします")
+        yield (
+            gr.Markdown(value=llama_4_maverick_answer_text),
+            gr.Markdown(value=llama_4_scout_answer_text),
+            gr.Markdown(value=llama_3_2_90b_vision_answer_text)
+        )
+        return
+
+    # 指定されたLLMモデルがチェックされているかを確認
+    target_models = [
+        "meta/llama-4-maverick-17b-128e-instruct-fp8",
+        "meta/llama-4-scout-17b-16e-instruct",
+        "meta/llama-3-2-90b-vision"
+    ]
+
+    # llm_answer_checkbox_groupに指定されたモデルのいずれかが含まれているかチェック
+    has_target_model = any(model in llm_answer_checkbox_group for model in target_models)
+
+    if not has_target_model:
+        print("対象のLLMモデル（llama-4-maverick, llama-4-scout, llama-3-2-90b-vision）がチェックされていないため、base64_data取得をスキップします")
+        yield (
+            gr.Markdown(value=llama_4_maverick_answer_text),
+            gr.Markdown(value=llama_4_scout_answer_text),
+            gr.Markdown(value=llama_3_2_90b_vision_answer_text)
+        )
+        return
+
+    print("条件を満たしているため、base64_dataを取得します...")
+
+    try:
+        # 検索結果からdoc_idとembed_idを取得
+        doc_embed_pairs = []
+        for _, row in search_result.iterrows():
+            source = row['SOURCE']
+            embed_id = row['EMBED_ID']
+            if ':' in source:
+                doc_id = source.split(':')[0]
+                doc_embed_pair = (doc_id, embed_id)
+                if doc_embed_pair not in doc_embed_pairs:
+                    doc_embed_pairs.append(doc_embed_pair)
+
+        if not doc_embed_pairs:
+            print("検索結果からdoc_idとembed_idを取得できませんでした")
+            yield (
+                gr.Markdown(value=llama_4_maverick_answer_text),
+                gr.Markdown(value=llama_4_scout_answer_text),
+                gr.Markdown(value=llama_3_2_90b_vision_answer_text)
+            )
+            return
+
+        print(f"取得したdoc_id, embed_idペア数: {len(doc_embed_pairs)}")
+        print(f"最初の5ペア: {doc_embed_pairs[:5]}")
+
+        # データベースからdistinct base64_dataを取得
+        with pool.acquire() as conn:
+            with conn.cursor() as cursor:
+                # まず_image_embeddingテーブルからimg_idを取得
+                embed_where_conditions = []
+                for doc_id, embed_id in doc_embed_pairs:
+                    embed_where_conditions.append(f"(doc_id = '{doc_id}' AND embed_id = {embed_id})")
+
+                embed_where_clause = " OR ".join(embed_where_conditions)
+
+                # _image_embeddingテーブルからimg_idを取得
+                get_img_ids_sql = f"""
+                SELECT DISTINCT doc_id, embed_id, img_id
+                FROM {DEFAULT_COLLECTION_NAME}_image_embedding
+                WHERE ({embed_where_clause})
+                AND img_id IS NOT NULL
+                """
+
+                print(f"img_id取得SQL: {get_img_ids_sql}")
+                cursor.execute(get_img_ids_sql)
+
+                doc_img_pairs = []
+                for row in cursor:
+                    doc_id = row[0]
+                    embed_id = row[1]
+                    img_id = row[2]
+                    doc_img_pair = (doc_id, img_id)
+                    if doc_img_pair not in doc_img_pairs:
+                        doc_img_pairs.append(doc_img_pair)
+                        print(f"見つかったペア: doc_id={doc_id}, embed_id={embed_id}, img_id={img_id}")
+
+                if not doc_img_pairs:
+                    print("_image_embeddingテーブルからimg_idを取得できませんでした")
+                    yield (
+                        gr.Markdown(value=llama_4_maverick_answer_text),
+                        gr.Markdown(value=llama_4_scout_answer_text),
+                        gr.Markdown(value=llama_3_2_90b_vision_answer_text)
+                    )
+                    return
+
+                print(f"取得したdoc_id, img_idペア数: {len(doc_img_pairs)}")
+
+                # 次に_imageテーブルからbase64_dataを取得
+                img_where_conditions = []
+                for doc_id, img_id in doc_img_pairs:
+                    img_where_conditions.append(f"(doc_id = '{doc_id}' AND img_id = {img_id})")
+
+                img_where_clause = " OR ".join(img_where_conditions)
+
+                # Oracle不允许对CLOB字段使用DISTINCT，所以直接获取前20条记录（因为可能有重复）
+                select_sql = f"""
+                SELECT base64_data, doc_id, img_id
+                FROM {DEFAULT_COLLECTION_NAME}_image
+                WHERE ({img_where_clause})
+                AND base64_data IS NOT NULL
+                AND ROWNUM <= 20
+                """
+
+                print(f"実行するSQL: {select_sql}")
+                cursor.execute(select_sql)
+
+                base64_data_set = set()  # 重複を避けるためにsetを使用
+                base64_data_list = []
+
+                for row in cursor:
+                    if row[0] is not None:
+                        # CLOBオブジェクトの場合はread()メソッドを使用
+                        base64_string = row[0].read() if hasattr(row[0], 'read') else str(row[0])
+                        doc_id = row[1]
+                        img_id = row[2]
+
+                        # 重複チェック（最初の100文字で判定）
+                        base64_prefix = base64_string[:100] if len(base64_string) > 100 else base64_string
+                        if base64_prefix not in base64_data_set:
+                            base64_data_set.add(base64_prefix)
+                            base64_data_list.append((base64_string, doc_id, img_id))
+
+                            # 10個に達したら終了
+                            if len(base64_data_list) >= 10:
+                                break
+
+                print(f"取得したdistinct base64_dataの数: {len(base64_data_list)}")
+
+                # 初期化：現在のLLM回答テキストを保持
+                current_llama_4_maverick_text = llama_4_maverick_answer_text
+                current_llama_4_scout_text = llama_4_scout_answer_text
+                current_llama_3_2_90b_vision_text = llama_3_2_90b_vision_answer_text
+
+                # 各base64_dataに対してLLMで処理
+                for i, (base64_data, doc_id, img_id) in enumerate(base64_data_list, 1):
+                    print(f"画像 {i} (doc_id: {doc_id}, img_id: {img_id}) を処理中...")
+
+                    # base64データをdata:image/png;base64,{base64_data}形式に変換
+                    image_url = f"data:image/png;base64,{base64_data}"
+
+                    # 選択されたLLMモデルに対して処理を実行し、結果を取得
+                    llm_results = process_image_with_selected_llms(
+                        image_url,
+                        query_text,
+                        llm_answer_checkbox_group,
+                        target_models,
+                        i,
+                        doc_id,
+                        img_id
+                    )
+
+                    # 各LLMの結果を対応するテキストにappend
+                    if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_results:
+                        current_llama_4_maverick_text += llm_results["meta/llama-4-maverick-17b-128e-instruct-fp8"]
+
+                    if "meta/llama-4-scout-17b-16e-instruct" in llm_results:
+                        current_llama_4_scout_text += llm_results["meta/llama-4-scout-17b-16e-instruct"]
+
+                    if "meta/llama-3-2-90b-vision" in llm_results:
+                        current_llama_3_2_90b_vision_text += llm_results["meta/llama-3-2-90b-vision"]
+
+                    # 更新された結果をyield
+                    yield (
+                        gr.Markdown(value=current_llama_4_maverick_text),
+                        gr.Markdown(value=current_llama_4_scout_text),
+                        gr.Markdown(value=current_llama_3_2_90b_vision_text)
+                    )
+
+    except Exception as e:
+        print(f"base64_data取得中にエラーが発生しました: {e}")
+        # エラー時も現在の状態をyield
+        yield (
+            gr.Markdown(value=llama_4_maverick_answer_text),
+            gr.Markdown(value=llama_4_scout_answer_text),
+            gr.Markdown(value=llama_3_2_90b_vision_answer_text)
+        )
+
+    print("print_base64_data_for_selected_models() 完了")
+
+
 async def eval_by_ragas(
         query_text,
         doc_id_all_checkbox_input,
@@ -3613,6 +4344,7 @@ async def eval_by_ragas(
         llm_evaluation_checkbox,
         system_text,
         standard_answer_text,
+        xai_grok_3_response,
         command_a_response,
         command_r_response,
         command_r_plus_response,
@@ -3695,9 +4427,11 @@ async def eval_by_ragas(
             gr.Markdown(value=""),
             gr.Markdown(value=""),
             gr.Markdown(value=""),
+            gr.Markdown(value=""),
             gr.Markdown(value="")
         )
     else:
+        xai_grok_3_checkbox = False
         command_a_checkbox = False
         command_r_checkbox = False
         command_r_plus_checkbox = False
@@ -3712,6 +4446,8 @@ async def eval_by_ragas(
         claude_3_opus_checkbox = False
         claude_3_sonnet_checkbox = False
         claude_3_haiku_checkbox = False
+        if "xai/grok-3" in llm_answer_checkbox_group:
+            xai_grok_3_checkbox = True
         if "cohere/command-a" in llm_answer_checkbox_group:
             command_a_checkbox = True
         if "cohere/command-r" in llm_answer_checkbox_group:
@@ -3741,6 +4477,7 @@ async def eval_by_ragas(
         if "claude/haiku" in llm_answer_checkbox_group:
             claude_3_haiku_checkbox = True
 
+        xai_grok_3_response = remove_last_line(xai_grok_3_response)
         command_a_response = remove_last_line(command_a_response)
         command_r_response = remove_last_line(command_r_response)
         command_r_plus_response = remove_last_line(command_r_plus_response)
@@ -3755,6 +4492,15 @@ async def eval_by_ragas(
         claude_3_opus_response = remove_last_line(claude_3_opus_response)
         claude_3_sonnet_response = remove_last_line(claude_3_sonnet_response)
         claude_3_haiku_response = remove_last_line(claude_3_haiku_response)
+
+        xai_grok_3_user_text = f"""
+-標準回答-
+ {standard_answer_text}
+
+-与えられた回答-
+ {xai_grok_3_response}
+
+-出力-\n　"""
 
         command_a_user_text = f"""
 -標準回答-
@@ -3882,6 +4628,7 @@ async def eval_by_ragas(
 
 -出力-\n　"""
 
+        eval_xai_grok_3_response = ""
         eval_command_a_response = ""
         eval_command_r_response = ""
         eval_command_r_plus_response = ""
@@ -3897,8 +4644,9 @@ async def eval_by_ragas(
         eval_claude_3_sonnet_response = ""
         eval_claude_3_haiku_response = ""
 
-        async for command_a, command_r, command_r_plus, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
+        async for xai_grok_3, command_a, command_r, command_r_plus, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
                 system_text,
+                xai_grok_3_user_text,
                 command_a_user_text,
                 command_r_user_text,
                 command_r_plus_user_text,
@@ -3916,6 +4664,7 @@ async def eval_by_ragas(
                 claude_3_opus_user_text,
                 claude_3_sonnet_user_text,
                 claude_3_haiku_user_text,
+                xai_grok_3_checkbox,
                 command_a_checkbox,
                 command_r_checkbox,
                 command_r_plus_checkbox,
@@ -3931,6 +4680,7 @@ async def eval_by_ragas(
                 claude_3_sonnet_checkbox,
                 claude_3_haiku_checkbox
         ):
+            eval_xai_grok_3_response += xai_grok_3
             eval_command_a_response += command_a
             eval_command_r_response += command_r
             eval_command_r_plus_response += command_r_plus
@@ -3946,6 +4696,7 @@ async def eval_by_ragas(
             eval_claude_3_sonnet_response += sonnet
             eval_claude_3_haiku_response += haiku
             yield (
+                gr.Markdown(value=eval_xai_grok_3_response),
                 gr.Markdown(value=eval_command_a_response),
                 gr.Markdown(value=eval_command_r_response),
                 gr.Markdown(value=eval_command_r_plus_response),
@@ -3972,6 +4723,7 @@ def generate_download_file(
         doc_id_all_checkbox_input,
         doc_id_checkbox_group_input,
         standard_answer_text,
+        xai_grok_3_response,
         command_a_response,
         command_r_response,
         command_r_plus_response,
@@ -3986,6 +4738,7 @@ def generate_download_file(
         claude_3_opus_response,
         claude_3_sonnet_response,
         claude_3_haiku_response,
+        xai_grok_3_evaluation,
         command_a_evaluation,
         command_r_evaluation,
         command_r_plus_evaluation,
@@ -4015,6 +4768,20 @@ def generate_download_file(
     df1 = pd.DataFrame({'クエリ': [query_text], '標準回答': [standard_answer_text]})
 
     df2 = search_result
+
+    if "xai/grok-3" in llm_answer_checkbox_group:
+        xai_grok_3_response = xai_grok_3_response
+        xai_grok_3_referenced_contexts = ""
+        if include_citation:
+            xai_grok_3_response, xai_grok_3_referenced_contexts = extract_citation(xai_grok_3_response)
+        if llm_evaluation_checkbox:
+            xai_grok_3_evaluation = xai_grok_3_evaluation
+        else:
+            xai_grok_3_evaluation = ""
+    else:
+        xai_grok_3_response = ""
+        xai_grok_3_evaluation = ""
+        xai_grok_3_referenced_contexts = ""
 
     if "cohere/command-a" in llm_answer_checkbox_group:
         command_a_response = command_a_response
@@ -4219,6 +4986,7 @@ def generate_download_file(
         {
             'LLM モデル':
                 [
+                    "xai/grok-3",
                     "cohere/command-a",
                     "cohere/command-r",
                     "cohere/command-r-plus",
@@ -4235,6 +5003,7 @@ def generate_download_file(
                     "claude/haiku"
                 ],
             'LLM メッセージ': [
+                xai_grok_3_response,
                 command_a_response,
                 command_r_response,
                 command_r_plus_response,
@@ -4251,6 +5020,7 @@ def generate_download_file(
                 claude_3_haiku_response
             ],
             '引用 Contexts': [
+                xai_grok_3_referenced_contexts,
                 command_a_referenced_contexts,
                 command_r_referenced_contexts,
                 command_r_plus_referenced_contexts,
@@ -4267,6 +5037,7 @@ def generate_download_file(
                 claude_3_haiku_referenced_contexts
             ],
             'LLM 評価結果': [
+                xai_grok_3_evaluation,
                 command_a_evaluation,
                 command_r_evaluation,
                 command_r_plus_evaluation,
@@ -4382,6 +5153,7 @@ def insert_query_result(
         llm_answer_checkbox_group,
         llm_evaluation_checkbox,
         standard_answer_text,
+        xai_grok_3_response,
         command_a_response,
         command_r_response,
         command_r_plus_response,
@@ -4396,6 +5168,7 @@ def insert_query_result(
         claude_3_opus_response,
         claude_3_sonnet_response,
         claude_3_haiku_response,
+        xai_grok_3_evaluation,
         command_a_evaluation,
         command_r_evaluation,
         command_r_plus_evaluation,
@@ -4441,6 +5214,34 @@ def insert_query_result(
                     sql
                 ]
             )
+
+            if "xai/grok-3" in llm_answer_checkbox_group:
+                xai_grok_3_response = xai_grok_3_response
+                if llm_evaluation_checkbox:
+                    xai_grok_3_evaluation = xai_grok_3_evaluation
+                else:
+                    xai_grok_3_evaluation = ""
+
+                insert_sql = """
+                             INSERT INTO RAG_QA_FEEDBACK (query_id,
+                                                          llm_name,
+                                                          llm_answer,
+                                                          ragas_evaluation_result)
+                             VALUES (:1,
+                                     :2,
+                                     :3,
+                                     :4) \
+                             """
+                cursor.setinputsizes(None, None, oracledb.CLOB)
+                cursor.execute(
+                    insert_sql,
+                    [
+                        query_id,
+                        "xai/grok-3",
+                        xai_grok_3_response,
+                        xai_grok_3_evaluation
+                    ]
+                )
 
             if "cohere/command-a" in llm_answer_checkbox_group:
                 command_a_response = command_a_response
@@ -4869,10 +5670,22 @@ WHERE doc_id = :doc_id """
             delete_collection_sql = f"""
 DELETE FROM {DEFAULT_COLLECTION_NAME}_collection
 WHERE id = :doc_id """
-            output_sql += delete_embedding_sql.strip().replace(":doc_id", "'" + doc_id + "'") + "\n"
-            output_sql += delete_collection_sql.strip().replace(":doc_id", "'" + doc_id + "'")
+            delete_image_sql = f"""
+DELETE FROM {DEFAULT_COLLECTION_NAME}_image
+WHERE doc_id = :doc_id """
+            delete_image_embedding_sql = f"""
+DELETE FROM {DEFAULT_COLLECTION_NAME}_image_embedding
+WHERE doc_id = :doc_id """
+
+            output_sql += delete_embedding_sql.strip().replace(":doc_id", "'" + doc_id + "'") + ";\n"
+            output_sql += delete_collection_sql.strip().replace(":doc_id", "'" + doc_id + "'") + ";\n"
+            output_sql += delete_image_sql.strip().replace(":doc_id", "'" + doc_id + "'") + ";\n"
+            output_sql += delete_image_embedding_sql.strip().replace(":doc_id", "'" + doc_id + "'") + ";\n"
+
             cursor.execute(delete_embedding_sql, doc_id=doc_id)
             cursor.execute(delete_collection_sql, doc_id=doc_id)
+            cursor.execute(delete_image_sql, doc_id=doc_id)
+            cursor.execute(delete_image_embedding_sql, doc_id=doc_id)
 
             conn.commit()
 
@@ -5087,6 +5900,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     with gr.Column():
                         tab_chat_with_llm_answer_checkbox_group = gr.CheckboxGroup(
                             [
+                                "xai/grok-3",
                                 "cohere/command-a",
                                 "cohere/command-r",
                                 # "cohere/command-r-plus",
@@ -5104,6 +5918,17 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             label="LLM モデル*",
                             value=[]
                         )
+                with gr.Accordion(
+                        label="XAI Grok-3 メッセージ",
+                        visible=False,
+                        open=True
+                ) as tab_chat_with_llm_xai_grok_3_accordion:
+                    tab_chat_with_xai_grok_3_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
+                    )
                 with gr.Accordion(
                         label="Command-A メッセージ",
                         visible=False,
@@ -5604,6 +6429,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     with gr.Column():
                         tab_chat_document_llm_answer_checkbox_group = gr.CheckboxGroup(
                             [
+                                "xai/grok-3",
                                 "cohere/command-a",
                                 "cohere/command-r",
                                 # "cohere/command-r-plus",
@@ -5684,6 +6510,15 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 with gr.Accordion("Advanced Settings", open=False):
                     with gr.Row():
                         with gr.Column():
+                            tab_chat_document_use_image_checkbox = gr.Checkbox(
+                                label="画像を使って回答",
+                                value=False,
+                                info="RAGの回答時に画像データを使用。"
+                            )
+                        with gr.Column():
+                            gr.Markdown("&nbsp;")
+                    with gr.Row():
+                        with gr.Column():
                             tab_chat_document_answer_by_one_checkbox = gr.Checkbox(
                                 label="Highest-Ranked-One 文書による回答",
                                 value=False,
@@ -5735,7 +6570,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 value=6,
                                 info="Default value: 6。テキスト検索に使用できる単語数の制限。"
                             )
-                    with gr.Accordion(label="RAG Prompt 設定", open=False):
+                    with gr.Accordion(label="RAG Prompt 設定", open=False) as tab_chat_document_rag_prompt_accordion:
                         with gr.Row():
                             with gr.Column():
                                 tab_chat_document_rag_prompt_text = gr.Textbox(
@@ -5926,6 +6761,60 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             wrap=True,
                             column_widths=["4%", "50%", "6%", "8%", "6%", "6%", "8%"],
                             interactive=False,
+                        )
+                with gr.Accordion(
+                        label="XAI Grok-3 メッセージ",
+                        visible=False,
+                        open=True
+                ) as tab_chat_document_llm_xai_grok_3_accordion:
+                    tab_chat_document_xai_grok_3_answer_text = gr.Markdown(
+                        show_copy_button=True,
+                        height=200,
+                        min_height=200,
+                        max_height=300
+                    )
+                    with gr.Accordion(
+                            label="Human 評価",
+                            visible=True,
+                            open=True
+                    ) as tab_chat_document_llm_xai_grok_3_human_evaluation_accordion:
+                        with gr.Row():
+                            tab_chat_document_xai_grok_3_answer_human_eval_feedback_radio = gr.Radio(
+                                show_label=False,
+                                choices=[
+                                    ("Good response", "good"),
+                                    ("Neutral response", "neutral"),
+                                    ("Bad response", "bad"),
+                                ],
+                                value="good",
+                                container=False,
+                                interactive=True,
+                            )
+                        with gr.Row():
+                            with gr.Column(scale=11):
+                                tab_chat_document_xai_grok_3_answer_human_eval_feedback_text = gr.Textbox(
+                                    show_label=False,
+                                    container=False,
+                                    lines=2,
+                                    interactive=True,
+                                    autoscroll=True,
+                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                )
+                            with gr.Column(scale=1):
+                                tab_chat_document_xai_grok_3_answer_human_eval_feedback_send_button = gr.Button(
+                                    value="送信",
+                                    variant="primary",
+                                )
+                    with gr.Accordion(
+                            label="LLM 評価結果",
+                            visible=False,
+                            open=True
+                    ) as tab_chat_document_llm_xai_grok_3_evaluation_accordion:
+                        tab_chat_document_xai_grok_3_evaluation_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=200,
+                            min_height=200,
+                            max_height=300
                         )
                 with gr.Accordion(
                         label="Command-A メッセージ",
@@ -6790,6 +7679,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_llm_answer_checkbox_group
         ],
         outputs=[
+            tab_chat_with_llm_xai_grok_3_accordion,
             tab_chat_with_llm_command_a_accordion,
             tab_chat_with_llm_command_r_accordion,
             tab_chat_with_llm_command_r_plus_accordion,
@@ -6811,9 +7701,12 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_llm_query_image,
             tab_chat_with_llm_query_text,
             tab_chat_with_llm_answer_checkbox_group,
+            tab_chat_with_xai_grok_3_answer_text,
             tab_chat_with_command_a_answer_text,
             tab_chat_with_command_r_answer_text,
             tab_chat_with_command_r_plus_answer_text,
+            tab_chat_with_llama_4_maverick_answer_text,
+            tab_chat_with_llama_4_scout_answer_text,
             tab_chat_with_llama_3_3_70b_answer_text,
             tab_chat_with_llama_3_2_90b_vision_answer_text,
             tab_chat_with_openai_gpt4o_answer_text,
@@ -6834,6 +7727,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_llm_answer_checkbox_group
         ],
         outputs=[
+            tab_chat_with_xai_grok_3_answer_text,
             tab_chat_with_command_a_answer_text,
             tab_chat_with_command_r_answer_text,
             tab_chat_with_command_r_plus_answer_text,
@@ -7055,6 +7949,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_answer_checkbox_group
         ],
         outputs=[
+            tab_chat_document_llm_xai_grok_3_accordion,
             tab_chat_document_llm_command_a_accordion,
             tab_chat_document_llm_command_r_accordion,
             tab_chat_document_llm_command_r_plus_accordion,
@@ -7090,6 +7985,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_evaluation_checkbox
         ],
         outputs=[
+            tab_chat_document_llm_xai_grok_3_evaluation_accordion,
             tab_chat_document_llm_command_a_evaluation_accordion,
             tab_chat_document_llm_command_r_evaluation_accordion,
             tab_chat_document_llm_command_r_plus_evaluation_accordion,
@@ -7118,6 +8014,27 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_sub_query1_text,
             tab_chat_document_sub_query2_text,
             tab_chat_document_sub_query3_text
+        ]
+    )
+
+    # 画像を使って回答チェックボックスの変更イベント
+    tab_chat_document_use_image_checkbox.change(
+        lambda x: (
+            # 画像使用時の設定
+            gr.Checkbox(value=False, interactive=False),  # Highest-Ranked-One OFF、修正可能
+            gr.Slider(value=0, interactive=False),        # Extend-First-K 0、修正可能
+            gr.Slider(value=0, interactive=False)         # Extend-Around-K 2、修正可能
+        ) if x else (
+            # 通常時の設定
+            gr.Checkbox(value=False, interactive=True),  # Highest-Ranked-One デフォルト
+            gr.Slider(value=0, interactive=True),        # Extend-First-K デフォルト
+            gr.Slider(value=2, interactive=True)         # Extend-Around-K デフォルト
+        ),
+        inputs=[tab_chat_document_use_image_checkbox],
+        outputs=[
+            tab_chat_document_answer_by_one_checkbox,
+            tab_chat_document_extend_first_chunk_size,
+            tab_chat_document_extend_around_chunk_size
         ]
     )
 
@@ -7198,7 +8115,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_partition_by_k_slider,
             tab_chat_document_answer_by_one_checkbox,
             tab_chat_document_extend_first_chunk_size,
-            tab_chat_document_extend_around_chunk_size
+            tab_chat_document_extend_around_chunk_size,
+            tab_chat_document_use_image_checkbox
         ],
         outputs=[
             tab_chat_document_output_sql_text,
@@ -7212,12 +8130,14 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_include_citation_checkbox,
             tab_chat_document_include_current_time_checkbox,
+            tab_chat_document_use_image_checkbox,
             tab_chat_document_query_text,
             tab_chat_document_doc_id_all_checkbox,
             tab_chat_document_doc_id_checkbox_group,
             tab_chat_document_rag_prompt_text,
         ],
         outputs=[
+            tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
@@ -7242,6 +8162,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_query_text,
             tab_chat_document_doc_id_all_checkbox,
             tab_chat_document_doc_id_checkbox_group,
+            tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
@@ -7258,6 +8179,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_claude_3_haiku_answer_text,
         ],
         outputs=[
+            tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
@@ -7274,6 +8196,22 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_claude_3_haiku_answer_text,
         ]
     ).then(
+        print_base64_data_for_selected_models,
+        inputs=[
+            tab_chat_document_searched_result_dataframe,
+            tab_chat_document_use_image_checkbox,
+            tab_chat_document_llm_answer_checkbox_group,
+            tab_chat_document_query_text,
+            tab_chat_document_llama_4_maverick_answer_text,
+            tab_chat_document_llama_4_scout_answer_text,
+            tab_chat_document_llama_3_2_90b_vision_answer_text
+        ],
+        outputs=[
+            tab_chat_document_llama_4_maverick_answer_text,
+            tab_chat_document_llama_4_scout_answer_text,
+            tab_chat_document_llama_3_2_90b_vision_answer_text
+        ]
+    ).then(
         eval_by_ragas,
         inputs=[
             tab_chat_document_query_text,
@@ -7284,6 +8222,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_evaluation_checkbox,
             tab_chat_document_system_message_text,
             tab_chat_document_standard_answer_text,
+            tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
@@ -7300,6 +8239,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_claude_3_haiku_answer_text
         ],
         outputs=[
+            tab_chat_document_xai_grok_3_evaluation_text,
             tab_chat_document_command_a_evaluation_text,
             tab_chat_document_command_r_evaluation_text,
             tab_chat_document_command_r_plus_evaluation_text,
@@ -7326,6 +8266,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_doc_id_all_checkbox,
             tab_chat_document_doc_id_checkbox_group,
             tab_chat_document_standard_answer_text,
+            tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
@@ -7340,6 +8281,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_claude_3_opus_answer_text,
             tab_chat_document_claude_3_sonnet_answer_text,
             tab_chat_document_claude_3_haiku_answer_text,
+            tab_chat_document_xai_grok_3_evaluation_text,
             tab_chat_document_command_a_evaluation_text,
             tab_chat_document_command_r_evaluation_text,
             tab_chat_document_command_r_plus_evaluation_text,
@@ -7376,6 +8318,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_llm_evaluation_checkbox,
             tab_chat_document_standard_answer_text,
+            tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
             tab_chat_document_command_r_plus_answer_text,
@@ -7390,6 +8333,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_claude_3_opus_answer_text,
             tab_chat_document_claude_3_sonnet_answer_text,
             tab_chat_document_claude_3_haiku_answer_text,
+            tab_chat_document_xai_grok_3_evaluation_text,
             tab_chat_document_command_a_evaluation_text,
             tab_chat_document_command_r_evaluation_text,
             tab_chat_document_command_r_plus_evaluation_text,
@@ -7406,6 +8350,20 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_claude_3_haiku_evaluation_text,
         ],
         outputs=[]
+    )
+
+    tab_chat_document_xai_grok_3_answer_human_eval_feedback_send_button.click(
+        eval_by_human,
+        inputs=[
+            query_id_state,
+            gr.State(value="xai/grok-3"),
+            tab_chat_document_xai_grok_3_answer_human_eval_feedback_radio,
+            tab_chat_document_xai_grok_3_answer_human_eval_feedback_text,
+        ],
+        outputs=[
+            tab_chat_document_xai_grok_3_answer_human_eval_feedback_radio,
+            tab_chat_document_xai_grok_3_answer_human_eval_feedback_text,
+        ]
     )
 
     tab_chat_document_command_a_answer_human_eval_feedback_send_button.click(

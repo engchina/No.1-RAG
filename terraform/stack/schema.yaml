@@ -66,7 +66,7 @@ variables:
     description: "Set the password for your Autonomous Database ADMIN user here."
     # renders a second field to re-enter the password for confirmation
     confirmation: true
-    pattern: "^(?=.*[!@#%^*_+\\-:?.,\\[\\]\\{\\}])(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?!.*[$\\(\\)]).{8,32}$"
+    pattern: "^(?!.*admin)(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?!.*[\"]).{12,30}$"
 
   license_model:
     type: enum
