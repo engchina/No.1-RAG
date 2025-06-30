@@ -132,7 +132,7 @@ IMAGE_QA_PROMPT_TEMPLATE_OLD = """## 厳格なコンテキストQAシステム�
 
 IMAGE_QA_PROMPT_TEMPLATE = """画像をもとに簡潔に質問に答えてください（回答は日本語で）。
 
-Question: {{query_text}}
+質問: {{query_text}}
 """
 
 # Query generation prompts

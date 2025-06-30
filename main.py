@@ -20,7 +20,7 @@ import requests
 from PIL import Image
 from dotenv import load_dotenv, find_dotenv, set_key, get_key
 from gradio.themes import GoogleFont
-from langchain_anthropic import ChatAnthropic
+
 from langchain_community.document_loaders import TextLoader
 from langchain_community.embeddings import OCIGenAIEmbeddings
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -185,27 +185,46 @@ async def cleanup_llm_client_async(llm_client):
     try:
         # OpenAI系クライアントの場合（非同期クローズ）
         if hasattr(llm_client, 'client'):
+            # HTTPXクライアントの場合
             if hasattr(llm_client.client, 'aclose'):
                 try:
                     await llm_client.client.aclose()
+                    print(f"OpenAI HTTPXクライアントの非同期クローズが完了しました")
                 except Exception as e:
-                    print(f"OpenAI クライアントの非同期クローズ中にエラー: {e}")
+                    # OpenAI API type エラーは無視
+                    if "Ambiguous use of module client" not in str(e):
+                        print(f"OpenAI クライアントの非同期クローズ中にエラー: {e}")
             elif hasattr(llm_client.client, 'close'):
                 try:
                     llm_client.client.close()
+                    print(f"OpenAI クライアントの同期クローズが完了しました")
                 except Exception as e:
-                    print(f"OpenAI クライアントの同期クローズ中にエラー: {e}")
+                    # OpenAI API type エラーは無視
+                    if "Ambiguous use of module client" not in str(e):
+                        print(f"OpenAI クライアントの同期クローズ中にエラー: {e}")
 
-        # _clientアトリビュートを持つ場合
+            # 追加のHTTP接続プール清理
+            if hasattr(llm_client.client, '_client'):
+                if hasattr(llm_client.client._client, 'aclose'):
+                    try:
+                        await llm_client.client._client.aclose()
+                        print(f"OpenAI 内部HTTPクライアントの非同期クローズが完了しました")
+                    except Exception as e:
+                        if "Ambiguous use of module client" not in str(e):
+                            print(f"OpenAI 内部HTTPクライアントクローズ中にエラー: {e}")
+
+        # _clientアトリビュートを持つ場合（OCI GenAI等）
         elif hasattr(llm_client, '_client'):
             if hasattr(llm_client._client, 'aclose'):
                 try:
                     await llm_client._client.aclose()
+                    print(f"OCI _client の非同期クローズが完了しました")
                 except Exception as e:
                     print(f"_client 非同期クローズ中にエラー: {e}")
             elif hasattr(llm_client._client, 'close'):
                 try:
                     llm_client._client.close()
+                    print(f"OCI _client の同期クローズが完了しました")
                 except Exception as e:
                     print(f"_client クローズ中にエラー: {e}")
 
@@ -214,18 +233,267 @@ async def cleanup_llm_client_async(llm_client):
                 if hasattr(llm_client._client._session, 'aclose'):
                     try:
                         await llm_client._client._session.aclose()
+                        print(f"OCI セッションの非同期クローズが完了しました")
                     except Exception as e:
                         print(f"OCI セッション非同期クローズ中にエラー: {e}")
                 elif hasattr(llm_client._client._session, 'close'):
                     try:
                         llm_client._client._session.close()
+                        print(f"OCI セッションの同期クローズが完了しました")
                     except Exception as e:
                         print(f"OCI セッションクローズ中にエラー: {e}")
+
+        # 追加のリソース清理：HTTPコネクションプールの強制クリーンアップ（軽量版）
+        try:
+            await force_cleanup_http_connections(llm_client)
+        except Exception as force_cleanup_error:
+            # 強制クリーンアップのエラーは詳細を表示しない
+            if "Ambiguous use of module client" not in str(force_cleanup_error):
+                print(f"HTTP接続プール強制クリーンアップ中にエラー: {force_cleanup_error}")
 
         print(f"LLMクライアント {type(llm_client).__name__} の非同期リソースクリーンアップが完了しました")
 
     except Exception as cleanup_error:
-        print(f"LLMクライアントの非同期クリーンアップ中に予期しないエラーが発生しました: {cleanup_error}")
+        # OpenAI API type エラーは無視
+        if "Ambiguous use of module client" not in str(cleanup_error):
+            print(f"LLMクライアントの非同期クリーンアップ中に予期しないエラーが発生しました: {cleanup_error}")
+
+
+async def force_cleanup_http_connections(llm_client):
+    """
+    HTTPコネクションプールを強制的にクリーンアップする
+
+    Args:
+        llm_client: LLMクライアント
+    """
+    try:
+        # httpxライブラリのコネクションプールを探してクリーンアップ
+        import httpx
+        import gc
+
+        # ガベージコレクションを実行してオブジェクトを収集
+        gc.collect()
+
+        # httpxクライアントを探してクリーンアップ（最大3つまで）
+        cleaned_count = 0
+        for obj in gc.get_objects():
+            if cleaned_count >= 3:  # 処理数を制限
+                break
+
+            if isinstance(obj, httpx.AsyncClient):
+                try:
+                    if not obj.is_closed:
+                        await obj.aclose()
+                        cleaned_count += 1
+                        print(f"未閉鎖のHTTPXクライアント #{cleaned_count} をクリーンアップしました")
+                except Exception as e:
+                    # OpenAI API type エラーは無視
+                    if "Ambiguous use of module client" not in str(e):
+                        print(f"HTTPXクライアントクリーンアップ中にエラー: {e}")
+            elif isinstance(obj, httpx.Client):
+                try:
+                    if not obj.is_closed:
+                        obj.close()
+                        cleaned_count += 1
+                        print(f"未閉鎖の同期HTTPXクライアント #{cleaned_count} をクリーンアップしました")
+                except Exception as e:
+                    # OpenAI API type エラーは無視
+                    if "Ambiguous use of module client" not in str(e):
+                        print(f"同期HTTPXクライアントクリーンアップ中にエラー: {e}")
+
+    except ImportError:
+        # httpxがインストールされていない場合は無視
+        pass
+    except Exception as e:
+        # OpenAI API type エラーは無視
+        if "Ambiguous use of module client" not in str(e):
+            print(f"HTTP接続プール強制クリーンアップ中にエラー: {e}")
+
+
+async def cleanup_all_http_connections():
+    """
+    システム全体のHTTP接続プールをクリーンアップする
+    """
+    try:
+        import httpx
+        import aiohttp
+        import gc
+
+        print("システム全体のHTTP接続プールクリーンアップを開始...")
+
+        # ガベージコレクションを実行
+        gc.collect()
+
+        cleaned_count = 0
+
+        # すべてのオブジェクトをスキャンしてHTTPクライアントを探す
+        for obj in gc.get_objects():
+            try:
+                # httpxクライアント
+                if isinstance(obj, httpx.AsyncClient):
+                    if not obj.is_closed:
+                        await obj.aclose()
+                        cleaned_count += 1
+                        print(f"HTTPXクライアント #{cleaned_count} をクリーンアップしました")
+                elif isinstance(obj, httpx.Client):
+                    if not obj.is_closed:
+                        obj.close()
+                        cleaned_count += 1
+                        print(f"同期HTTPXクライアント #{cleaned_count} をクリーンアップしました")
+
+                # aiohttpクライアント
+                elif hasattr(obj, '__class__') and 'aiohttp' in str(obj.__class__):
+                    if hasattr(obj, 'close') and not getattr(obj, 'closed', True):
+                        try:
+                            await obj.close()
+                            cleaned_count += 1
+                            print(f"aiohttpクライアント #{cleaned_count} をクリーンアップしました")
+                        except Exception:
+                            pass
+
+            except Exception as e:
+                # 個別のオブジェクトクリーンアップエラーは無視
+                pass
+
+        # 最終ガベージコレクション
+        gc.collect()
+
+        print(f"HTTP接続プールクリーンアップ完了: {cleaned_count}個のクライアントを処理しました")
+
+    except ImportError:
+        print("HTTP接続プールクリーンアップ: 必要なライブラリがインストールされていません")
+    except Exception as e:
+        print(f"システム全体のHTTP接続プールクリーンアップ中にエラー: {e}")
+
+
+async def lightweight_cleanup():
+    """
+    軽量なリソースクリーンアップ（画像処理後に使用）
+    """
+    try:
+        import gc
+
+        # 軽量なガベージコレクション
+        collected = gc.collect()
+        if collected > 0:
+            print(f"軽量クリーンアップ: {collected} オブジェクトを回収しました")
+
+        # 基本的なHTTP接続チェック（重い処理は避ける）
+        try:
+            import httpx
+            # 明らかに閉じられていないクライアントのみチェック
+            cleaned_count = 0
+            for obj in gc.get_objects():
+                if isinstance(obj, httpx.AsyncClient) and hasattr(obj, 'is_closed'):
+                    if not obj.is_closed:
+                        try:
+                            await obj.aclose()
+                            cleaned_count += 1
+                            print(f"未閉鎖のHTTPXクライアント #{cleaned_count} をクリーンアップしました")
+                        except Exception as close_error:
+                            # OpenAI API type エラーなどは無視
+                            if "Ambiguous use of module client" not in str(close_error):
+                                print(f"HTTPXクライアントクローズ中にエラー: {close_error}")
+                        if cleaned_count >= 3:  # 最大3つまで処理
+                            break
+        except ImportError:
+            pass
+        except Exception as http_error:
+            # HTTP関連のエラーは詳細を表示しない
+            print(f"HTTP接続チェック中にエラーが発生しました（無視されます）")
+
+    except Exception as e:
+        print(f"軽量クリーンアップ中にエラー: {e}")
+
+
+def enable_resource_warnings():
+    """
+    リソース警告を有効にして詳細な情報を取得する
+    """
+    import warnings
+    import tracemalloc
+
+    # ResourceWarningを有効にする
+    warnings.filterwarnings("always", category=ResourceWarning)
+
+    # tracemallocを有効にしてメモリ追跡を開始
+    if not tracemalloc.is_tracing():
+        tracemalloc.start()
+        print("リソース追跡が有効になりました")
+
+    # カスタムwarning処理を設定
+    def custom_warning_handler(message, category, filename, lineno, file=None, line=None):
+        if category == ResourceWarning:
+            print(f"🚨 リソース警告: {message}")
+            print(f"   ファイル: {filename}:{lineno}")
+            if tracemalloc.is_tracing():
+                # メモリ使用量の統計を表示
+                current, peak = tracemalloc.get_traced_memory()
+                print(f"   メモリ使用量: 現在={current / 1024 / 1024:.1f}MB, ピーク={peak / 1024 / 1024:.1f}MB")
+
+    warnings.showwarning = custom_warning_handler
+
+
+async def final_resource_cleanup():
+    """
+    プログラム終了時の最終リソースクリーンアップ
+    """
+    print("\n=== 最終リソースクリーンアップを開始 ===")
+
+    try:
+        # HTTP接続プールの全体クリーンアップ
+        await cleanup_all_http_connections()
+
+        # 追加のリソースクリーンアップ
+        import gc
+        import asyncio
+
+        # 現在のタスクを取得（自分自身は除外）
+        current_task = asyncio.current_task()
+        tasks = [task for task in asyncio.all_tasks()
+                 if not task.done() and task != current_task]
+
+        if tasks:
+            print(f"実行中のタスク {len(tasks)} 個をキャンセルします...")
+            # タスクを安全にキャンセル
+            for task in tasks:
+                try:
+                    if not task.done() and not task.cancelled():
+                        task.cancel()
+                except Exception as cancel_error:
+                    print(f"タスクキャンセル中にエラー: {cancel_error}")
+
+            # キャンセルされたタスクの完了を待つ（タイムアウト付き）
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*tasks, return_exceptions=True),
+                    timeout=5.0
+                )
+                print("すべてのタスクがキャンセルされました")
+            except asyncio.TimeoutError:
+                print("タスクキャンセルがタイムアウトしました（一部のタスクが残っている可能性があります）")
+            except Exception as gather_error:
+                print(f"タスク待機中にエラー: {gather_error}")
+
+        # 強制ガベージコレクション
+        for i in range(3):
+            collected = gc.collect()
+            if collected > 0:
+                print(f"ガベージコレクション {i + 1}: {collected} オブジェクトを回収しました")
+
+        # メモリ統計を表示
+        import tracemalloc
+        if tracemalloc.is_tracing():
+            current, peak = tracemalloc.get_traced_memory()
+            print(f"最終メモリ使用量: 現在={current / 1024 / 1024:.1f}MB, ピーク={peak / 1024 / 1024:.1f}MB")
+            tracemalloc.stop()
+
+        print("=== 最終リソースクリーンアップ完了 ===\n")
+
+    except Exception as e:
+        print(f"最終リソースクリーンアップ中にエラー: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 def check_langfuse_availability():
@@ -587,10 +855,7 @@ async def command_r_task(system_text, query_text, command_r_checkbox):
             provider="cohere",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            temperature=0.0,
-            top_p=0.75,
-            seed=42,
-            model_kwargs={"max_tokens": 3600},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
         )
         if system_text:
             messages = [
@@ -611,49 +876,6 @@ async def command_r_task(system_text, query_text, command_r_checkbox):
         async for chunk in command_r_16k.astream(messages, config={"callbacks": [langfuse_handler],
                                                                    "metadata": {
                                                                        "ls_model_name": "cohere.command-r-08-2024"}}):
-            yield chunk.content
-        end_time = time.time()
-        print(f"{end_time=}")
-        inference_time = end_time - start_time
-        print(f"\n\n推論時間: {inference_time:.2f}秒")
-        yield f"\n\n推論時間: {inference_time:.2f}秒"
-        yield "TASK_DONE"
-    else:
-        yield "TASK_DONE"
-
-
-async def command_r_plus_task(system_text, query_text, command_r_plus_checkbox):
-    region = get_region()
-    if command_r_plus_checkbox:
-        command_r_plus = ChatOCIGenAI(
-            model_id="cohere.command-r-plus-08-2024",
-            provider="cohere",
-            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
-            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            temperature=0.0,
-            top_p=0.75,
-            seed=42,
-            model_kwargs={"max_tokens": 3600},
-        )
-        if system_text:
-            messages = [
-                SystemMessage(content=system_text),
-                HumanMessage(content=query_text),
-            ]
-        else:
-            messages = [
-                HumanMessage(content=query_text),
-            ]
-        start_time = time.time()
-        print(f"{start_time=}")
-        langfuse_handler = CallbackHandler(
-            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-            host=os.environ["LANGFUSE_HOST"],
-        )
-        async for chunk in command_r_plus.astream(messages, config={"callbacks": [langfuse_handler],
-                                                                    "metadata": {
-                                                                        "ls_model_name": "cohere.command-r-plus"}}):
             yield chunk.content
         end_time = time.time()
         print(f"{end_time=}")
@@ -761,7 +983,8 @@ async def llama_3_2_90b_vision_task(system_text, query_image, query_text, llama_
             provider="meta",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600, "presence_penalty": 2, "frequency_penalty": 2},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600, "presence_penalty": 2,
+                          "frequency_penalty": 2},
         )
         if query_image:
             base64_image = encode_image(query_image)
@@ -1110,138 +1333,11 @@ async def azure_openai_gpt4_task(system_text, query_text, azure_openai_gpt4_chec
         yield "TASK_DONE"
 
 
-async def claude_3_opus_task(system_text, query_text, claude_3_opus_checkbox):
-    if claude_3_opus_checkbox:
-        load_dotenv(find_dotenv())
-        claude_3_opus = ChatAnthropic(
-            model="claude-3-opus-20240229",
-            temperature=0,
-            max_tokens=1024,
-            timeout=None,
-            max_retries=2,
-        )
-        if system_text:
-            messages = [
-                SystemMessage(content=system_text),
-                HumanMessage(content=query_text),
-            ]
-        else:
-            messages = [
-                HumanMessage(content=query_text),
-            ]
-        start_time = time.time()
-        print(f"{start_time=}")
-
-        # 安全なlangfuse設定を取得
-        stream_config = get_safe_stream_config("claude-3-opus")
-
-        try:
-            async for chunk in claude_3_opus.astream(messages, config=stream_config):
-                yield chunk.content
-        except Exception as e:
-            logger.error(f"Claude-3-Opus ストリーム処理中にエラーが発生しました: {e}")
-            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
-            yield f"\n\nエラーが発生しました: {e}\n\n"
-        end_time = time.time()
-        print(f"{end_time=}")
-        inference_time = end_time - start_time
-        print(f"\n\n推論時間: {inference_time:.2f}秒")
-        yield f"\n\n推論時間: {inference_time:.2f}秒"
-        yield "TASK_DONE"
-    else:
-        yield "TASK_DONE"
-
-
-async def claude_3_sonnet_task(system_text, query_text, claude_3_sonnet_checkbox):
-    if claude_3_sonnet_checkbox:
-        load_dotenv(find_dotenv())
-        claude_3_sonnet = ChatAnthropic(
-            model="claude-3-5-sonnet-20240620",
-            temperature=0,
-            max_tokens=1024,
-            timeout=None,
-            max_retries=2,
-        )
-        if system_text:
-            messages = [
-                SystemMessage(content=system_text),
-                HumanMessage(content=query_text),
-            ]
-        else:
-            messages = [
-                HumanMessage(content=query_text),
-            ]
-        start_time = time.time()
-        print(f"{start_time=}")
-
-        # 安全なlangfuse設定を取得
-        stream_config = get_safe_stream_config("claude-3-5-sonnet")
-
-        try:
-            async for chunk in claude_3_sonnet.astream(messages, config=stream_config):
-                yield chunk.content
-        except Exception as e:
-            logger.error(f"Claude-3-Sonnet ストリーム処理中にエラーが発生しました: {e}")
-            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
-            yield f"\n\nエラーが発生しました: {e}\n\n"
-        end_time = time.time()
-        print(f"{end_time=}")
-        inference_time = end_time - start_time
-        print(f"\n\n推論時間: {inference_time:.2f}秒")
-        yield f"\n\n推論時間: {inference_time:.2f}秒"
-        yield "TASK_DONE"
-    else:
-        yield "TASK_DONE"
-
-
-async def claude_3_haiku_task(system_text, query_text, claude_3_haiku_checkbox):
-    if claude_3_haiku_checkbox:
-        load_dotenv(find_dotenv())
-        claude_3_haiku = ChatAnthropic(
-            model="claude-3-haiku-20240307",
-            temperature=0,
-            max_tokens=1024,
-            timeout=None,
-            max_retries=2,
-        )
-        if system_text:
-            messages = [
-                SystemMessage(content=system_text),
-                HumanMessage(content=query_text),
-            ]
-        else:
-            messages = [
-                HumanMessage(content=query_text),
-            ]
-        start_time = time.time()
-        print(f"{start_time=}")
-
-        # 安全なlangfuse設定を取得
-        stream_config = get_safe_stream_config("claude-3-haiku")
-
-        try:
-            async for chunk in claude_3_haiku.astream(messages, config=stream_config):
-                yield chunk.content
-        except Exception as e:
-            logger.error(f"Claude-3-Haiku ストリーム処理中にエラーが発生しました: {e}")
-            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
-            yield f"\n\nエラーが発生しました: {e}\n\n"
-        end_time = time.time()
-        print(f"{end_time=}")
-        inference_time = end_time - start_time
-        print(f"\n\n推論時間: {inference_time:.2f}秒")
-        yield f"\n\n推論時間: {inference_time:.2f}秒"
-        yield "TASK_DONE"
-    else:
-        yield "TASK_DONE"
-
-
 async def chat(
         system_text,
         xai_grok_3_user_text,
         command_a_user_text,
         command_r_user_text,
-        command_r_plus_user_text,
         llama_4_maverick_user_image,
         llama_4_maverick_user_text,
         llama_4_scout_user_image,
@@ -1253,13 +1349,9 @@ async def chat(
         openai_gpt4_user_text,
         azure_openai_gpt4o_user_text,
         azure_openai_gpt4_user_text,
-        claude_3_opus_user_text,
-        claude_3_sonnet_user_text,
-        claude_3_haiku_user_text,
         xai_grok_3_checkbox,
         command_a_checkbox,
         command_r_checkbox,
-        command_r_plus_checkbox,
         llama_4_maverick_checkbox,
         llama_4_scout_checkbox,
         llama_3_3_70b_checkbox,
@@ -1267,15 +1359,11 @@ async def chat(
         openai_gpt4o_gen_checkbox,
         openai_gpt4_gen_checkbox,
         azure_openai_gpt4o_gen_checkbox,
-        azure_openai_gpt4_gen_checkbox,
-        claude_3_opus_checkbox,
-        claude_3_sonnet_checkbox,
-        claude_3_haiku_checkbox
+        azure_openai_gpt4_gen_checkbox
 ):
     xai_grok_3_gen = xai_grok_3_task(system_text, xai_grok_3_user_text, xai_grok_3_checkbox)
     command_a_gen = command_a_task(system_text, command_a_user_text, command_a_checkbox)
     command_r_gen = command_r_task(system_text, command_r_user_text, command_r_checkbox)
-    command_r_plus_gen = command_r_plus_task(system_text, command_r_plus_user_text, command_r_plus_checkbox)
     llama_4_maverick_gen = llama_4_maverick_task(system_text, llama_4_maverick_user_image,
                                                  llama_4_maverick_user_text, llama_4_maverick_checkbox)
     llama_4_scout_gen = llama_4_scout_task(system_text, llama_4_scout_user_image,
@@ -1290,19 +1378,15 @@ async def chat(
                                                      azure_openai_gpt4o_gen_checkbox)
     azure_openai_gpt4_gen = azure_openai_gpt4_task(system_text, azure_openai_gpt4_user_text,
                                                    azure_openai_gpt4_gen_checkbox)
-    claude_3_opus_gen = claude_3_opus_task(system_text, claude_3_opus_user_text, claude_3_opus_checkbox)
-    claude_3_sonnet_gen = claude_3_sonnet_task(system_text, claude_3_sonnet_user_text, claude_3_sonnet_checkbox)
-    claude_3_haiku_gen = claude_3_haiku_task(system_text, claude_3_haiku_user_text, claude_3_haiku_checkbox)
 
-    responses_status = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+    responses_status = ["", "", "", "", "", "", "", "", "", "", ""]
     while True:
-        responses = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
-        generators = [xai_grok_3_gen, command_a_gen, command_r_gen, command_r_plus_gen,
+        responses = ["", "", "", "", "", "", "", "", "", "", ""]
+        generators = [xai_grok_3_gen, command_a_gen, command_r_gen,
                       llama_4_maverick_gen, llama_4_scout_gen,
                       llama_3_3_70b_gen, llama_3_2_90b_vision_gen,
                       openai_gpt4o_gen, openai_gpt4_gen,
-                      azure_openai_gpt4o_gen, azure_openai_gpt4_gen,
-                      claude_3_opus_gen, claude_3_sonnet_gen, claude_3_haiku_gen]
+                      azure_openai_gpt4o_gen, azure_openai_gpt4_gen]
 
         for i, gen in enumerate(generators):
             try:
@@ -1326,7 +1410,6 @@ def set_chat_llm_answer(llm_answer_checkbox):
     xai_grok_3_answer_visible = False
     command_a_answer_visible = False
     command_r_answer_visible = False
-    command_r_plus_answer_visible = False
     llama_4_maverick_answer_visible = False
     llama_4_scout_answer_visible = False
     llama_3_3_70b_answer_visible = False
@@ -1335,17 +1418,12 @@ def set_chat_llm_answer(llm_answer_checkbox):
     openai_gpt4_answer_visible = False
     azure_openai_gpt4o_answer_visible = False
     azure_openai_gpt4_answer_visible = False
-    claude_3_opus_answer_visible = False
-    claude_3_sonnet_answer_visible = False
-    claude_3_haiku_answer_visible = False
     if "xai/grok-3" in llm_answer_checkbox:
         xai_grok_3_answer_visible = True
     if "cohere/command-a" in llm_answer_checkbox:
         command_a_answer_visible = True
     if "cohere/command-r" in llm_answer_checkbox:
         command_r_answer_visible = True
-    if "cohere/command-r-plus" in llm_answer_checkbox:
-        command_r_plus_answer_visible = True
     if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox:
         llama_4_maverick_answer_visible = True
     if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
@@ -1362,17 +1440,10 @@ def set_chat_llm_answer(llm_answer_checkbox):
         azure_openai_gpt4o_answer_visible = True
     if "azure_openai/gpt-4" in llm_answer_checkbox:
         azure_openai_gpt4_answer_visible = True
-    if "claude/opus" in llm_answer_checkbox:
-        claude_3_opus_answer_visible = True
-    if "claude/sonnet" in llm_answer_checkbox:
-        claude_3_sonnet_answer_visible = True
-    if "claude/haiku" in llm_answer_checkbox:
-        claude_3_haiku_answer_visible = True
     return (
         gr.Accordion(visible=xai_grok_3_answer_visible),
         gr.Accordion(visible=command_a_answer_visible),
         gr.Accordion(visible=command_r_answer_visible),
-        gr.Accordion(visible=command_r_plus_answer_visible),
         gr.Accordion(visible=llama_4_maverick_answer_visible),
         gr.Accordion(visible=llama_4_scout_answer_visible),
         gr.Accordion(visible=llama_3_3_70b_answer_visible),
@@ -1380,10 +1451,7 @@ def set_chat_llm_answer(llm_answer_checkbox):
         gr.Accordion(visible=openai_gpt4o_answer_visible),
         gr.Accordion(visible=openai_gpt4_answer_visible),
         gr.Accordion(visible=azure_openai_gpt4o_answer_visible),
-        gr.Accordion(visible=azure_openai_gpt4_answer_visible),
-        gr.Accordion(visible=claude_3_opus_answer_visible),
-        gr.Accordion(visible=claude_3_sonnet_answer_visible),
-        gr.Accordion(visible=claude_3_haiku_answer_visible)
+        gr.Accordion(visible=azure_openai_gpt4_answer_visible)
     )
 
 
@@ -1391,7 +1459,6 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
     xai_grok_3_evaluation_visible = False
     command_a_evaluation_visible = False
     command_r_evaluation_visible = False
-    command_r_plus_evaluation_visible = False
     llama_4_maverick_evaluation_visible = False
     llama_4_scout_evaluation_visible = False
     llama_3_3_70b_evaluation_visible = False
@@ -1400,14 +1467,10 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
     openai_gpt4_evaluation_visible = False
     azure_openai_gpt4o_evaluation_visible = False
     azure_openai_gpt4_evaluation_visible = False
-    claude_3_opus_evaluation_visible = False
-    claude_3_sonnet_evaluation_visible = False
-    claude_3_haiku_evaluation_visible = False
     if llm_evaluation_checkbox:
         xai_grok_3_evaluation_visible = True
         command_a_evaluation_visible = True
         command_r_evaluation_visible = True
-        command_r_plus_evaluation_visible = True
         llama_4_maverick_evaluation_visible = True
         llama_4_scout_evaluation_visible = True
         llama_3_3_70b_evaluation_visible = True
@@ -1416,14 +1479,10 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
         openai_gpt4_evaluation_visible = True
         azure_openai_gpt4o_evaluation_visible = True
         azure_openai_gpt4_evaluation_visible = True
-        claude_3_opus_evaluation_visible = True
-        claude_3_sonnet_evaluation_visible = True
-        claude_3_haiku_evaluation_visible = True
     return (
         gr.Accordion(visible=xai_grok_3_evaluation_visible),
         gr.Accordion(visible=command_a_evaluation_visible),
         gr.Accordion(visible=command_r_evaluation_visible),
-        gr.Accordion(visible=command_r_plus_evaluation_visible),
         gr.Accordion(visible=llama_4_maverick_evaluation_visible),
         gr.Accordion(visible=llama_4_scout_evaluation_visible),
         gr.Accordion(visible=llama_3_3_70b_evaluation_visible),
@@ -1431,10 +1490,7 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
         gr.Accordion(visible=openai_gpt4o_evaluation_visible),
         gr.Accordion(visible=openai_gpt4_evaluation_visible),
         gr.Accordion(visible=azure_openai_gpt4o_evaluation_visible),
-        gr.Accordion(visible=azure_openai_gpt4_evaluation_visible),
-        gr.Accordion(visible=claude_3_opus_evaluation_visible),
-        gr.Accordion(visible=claude_3_sonnet_evaluation_visible),
-        gr.Accordion(visible=claude_3_haiku_evaluation_visible)
+        gr.Accordion(visible=azure_openai_gpt4_evaluation_visible)
     )
 
 
@@ -1494,16 +1550,12 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             "",
             "",
             "",
-            "",
-            "",
-            "",
             ""
         )
         return
     xai_grok_3_user_text = query_text
     command_a_user_text = query_text
     command_r_user_text = query_text
-    command_r_plus_user_text = query_text
     llama_4_maverick_user_image = query_image
     llama_4_maverick_user_text = query_text
     llama_4_scout_user_image = query_image
@@ -1515,14 +1567,9 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     openai_gpt4_user_text = query_text
     azure_openai_gpt4o_user_text = query_text
     azure_openai_gpt4_user_text = query_text
-    claude_3_opus_user_text = query_text
-    claude_3_sonnet_user_text = query_text
-    claude_3_haiku_user_text = query_text
-
     xai_grok_3_checkbox = False
     command_a_checkbox = False
     command_r_checkbox = False
-    command_r_plus_checkbox = False
     llama_4_maverick_checkbox = False
     llama_4_scout_checkbox = False
     llama_3_3_70b_checkbox = False
@@ -1531,17 +1578,12 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     openai_gpt4_checkbox = False
     azure_openai_gpt4o_checkbox = False
     azure_openai_gpt4_checkbox = False
-    claude_3_opus_checkbox = False
-    claude_3_sonnet_checkbox = False
-    claude_3_haiku_checkbox = False
     if "xai/grok-3" in llm_answer_checkbox:
         xai_grok_3_checkbox = True
     if "cohere/command-a" in llm_answer_checkbox:
         command_a_checkbox = True
     if "cohere/command-r" in llm_answer_checkbox:
         command_r_checkbox = True
-    if "cohere/command-r-plus" in llm_answer_checkbox:
-        command_r_plus_checkbox = True
     if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox:
         llama_4_maverick_checkbox = True
     if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
@@ -1558,17 +1600,10 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
         azure_openai_gpt4o_checkbox = True
     if "azure_openai/gpt-4" in llm_answer_checkbox:
         azure_openai_gpt4_checkbox = True
-    if "claude/opus" in llm_answer_checkbox:
-        claude_3_opus_checkbox = True
-    if "claude/sonnet" in llm_answer_checkbox:
-        claude_3_sonnet_checkbox = True
-    if "claude/haiku" in llm_answer_checkbox:
-        claude_3_haiku_checkbox = True
     # ChatOCIGenAI
     xai_grok_3_response = ""
     command_a_response = ""
     command_r_response = ""
-    command_r_plus_response = ""
     llama_4_maverick_response = ""
     llama_4_scout_response = ""
     llama_3_3_70b_response = ""
@@ -1577,15 +1612,11 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     openai_gpt4_response = ""
     azure_openai_gpt4o_response = ""
     azure_openai_gpt4_response = ""
-    claude_3_opus_response = ""
-    claude_3_sonnet_response = ""
-    claude_3_haiku_response = ""
-    async for xai_grok_3, command_a, command_r, command_r_plus, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
+    async for xai_grok_3, command_a, command_r, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
             system_text,
             xai_grok_3_user_text,
             command_a_user_text,
             command_r_user_text,
-            command_r_plus_user_text,
             llama_4_maverick_user_image,
             llama_4_maverick_user_text,
             llama_4_scout_user_image,
@@ -1597,13 +1628,9 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             openai_gpt4_user_text,
             azure_openai_gpt4o_user_text,
             azure_openai_gpt4_user_text,
-            claude_3_opus_user_text,
-            claude_3_sonnet_user_text,
-            claude_3_haiku_user_text,
             xai_grok_3_checkbox,
             command_a_checkbox,
             command_r_checkbox,
-            command_r_plus_checkbox,
             llama_4_maverick_checkbox,
             llama_4_scout_checkbox,
             llama_3_3_70b_checkbox,
@@ -1611,15 +1638,11 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             openai_gpt4o_checkbox,
             openai_gpt4_checkbox,
             azure_openai_gpt4o_checkbox,
-            azure_openai_gpt4_checkbox,
-            claude_3_opus_checkbox,
-            claude_3_sonnet_checkbox,
-            claude_3_haiku_checkbox
+            azure_openai_gpt4_checkbox
     ):
         xai_grok_3_response += xai_grok_3
         command_a_response += command_a
         command_r_response += command_r
-        command_r_plus_response += command_r_plus
         llama_4_maverick_response += llama_4_maverick
         llama_4_scout_response += llama_4_scout
         llama_3_3_70b_response += llama_3_3_70b
@@ -1628,14 +1651,10 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
         openai_gpt4_response += gpt4
         azure_openai_gpt4o_response += azure_gpt4o
         azure_openai_gpt4_response += azure_gpt4
-        claude_3_opus_response += opus
-        claude_3_sonnet_response += sonnet
-        claude_3_haiku_response += haiku
         yield (
             gr.Markdown(value=xai_grok_3_response),
             gr.Markdown(value=command_a_response),
             gr.Markdown(value=command_r_response),
-            gr.Markdown(value=command_r_plus_response),
             gr.Markdown(value=llama_4_maverick_response),
             gr.Markdown(value=llama_4_scout_response),
             gr.Markdown(value=llama_3_3_70b_response),
@@ -1643,10 +1662,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             gr.Markdown(value=openai_gpt4o_response),
             gr.Markdown(value=openai_gpt4_response),
             gr.Markdown(value=azure_openai_gpt4o_response),
-            gr.Markdown(value=azure_openai_gpt4_response),
-            gr.Markdown(value=claude_3_opus_response),
-            gr.Markdown(value=claude_3_sonnet_response),
-            gr.Markdown(value=claude_3_haiku_response)
+            gr.Markdown(value=azure_openai_gpt4_response)
         )
 
 
@@ -1658,7 +1674,6 @@ def reset_all_llm_messages():
         gr.Markdown(value=""),  # tab_chat_document_xai_grok_3_answer_text
         gr.Markdown(value=""),  # tab_chat_document_command_a_answer_text
         gr.Markdown(value=""),  # tab_chat_document_command_r_answer_text
-        gr.Markdown(value=""),  # tab_chat_document_command_r_plus_answer_text
         gr.Markdown(value=""),  # tab_chat_document_llama_4_maverick_answer_text
         gr.Markdown(value=""),  # tab_chat_document_llama_4_scout_answer_text
         gr.Markdown(value=""),  # tab_chat_document_llama_3_3_70b_answer_text
@@ -1667,9 +1682,6 @@ def reset_all_llm_messages():
         gr.Markdown(value=""),  # tab_chat_document_openai_gpt4_answer_text
         gr.Markdown(value=""),  # tab_chat_document_azure_openai_gpt4o_answer_text
         gr.Markdown(value=""),  # tab_chat_document_azure_openai_gpt4_answer_text
-        gr.Markdown(value=""),  # tab_chat_document_claude_3_opus_answer_text
-        gr.Markdown(value=""),  # tab_chat_document_claude_3_sonnet_answer_text
-        gr.Markdown(value=""),  # tab_chat_document_claude_3_haiku_answer_text
     )
 
 
@@ -1694,7 +1706,6 @@ def reset_llm_evaluations():
         gr.Markdown(value=""),  # tab_chat_document_xai_grok_3_evaluation_text
         gr.Markdown(value=""),  # tab_chat_document_command_a_evaluation_text
         gr.Markdown(value=""),  # tab_chat_document_command_r_evaluation_text
-        gr.Markdown(value=""),  # tab_chat_document_command_r_plus_evaluation_text
         gr.Markdown(value=""),  # tab_chat_document_llama_4_maverick_evaluation_text
         gr.Markdown(value=""),  # tab_chat_document_llama_4_scout_evaluation_text
         gr.Markdown(value=""),  # tab_chat_document_llama_3_3_70b_evaluation_text
@@ -1703,18 +1714,11 @@ def reset_llm_evaluations():
         gr.Markdown(value=""),  # tab_chat_document_openai_gpt4_evaluation_text
         gr.Markdown(value=""),  # tab_chat_document_azure_openai_gpt4o_evaluation_text
         gr.Markdown(value=""),  # tab_chat_document_azure_openai_gpt4_evaluation_text
-        gr.Markdown(value=""),  # tab_chat_document_claude_3_opus_evaluation_text
-        gr.Markdown(value=""),  # tab_chat_document_claude_3_sonnet_evaluation_text
-        gr.Markdown(value=""),  # tab_chat_document_claude_3_haiku_evaluation_text
     )
 
 
 def reset_eval_by_human_result():
     return (
-        gr.Radio(value="good"),
-        gr.Textbox(value=""),
-        gr.Radio(value="good"),
-        gr.Textbox(value=""),
         gr.Radio(value="good"),
         gr.Textbox(value=""),
         gr.Radio(value="good"),
@@ -1986,23 +1990,6 @@ def create_azure_openai_cred(
     return gr.Textbox(value=azure_openai_cred_api_key), \
         gr.Textbox(value=azure_openai_cred_endpoint_gpt_4o), \
         gr.Textbox(value=azure_openai_cred_endpoint_gpt_4)
-
-
-def create_claude_cred(claude_cred_api_key):
-    has_error = False
-    if not claude_cred_api_key:
-        has_error = True
-        gr.Warning("Claude API Keyを入力してください")
-    if has_error:
-        return gr.Textbox()
-
-    claude_cred_api_key = claude_cred_api_key.strip()
-    env_path = find_dotenv()
-    os.environ["ANTHROPIC_API_KEY"] = claude_cred_api_key
-    set_key(env_path, "ANTHROPIC_API_KEY", claude_cred_api_key, quote_mode="never")
-    load_dotenv(env_path)
-    gr.Info("Claude API Keyの設定が完了しました")
-    return gr.Textbox(value=claude_cred_api_key)
 
 
 def create_langfuse_cred(langfuse_cred_secret_key, langfuse_cred_public_key, langfuse_cred_host):
@@ -4200,7 +4187,6 @@ async def chat_document(
     xai_grok_3_response = ""
     command_a_response = ""
     command_r_response = ""
-    command_r_plus_response = ""
     llama_4_maverick_response = ""
     llama_4_scout_response = ""
     llama_3_3_70b_response = ""
@@ -4209,14 +4195,10 @@ async def chat_document(
     openai_gpt4_response = ""
     azure_openai_gpt4o_response = ""
     azure_openai_gpt4_response = ""
-    claude_3_opus_response = ""
-    claude_3_sonnet_response = ""
-    claude_3_haiku_response = ""
 
     xai_grok_3_checkbox = False
     command_a_checkbox = False
     command_r_checkbox = False
-    command_r_plus_checkbox = False
     llama_4_maverick_checkbox = False
     llama_4_scout_checkbox = False
     llama_3_3_70b_checkbox = False
@@ -4225,17 +4207,12 @@ async def chat_document(
     openai_gpt4_checkbox = False
     azure_openai_gpt4o_checkbox = False
     azure_openai_gpt4_checkbox = False
-    claude_3_opus_checkbox = False
-    claude_3_sonnet_checkbox = False
-    claude_3_haiku_checkbox = False
     if "xai/grok-3" in llm_answer_checkbox:
         xai_grok_3_checkbox = True
     if "cohere/command-a" in llm_answer_checkbox:
         command_a_checkbox = True
     if "cohere/command-r" in llm_answer_checkbox:
         command_r_checkbox = True
-    if "cohere/command-r-plus" in llm_answer_checkbox:
-        command_r_plus_checkbox = True
     if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox:
         llama_4_maverick_checkbox = True
     if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
@@ -4252,12 +4229,6 @@ async def chat_document(
         azure_openai_gpt4o_checkbox = True
     if "azure_openai/gpt-4" in llm_answer_checkbox:
         azure_openai_gpt4_checkbox = True
-    if "claude/opus" in llm_answer_checkbox:
-        claude_3_opus_checkbox = True
-    if "claude/sonnet" in llm_answer_checkbox:
-        claude_3_sonnet_checkbox = True
-    if "claude/haiku" in llm_answer_checkbox:
-        claude_3_haiku_checkbox = True
 
     # context = '\n'.join(search_result['CONTENT'].astype(str).values)
     context = search_result[['EMBED_ID', 'SOURCE', 'CONTENT']].to_dict('records')
@@ -4334,7 +4305,7 @@ async def chat_document(
     xai_grok_3_user_text = user_text
     command_a_user_text = user_text
     command_r_user_text = user_text
-    command_r_plus_user_text = user_text
+
     llama_4_maverick_user_text = user_text
     llama_4_scout_user_text = user_text
     llama_3_3_70b_user_text = user_text
@@ -4343,16 +4314,12 @@ async def chat_document(
     openai_gpt4_user_text = user_text
     azure_openai_gpt4o_user_text = user_text
     azure_openai_gpt4_user_text = user_text
-    claude_3_opus_user_text = user_text
-    claude_3_sonnet_user_text = user_text
-    claude_3_haiku_user_text = user_text
 
-    async for xai_grok_3, command_a, command_r, command_r_plus, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
+    async for xai_grok_3, command_a, command_r, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
             system_text,
             xai_grok_3_user_text,
             command_a_user_text,
             command_r_user_text,
-            command_r_plus_user_text,
             None,
             llama_4_maverick_user_text,
             None,
@@ -4364,13 +4331,9 @@ async def chat_document(
             openai_gpt4_user_text,
             azure_openai_gpt4o_user_text,
             azure_openai_gpt4_user_text,
-            claude_3_opus_user_text,
-            claude_3_sonnet_user_text,
-            claude_3_haiku_user_text,
             xai_grok_3_checkbox,
             command_a_checkbox,
             command_r_checkbox,
-            command_r_plus_checkbox,
             llama_4_maverick_checkbox,
             llama_4_scout_checkbox,
             llama_3_3_70b_checkbox,
@@ -4378,15 +4341,11 @@ async def chat_document(
             openai_gpt4o_checkbox,
             openai_gpt4_checkbox,
             azure_openai_gpt4o_checkbox,
-            azure_openai_gpt4_checkbox,
-            claude_3_opus_checkbox,
-            claude_3_sonnet_checkbox,
-            claude_3_haiku_checkbox
+            azure_openai_gpt4_checkbox
     ):
         xai_grok_3_response += xai_grok_3
         command_a_response += command_a
         command_r_response += command_r
-        command_r_plus_response += command_r_plus
         llama_4_maverick_response += llama_4_maverick
         llama_4_scout_response += llama_4_scout
         llama_3_3_70b_response += llama_3_3_70b
@@ -4395,14 +4354,10 @@ async def chat_document(
         openai_gpt4_response += gpt4
         azure_openai_gpt4o_response += azure_gpt4o
         azure_openai_gpt4_response += azure_gpt4
-        claude_3_opus_response += opus
-        claude_3_sonnet_response += sonnet
-        claude_3_haiku_response += haiku
         yield (
             gr.Markdown(value=xai_grok_3_response),
             gr.Markdown(value=command_a_response),
             gr.Markdown(value=command_r_response),
-            gr.Markdown(value=command_r_plus_response),
             gr.Markdown(value=llama_4_maverick_response),
             gr.Markdown(value=llama_4_scout_response),
             gr.Markdown(value=llama_3_3_70b_response),
@@ -4410,10 +4365,7 @@ async def chat_document(
             gr.Markdown(value=openai_gpt4o_response),
             gr.Markdown(value=openai_gpt4_response),
             gr.Markdown(value=azure_openai_gpt4o_response),
-            gr.Markdown(value=azure_openai_gpt4_response),
-            gr.Markdown(value=claude_3_opus_response),
-            gr.Markdown(value=claude_3_sonnet_response),
-            gr.Markdown(value=claude_3_haiku_response)
+            gr.Markdown(value=azure_openai_gpt4_response)
         )
 
 
@@ -4427,7 +4379,6 @@ async def append_citation(
         xai_grok_3_answer_text,
         command_a_answer_text,
         command_r_answer_text,
-        command_r_plus_answer_text,
         llama_4_maverick_answer_text,
         llama_4_scout_answer_text,
         llama_3_3_70b_answer_text,
@@ -4435,10 +4386,7 @@ async def append_citation(
         openai_gpt4o_answer_text,
         openai_gpt4_answer_text,
         azure_openai_gpt4o_answer_text,
-        azure_openai_gpt4_answer_text,
-        claude_3_opus_answer_text,
-        claude_3_sonnet_answer_text,
-        claude_3_haiku_answer_text
+        azure_openai_gpt4_answer_text
 ):
     has_error = False
     if not query_text:
@@ -4455,7 +4403,6 @@ async def append_citation(
             gr.Markdown(value=xai_grok_3_answer_text),
             gr.Markdown(value=command_a_answer_text),
             gr.Markdown(value=command_r_answer_text),
-            gr.Markdown(value=command_r_plus_answer_text),
             gr.Markdown(value=llama_4_maverick_answer_text),
             gr.Markdown(value=llama_4_scout_answer_text),
             gr.Markdown(value=llama_3_3_70b_answer_text),
@@ -4463,10 +4410,7 @@ async def append_citation(
             gr.Markdown(value=openai_gpt4o_answer_text),
             gr.Markdown(value=openai_gpt4_answer_text),
             gr.Markdown(value=azure_openai_gpt4o_answer_text),
-            gr.Markdown(value=azure_openai_gpt4_answer_text),
-            gr.Markdown(value=claude_3_opus_answer_text),
-            gr.Markdown(value=claude_3_sonnet_answer_text),
-            gr.Markdown(value=claude_3_haiku_answer_text)
+            gr.Markdown(value=azure_openai_gpt4_answer_text)
         )
         return
 
@@ -4475,7 +4419,6 @@ async def append_citation(
             gr.Markdown(value=xai_grok_3_answer_text),
             gr.Markdown(value=command_a_answer_text),
             gr.Markdown(value=command_r_answer_text),
-            gr.Markdown(value=command_r_plus_answer_text),
             gr.Markdown(value=llama_4_maverick_answer_text),
             gr.Markdown(value=llama_4_scout_answer_text),
             gr.Markdown(value=llama_3_3_70b_answer_text),
@@ -4483,10 +4426,7 @@ async def append_citation(
             gr.Markdown(value=openai_gpt4o_answer_text),
             gr.Markdown(value=openai_gpt4_answer_text),
             gr.Markdown(value=azure_openai_gpt4o_answer_text),
-            gr.Markdown(value=azure_openai_gpt4_answer_text),
-            gr.Markdown(value=claude_3_opus_answer_text),
-            gr.Markdown(value=claude_3_sonnet_answer_text),
-            gr.Markdown(value=claude_3_haiku_answer_text)
+            gr.Markdown(value=azure_openai_gpt4_answer_text)
         )
         return
 
@@ -4496,8 +4436,6 @@ async def append_citation(
         command_a_answer_text = extract_and_format(command_a_answer_text, search_result)
     if "cohere/command-r" in llm_answer_checkbox:
         command_r_answer_text = extract_and_format(command_r_answer_text, search_result)
-    if "cohere/command-r-plus" in llm_answer_checkbox:
-        command_r_plus_answer_text = extract_and_format(command_r_plus_answer_text, search_result)
     if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox:
         llama_4_maverick_answer_text = extract_and_format(llama_4_maverick_answer_text, search_result)
     if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
@@ -4514,18 +4452,10 @@ async def append_citation(
         azure_openai_gpt4o_answer_text = extract_and_format(azure_openai_gpt4o_answer_text, search_result)
     if "azure_openai/gpt-4" in llm_answer_checkbox:
         azure_openai_gpt4_answer_text = extract_and_format(azure_openai_gpt4_answer_text, search_result)
-    if "claude/opus" in llm_answer_checkbox:
-        claude_3_opus_answer_text = extract_and_format(claude_3_opus_answer_text, search_result)
-    if "claude/sonnet" in llm_answer_checkbox:
-        claude_3_sonnet_answer_text = extract_and_format(claude_3_sonnet_answer_text, search_result)
-    if "claude/haiku" in llm_answer_checkbox:
-        claude_3_haiku_answer_text = extract_and_format(claude_3_haiku_answer_text, search_result)
-
     yield (
         gr.Markdown(value=xai_grok_3_answer_text),
         gr.Markdown(value=command_a_answer_text),
         gr.Markdown(value=command_r_answer_text),
-        gr.Markdown(value=command_r_plus_answer_text),
         gr.Markdown(value=llama_4_maverick_answer_text),
         gr.Markdown(value=llama_4_scout_answer_text),
         gr.Markdown(value=llama_3_3_70b_answer_text),
@@ -4533,10 +4463,7 @@ async def append_citation(
         gr.Markdown(value=openai_gpt4o_answer_text),
         gr.Markdown(value=openai_gpt4_answer_text),
         gr.Markdown(value=azure_openai_gpt4o_answer_text),
-        gr.Markdown(value=azure_openai_gpt4_answer_text),
-        gr.Markdown(value=claude_3_opus_answer_text),
-        gr.Markdown(value=claude_3_sonnet_answer_text),
-        gr.Markdown(value=claude_3_haiku_answer_text)
+        gr.Markdown(value=azure_openai_gpt4_answer_text)
     )
     return
 
@@ -4690,8 +4617,17 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
             yield "TASK_DONE"
         finally:
             # リソースクリーンアップ：LLMクライアントの接続を適切に閉じる
-            await cleanup_llm_client_async(llm)
-            llm = None  # 参照をクリア
+            try:
+                await cleanup_llm_client_async(llm)
+                print(f"モデル {model} のLLMクライアントクリーンアップが完了しました")
+            except Exception as cleanup_error:
+                print(f"モデル {model} のLLMクライアントクリーンアップ中にエラー: {cleanup_error}")
+            finally:
+                llm = None  # 参照をクリア
+
+                # 追加の強制クリーンアップ
+                import gc
+                gc.collect()  # ガベージコレクションを実行
 
     # 各モデルのジェネレーターを作成
     llama_4_maverick_gen = create_model_task("meta/llama-4-maverick-17b-128e-instruct-fp8")
@@ -4772,24 +4708,319 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
         # 最終的なリソースクリーンアップ：すべてのジェネレーターを適切に閉じる
         generators = [llama_4_maverick_gen, llama_4_scout_gen, llama_3_2_90b_vision_gen, openai_gpt4o_gen,
                       azure_openai_gpt4o_gen]
+        generator_names = ["llama_4_maverick", "llama_4_scout", "llama_3_2_90b_vision", "openai_gpt4o",
+                           "azure_openai_gpt4o"]
+
         for i, gen in enumerate(generators):
             try:
+                # 非同期ジェネレーターの場合
                 if hasattr(gen, 'aclose'):
                     await gen.aclose()
+                    print(f"ジェネレーター {generator_names[i]} の非同期クローズが完了しました")
                 elif hasattr(gen, 'close'):
                     gen.close()
+                    print(f"ジェネレーター {generator_names[i]} の同期クローズが完了しました")
+
+                # ジェネレーター内のLLMクライアントも確実にクリーンアップ
+                if hasattr(gen, 'gi_frame') and gen.gi_frame is not None:
+                    # ジェネレーターがまだ実行中の場合、強制終了
+                    try:
+                        gen.close()
+                        print(f"実行中のジェネレーター {generator_names[i]} を強制終了しました")
+                    except GeneratorExit:
+                        pass  # 正常な終了
+                    except Exception as force_close_error:
+                        print(f"ジェネレーター {generator_names[i]} の強制終了中にエラー: {force_close_error}")
+
             except Exception as cleanup_error:
-                print(f"ジェネレーター {i} のクリーンアップ中にエラーが発生しました: {cleanup_error}")
+                print(f"ジェネレーター {generator_names[i]} のクリーンアップ中にエラーが発生しました: {cleanup_error}")
+
+        # 軽量なHTTP接続クリーンアップ
+        await lightweight_cleanup()
 
         # ガベージコレクションを強制実行してリソースを解放
         import gc
         gc.collect()
-        print("リソースクリーンアップが完了しました")
+        print("単一画像処理のリソースクリーンアップが完了しました")
+
+
+async def process_multiple_images_streaming(image_data_list, query_text, llm_answer_checkbox_group, target_models,
+                                            custom_image_prompt=None):
+    """
+    複数の画像を一度にVLMに送信して処理し、ストリーミング形式で回答を返す
+
+    Args:
+        image_data_list: 画像データのリスト [(base64_data, doc_id, img_id), ...]
+        query_text: クエリテキスト
+        llm_answer_checkbox_group: 選択されたLLMモデルのリスト
+        target_models: 対象モデルのリスト
+        custom_image_prompt: カスタム画像プロンプトテンプレート
+
+    Yields:
+        dict: 各モデルの部分的な回答を含む辞書
+    """
+    if custom_image_prompt:
+        custom_image_prompt = custom_image_prompt.replace('{{query_text}}', '{query_text}')
+
+    region = get_region()
+
+    # 画像URLリストを作成
+    image_urls = []
+    for base64_data, doc_id, img_id in image_data_list:
+        image_url = f"data:image/png;base64,{base64_data}"
+        image_urls.append(image_url)
+
+    print(f"複数画像処理開始: {len(image_urls)}枚の画像を一括処理")
+
+    # 各モデルのタスクジェネレーターを作成
+    async def create_model_task(model):
+        llm = None  # LLMインスタンスを初期化
+        try:
+            if model not in llm_answer_checkbox_group:
+                # 選択されていないモデルは即座に完了を通知
+                yield "TASK_DONE"
+                return
+
+            print(f"\n=== 複数画像 ({len(image_urls)}枚) - {model} での処理 ===")
+
+            if model == "meta/llama-4-maverick-17b-128e-instruct-fp8":
+                llm = ChatOCIGenAI(
+                    model_id="meta.llama-4-maverick-17b-128e-instruct-fp8",
+                    provider="meta",
+                    service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+                    compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+                )
+            elif model == "meta/llama-4-scout-17b-16e-instruct":
+                llm = ChatOCIGenAI(
+                    model_id="meta.llama-4-scout-17b-16e-instruct",
+                    provider="meta",
+                    service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+                    compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+                )
+            elif model == "meta/llama-3-2-90b-vision":
+                llm = ChatOCIGenAI(
+                    model_id="meta.llama-3.2-90b-vision-instruct",
+                    provider="meta",
+                    service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+                    compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+                )
+            elif model == "openai/gpt-4o":
+                load_dotenv(find_dotenv())
+                llm = ChatOpenAI(
+                    model="gpt-4o",
+                    temperature=0,
+                    top_p=0.75,
+                    seed=42,
+                    max_tokens=None,
+                    timeout=None,
+                    max_retries=2,
+                    api_key=os.environ["OPENAI_API_KEY"],
+                    base_url=os.environ["OPENAI_BASE_URL"],
+                )
+            elif model == "azure_openai/gpt-4o":
+                load_dotenv(find_dotenv())
+                llm = AzureChatOpenAI(
+                    deployment_name="gpt-4o",
+                    temperature=0,
+                    top_p=0.75,
+                    seed=42,
+                    max_tokens=None,
+                    timeout=None,
+                    max_retries=2,
+                    azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT_GPT_4O"],
+                    openai_api_key=os.environ["AZURE_OPENAI_API_KEY"],
+                    openai_api_version=os.environ["AZURE_OPENAI_API_VERSION_GPT_4O"],
+                )
+            else:
+                # 未対応のモデルは即座に完了を通知
+                yield "TASK_DONE"
+                return
+
+            # メッセージを作成（複数画像対応）
+            prompt_text = get_image_qa_prompt(query_text, custom_image_prompt)
+            prompt_text = prompt_text.replace('{{query_text}}', '{query_text}')
+
+            # メッセージコンテンツを構築
+            message_content = [{"type": "text", "text": prompt_text}]
+
+            # 各画像を追加
+            for i, image_url in enumerate(image_urls):
+                message_content.append({
+                    "type": "image_url",
+                    "image_url": {"url": image_url},
+                })
+
+            human_message = HumanMessage(content=message_content)
+            messages = [human_message]
+
+            # LLMに送信して回答を取得
+            start_time = time.time()
+
+            # 表示用に画像を圧縮してヘッダー情報を作成
+            compressed_images_text = ""
+            for i, (image_url, (_, doc_id, img_id)) in enumerate(zip(image_urls, image_data_list), 1):
+                compressed_image_url = compress_image_for_display(image_url)
+                compressed_images_text += f"\n\n![画像{i}]({compressed_image_url})\n"
+
+            # ヘッダー情報を最初にyield
+            header_text = f"\n\n---\n{compressed_images_text}\n**{len(image_urls)}枚の画像による回答：**\n\n"
+            yield header_text
+
+            # ストリーミングで回答を取得
+            async for chunk in llm.astream(messages):
+                if chunk.content:
+                    print(chunk.content, end="", flush=True)
+                    yield chunk.content
+
+            end_time = time.time()
+            inference_time = end_time - start_time
+            print(f"\n\n推論時間: {inference_time:.2f}秒")
+            print(f"=== {model} での処理完了 ===\n")
+
+            # 推論時間を追加
+            yield f"\n\n推論時間: {inference_time:.2f}秒\n\n"
+            yield "TASK_DONE"
+
+        except Exception as e:
+            print(f"エラーが発生しました ({model}): {e}")
+            # 表示用に画像を圧縮してエラーメッセージを作成
+            compressed_images_text = ""
+            for i, (image_url, (_, doc_id, img_id)) in enumerate(zip(image_urls, image_data_list), 1):
+                compressed_image_url = compress_image_for_display(image_url)
+                compressed_images_text += f"\n\n![画像{i}]({compressed_image_url})\n"
+
+            error_text = f"\n\n---\n{compressed_images_text}\n**{len(image_urls)}枚の画像による回答：**\n\nエラーが発生しました: {e}\n\n"
+            yield error_text
+            yield "TASK_DONE"
+        finally:
+            # リソースクリーンアップ：LLMクライアントの接続を適切に閉じる
+            await cleanup_llm_client_async(llm)
+            llm = None  # 参照をクリア
+
+    # 各モデルのジェネレーターを作成
+    llama_4_maverick_gen = create_model_task("meta/llama-4-maverick-17b-128e-instruct-fp8")
+    llama_4_scout_gen = create_model_task("meta/llama-4-scout-17b-16e-instruct")
+    llama_3_2_90b_vision_gen = create_model_task("meta/llama-3-2-90b-vision")
+    openai_gpt4o_gen = create_model_task("openai/gpt-4o")
+    azure_openai_gpt4o_gen = create_model_task("azure_openai/gpt-4o")
+
+    # 各モデルの応答を蓄積
+    llama_4_maverick_response = ""
+    llama_4_scout_response = ""
+    llama_3_2_90b_vision_response = ""
+    openai_gpt4o_response = ""
+    azure_openai_gpt4o_response = ""
+
+    # 各モデルの状態を追跡
+    responses_status = ["", "", "", "", ""]
+
+    # タイムアウト設定（最大5分）
+    import asyncio
+    timeout_seconds = 300
+    start_time = time.time()
+
+    try:
+        while True:
+            # タイムアウトチェック
+            if time.time() - start_time > timeout_seconds:
+                print(f"複数画像処理がタイムアウトしました（{timeout_seconds}秒）")
+                break
+
+            responses = ["", "", "", "", ""]
+            generators = [llama_4_maverick_gen, llama_4_scout_gen, llama_3_2_90b_vision_gen, openai_gpt4o_gen,
+                          azure_openai_gpt4o_gen]
+
+            for i, gen in enumerate(generators):
+                if responses_status[i] == "TASK_DONE":
+                    continue
+
+                try:
+                    # タイムアウト付きでanextを実行
+                    response = await asyncio.wait_for(anext(gen), timeout=30.0)
+                    if response:
+                        if response == "TASK_DONE":
+                            responses_status[i] = response
+                        else:
+                            responses[i] = response
+                except StopAsyncIteration:
+                    responses_status[i] = "TASK_DONE"
+                except asyncio.TimeoutError:
+                    print(f"モデル {i} の処理がタイムアウトしました")
+                    responses_status[i] = "TASK_DONE"
+                except Exception as e:
+                    print(f"モデル {i} の処理中にエラーが発生しました: {e}")
+                    responses_status[i] = "TASK_DONE"
+
+            # 応答を蓄積
+            llama_4_maverick_response += responses[0]
+            llama_4_scout_response += responses[1]
+            llama_3_2_90b_vision_response += responses[2]
+            openai_gpt4o_response += responses[3]
+            azure_openai_gpt4o_response += responses[4]
+
+            # 現在の状態をyield
+            yield {
+                "meta/llama-4-maverick-17b-128e-instruct-fp8": llama_4_maverick_response,
+                "meta/llama-4-scout-17b-16e-instruct": llama_4_scout_response,
+                "meta/llama-3-2-90b-vision": llama_3_2_90b_vision_response,
+                "openai/gpt-4o": openai_gpt4o_response,
+                "azure_openai/gpt-4o": azure_openai_gpt4o_response
+            }
+
+            # すべてのタスクが完了したかチェック
+            if all(response_status == "TASK_DONE" for response_status in responses_status):
+                print("All multiple image processing tasks completed")
+                break
+
+    finally:
+        # 最終的なリソースクリーンアップ：すべてのジェネレーターを適切に閉じる
+        generators = [llama_4_maverick_gen, llama_4_scout_gen, llama_3_2_90b_vision_gen, openai_gpt4o_gen,
+                      azure_openai_gpt4o_gen]
+        generator_names = ["llama_4_maverick", "llama_4_scout", "llama_3_2_90b_vision", "openai_gpt4o",
+                           "azure_openai_gpt4o"]
+
+        for i, gen in enumerate(generators):
+            try:
+                # 非同期ジェネレーターの場合
+                if hasattr(gen, 'aclose'):
+                    await gen.aclose()
+                    print(f"複数画像処理: ジェネレーター {generator_names[i]} の非同期クローズが完了しました")
+                elif hasattr(gen, 'close'):
+                    gen.close()
+                    print(f"複数画像処理: ジェネレーター {generator_names[i]} の同期クローズが完了しました")
+
+                # ジェネレーター内のLLMクライアントも確実にクリーンアップ
+                if hasattr(gen, 'gi_frame') and gen.gi_frame is not None:
+                    # ジェネレーターがまだ実行中の場合、強制終了
+                    try:
+                        gen.close()
+                        print(f"複数画像処理: 実行中のジェネレーター {generator_names[i]} を強制終了しました")
+                    except GeneratorExit:
+                        pass  # 正常な終了
+                    except Exception as force_close_error:
+                        print(
+                            f"複数画像処理: ジェネレーター {generator_names[i]} の強制終了中にエラー: {force_close_error}")
+
+            except Exception as cleanup_error:
+                print(
+                    f"複数画像処理: ジェネレーター {generator_names[i]} のクリーンアップ中にエラーが発生しました: {cleanup_error}")
+
+        # 軽量なHTTP接続クリーンアップ
+        await lightweight_cleanup()
+
+        # ガベージコレクションを強制実行してリソースを解放
+        import gc
+        gc.collect()
+        print("複数画像処理のリソースクリーンアップが完了しました")
 
 
 async def process_image_answers_streaming(
         search_result,
         use_image,
+        single_image_processing,
         llm_answer_checkbox_group,
         query_text,
         llama_4_maverick_image_answer_text,
@@ -5029,70 +5260,127 @@ async def process_image_answers_streaming(
                     accumulated_openai_gpt4o_text = openai_gpt4o_image_answer_text
                     accumulated_azure_openai_gpt4o_text = azure_openai_gpt4o_image_answer_text
 
-                    # 各base64_dataに対してLLMで処理
-                    for i, (base64_data, doc_id, img_id) in enumerate(base64_data_list, 1):
-                        print(f"画像 {i} (doc_id: {doc_id}, img_id: {img_id}) を処理中...")
+                    # 処理方式を選択：1枚ずつ処理 vs 一括処理
+                    if base64_data_list:
+                        if single_image_processing:
+                            # 1枚ずつ処理モード
+                            print(f"単一画像処理開始: {len(base64_data_list)}枚の画像を1枚ずつ処理中...")
 
-                        # base64データをdata:image/png;base64,{base64_data}形式に変換
-                        image_url = f"data:image/png;base64,{base64_data}"
+                            # 各base64_dataに対してLLMで処理
+                            for i, (base64_data, doc_id, img_id) in enumerate(base64_data_list, 1):
+                                print(f"画像 {i} (doc_id: {doc_id}, img_id: {img_id}) を処理中...")
 
-                        # 各モデルの現在の画像に対する回答を保持
-                        current_image_llama_4_maverick = ""
-                        current_image_llama_4_scout = ""
-                        current_image_llama_3_2_90b_vision = ""
-                        current_image_openai_gpt4o = ""
-                        current_image_azure_openai_gpt4o = ""
+                                # base64データをdata:image/png;base64,{base64_data}形式に変換
+                                image_url = f"data:image/png;base64,{base64_data}"
 
-                        # 選択されたLLMモデルに対して処理を実行し、結果をストリーミングで取得
-                        async for llm_results in process_single_image_streaming(
-                                image_url,
-                                query_text,
-                                llm_answer_checkbox_group,
-                                target_models,
-                                i,
-                                doc_id,
-                                img_id,
-                                custom_image_prompt
-                        ):
-                            # 各LLMの結果を現在の画像の回答として更新
-                            if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_results:
-                                current_image_llama_4_maverick = llm_results[
-                                    "meta/llama-4-maverick-17b-128e-instruct-fp8"]
+                                # 各モデルの現在の画像に対する回答を保持
+                                current_image_llama_4_maverick = ""
+                                current_image_llama_4_scout = ""
+                                current_image_llama_3_2_90b_vision = ""
+                                current_image_openai_gpt4o = ""
+                                current_image_azure_openai_gpt4o = ""
 
-                            if "meta/llama-4-scout-17b-16e-instruct" in llm_results:
-                                current_image_llama_4_scout = llm_results["meta/llama-4-scout-17b-16e-instruct"]
+                                # 選択されたLLMモデルに対して処理を実行し、結果をストリーミングで取得
+                                async for llm_results in process_single_image_streaming(
+                                        image_url,
+                                        query_text,
+                                        llm_answer_checkbox_group,
+                                        target_models,
+                                        i,
+                                        doc_id,
+                                        img_id,
+                                        custom_image_prompt
+                                ):
+                                    # 各LLMの結果を現在の画像の回答として更新
+                                    if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_results:
+                                        current_image_llama_4_maverick = llm_results[
+                                            "meta/llama-4-maverick-17b-128e-instruct-fp8"]
 
-                            if "meta/llama-3-2-90b-vision" in llm_results:
-                                current_image_llama_3_2_90b_vision = llm_results["meta/llama-3-2-90b-vision"]
+                                    if "meta/llama-4-scout-17b-16e-instruct" in llm_results:
+                                        current_image_llama_4_scout = llm_results["meta/llama-4-scout-17b-16e-instruct"]
 
-                            if "openai/gpt-4o" in llm_results:
-                                current_image_openai_gpt4o = llm_results["openai/gpt-4o"]
+                                    if "meta/llama-3-2-90b-vision" in llm_results:
+                                        current_image_llama_3_2_90b_vision = llm_results["meta/llama-3-2-90b-vision"]
 
-                            if "azure_openai/gpt-4o" in llm_results:
-                                current_image_azure_openai_gpt4o = llm_results["azure_openai/gpt-4o"]
+                                    if "openai/gpt-4o" in llm_results:
+                                        current_image_openai_gpt4o = llm_results["openai/gpt-4o"]
 
-                            # 累積テキストと現在の画像の回答を結合して表示
-                            current_llama_4_maverick_text = accumulated_llama_4_maverick_text + current_image_llama_4_maverick
-                            current_llama_4_scout_text = accumulated_llama_4_scout_text + current_image_llama_4_scout
-                            current_llama_3_2_90b_vision_text = accumulated_llama_3_2_90b_vision_text + current_image_llama_3_2_90b_vision
-                            current_openai_gpt4o_text = accumulated_openai_gpt4o_text + current_image_openai_gpt4o
-                            current_azure_openai_gpt4o_text = accumulated_azure_openai_gpt4o_text + current_image_azure_openai_gpt4o
+                                    if "azure_openai/gpt-4o" in llm_results:
+                                        current_image_azure_openai_gpt4o = llm_results["azure_openai/gpt-4o"]
 
-                            # 更新された画像回答結果をyield
-                            yield (
-                                gr.Markdown(value=current_llama_4_maverick_text),
-                                gr.Markdown(value=current_llama_4_scout_text),
-                                gr.Markdown(value=current_llama_3_2_90b_vision_text),
-                                gr.Markdown(value=current_openai_gpt4o_text),
-                                gr.Markdown(value=current_azure_openai_gpt4o_text)
-                            )
+                                    # 累積テキストと現在の画像の回答を結合して表示
+                                    current_llama_4_maverick_text = accumulated_llama_4_maverick_text + current_image_llama_4_maverick
+                                    current_llama_4_scout_text = accumulated_llama_4_scout_text + current_image_llama_4_scout
+                                    current_llama_3_2_90b_vision_text = accumulated_llama_3_2_90b_vision_text + current_image_llama_3_2_90b_vision
+                                    current_openai_gpt4o_text = accumulated_openai_gpt4o_text + current_image_openai_gpt4o
+                                    current_azure_openai_gpt4o_text = accumulated_azure_openai_gpt4o_text + current_image_azure_openai_gpt4o
 
-                        # 現在の画像の処理が完了したら、累積テキストに追加
-                        accumulated_llama_4_maverick_text += current_image_llama_4_maverick
-                        accumulated_llama_4_scout_text += current_image_llama_4_scout
-                        accumulated_llama_3_2_90b_vision_text += current_image_llama_3_2_90b_vision
-                        accumulated_openai_gpt4o_text += current_image_openai_gpt4o
-                        accumulated_azure_openai_gpt4o_text += current_image_azure_openai_gpt4o
+                                    # 更新された画像回答結果をyield
+                                    yield (
+                                        gr.Markdown(value=current_llama_4_maverick_text),
+                                        gr.Markdown(value=current_llama_4_scout_text),
+                                        gr.Markdown(value=current_llama_3_2_90b_vision_text),
+                                        gr.Markdown(value=current_openai_gpt4o_text),
+                                        gr.Markdown(value=current_azure_openai_gpt4o_text)
+                                    )
+
+                                # 現在の画像の処理が完了したら、累積テキストに追加
+                                accumulated_llama_4_maverick_text += current_image_llama_4_maverick
+                                accumulated_llama_4_scout_text += current_image_llama_4_scout
+                                accumulated_llama_3_2_90b_vision_text += current_image_llama_3_2_90b_vision
+                                accumulated_openai_gpt4o_text += current_image_openai_gpt4o
+                                accumulated_azure_openai_gpt4o_text += current_image_azure_openai_gpt4o
+                        else:
+                            # 一括処理モード
+                            print(f"複数画像一括処理開始: {len(base64_data_list)}枚の画像を一括処理中...")
+
+                            # 各モデルの回答を保持
+                            current_llama_4_maverick = ""
+                            current_llama_4_scout = ""
+                            current_llama_3_2_90b_vision = ""
+                            current_openai_gpt4o = ""
+                            current_azure_openai_gpt4o = ""
+
+                            # 複数画像を一括処理
+                            async for llm_results in process_multiple_images_streaming(
+                                    base64_data_list,
+                                    query_text,
+                                    llm_answer_checkbox_group,
+                                    target_models,
+                                    custom_image_prompt
+                            ):
+                                # 各LLMの結果を複数画像の回答として更新
+                                if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_results:
+                                    current_llama_4_maverick = llm_results[
+                                        "meta/llama-4-maverick-17b-128e-instruct-fp8"]
+
+                                if "meta/llama-4-scout-17b-16e-instruct" in llm_results:
+                                    current_llama_4_scout = llm_results["meta/llama-4-scout-17b-16e-instruct"]
+
+                                if "meta/llama-3-2-90b-vision" in llm_results:
+                                    current_llama_3_2_90b_vision = llm_results["meta/llama-3-2-90b-vision"]
+
+                                if "openai/gpt-4o" in llm_results:
+                                    current_openai_gpt4o = llm_results["openai/gpt-4o"]
+
+                                if "azure_openai/gpt-4o" in llm_results:
+                                    current_azure_openai_gpt4o = llm_results["azure_openai/gpt-4o"]
+
+                                # 累積テキストと複数画像の回答を結合して表示
+                                current_llama_4_maverick_text = accumulated_llama_4_maverick_text + current_llama_4_maverick
+                                current_llama_4_scout_text = accumulated_llama_4_scout_text + current_llama_4_scout
+                                current_llama_3_2_90b_vision_text = accumulated_llama_3_2_90b_vision_text + current_llama_3_2_90b_vision
+                                current_openai_gpt4o_text = accumulated_openai_gpt4o_text + current_openai_gpt4o
+                                current_azure_openai_gpt4o_text = accumulated_azure_openai_gpt4o_text + current_azure_openai_gpt4o
+
+                                # 更新された画像回答結果をyield
+                                yield (
+                                    gr.Markdown(value=current_llama_4_maverick_text),
+                                    gr.Markdown(value=current_llama_4_scout_text),
+                                    gr.Markdown(value=current_llama_3_2_90b_vision_text),
+                                    gr.Markdown(value=current_openai_gpt4o_text),
+                                    gr.Markdown(value=current_azure_openai_gpt4o_text)
+                                )
 
         except Exception as db_e:
             print(f"データベース操作中にエラーが発生しました: {db_e}")
@@ -5117,6 +5405,13 @@ async def process_image_answers_streaming(
             gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
         )
 
+    finally:
+        # 画像処理完了後の軽量なリソースクリーンアップ
+        try:
+            await lightweight_cleanup()
+        except Exception as cleanup_error:
+            print(f"軽量リソースクリーンアップ中にエラー: {cleanup_error}")
+
     print("process_image_answers_streaming() 完了")
 
 
@@ -5132,7 +5427,6 @@ async def eval_by_ragas(
         xai_grok_3_response,
         command_a_response,
         command_r_response,
-        command_r_plus_response,
         llama_4_maverick_response,
         llama_4_scout_response,
         llama_3_3_70b_response,
@@ -5140,10 +5434,7 @@ async def eval_by_ragas(
         openai_gpt4o_response,
         openai_gpt4_response,
         azure_openai_gpt4o_response,
-        azure_openai_gpt4_response,
-        claude_3_opus_response,
-        claude_3_sonnet_response,
-        claude_3_haiku_response
+        azure_openai_gpt4_response
 ):
     has_error = False
     if not query_text:
@@ -5228,9 +5519,6 @@ async def eval_by_ragas(
         openai_gpt4_checkbox = False
         azure_openai_gpt4o_checkbox = False
         azure_openai_gpt4_checkbox = False
-        claude_3_opus_checkbox = False
-        claude_3_sonnet_checkbox = False
-        claude_3_haiku_checkbox = False
         if "xai/grok-3" in llm_answer_checkbox_group:
             xai_grok_3_checkbox = True
         if "cohere/command-a" in llm_answer_checkbox_group:
@@ -5255,17 +5543,11 @@ async def eval_by_ragas(
             azure_openai_gpt4o_checkbox = True
         if "azure_openai/gpt-4" in llm_answer_checkbox_group:
             azure_openai_gpt4_checkbox = True
-        if "claude/opus" in llm_answer_checkbox_group:
-            claude_3_opus_checkbox = True
-        if "claude/sonnet" in llm_answer_checkbox_group:
-            claude_3_sonnet_checkbox = True
-        if "claude/haiku" in llm_answer_checkbox_group:
-            claude_3_haiku_checkbox = True
 
         xai_grok_3_response = remove_last_line(xai_grok_3_response)
         command_a_response = remove_last_line(command_a_response)
         command_r_response = remove_last_line(command_r_response)
-        command_r_plus_response = remove_last_line(command_r_plus_response)
+
         llama_4_maverick_response = remove_last_line(llama_4_maverick_response)
         llama_4_scout_response = remove_last_line(llama_4_scout_response)
         llama_3_3_70b_response = remove_last_line(llama_3_3_70b_response)
@@ -5274,9 +5556,6 @@ async def eval_by_ragas(
         openai_gpt4_response = remove_last_line(openai_gpt4_response)
         azure_openai_gpt4o_response = remove_last_line(azure_openai_gpt4o_response)
         azure_openai_gpt4_response = remove_last_line(azure_openai_gpt4_response)
-        claude_3_opus_response = remove_last_line(claude_3_opus_response)
-        claude_3_sonnet_response = remove_last_line(claude_3_sonnet_response)
-        claude_3_haiku_response = remove_last_line(claude_3_haiku_response)
 
         xai_grok_3_user_text = f"""
 -標準回答-
@@ -5302,15 +5581,6 @@ async def eval_by_ragas(
 
 -与えられた回答-
  {command_r_response}
-
--出力-\n　"""
-
-        command_r_plus_user_text = f"""
--標準回答-
-{standard_answer_text}
-
--与えられた回答-
-{command_r_plus_response}
 
 -出力-\n　"""
 
@@ -5386,37 +5656,9 @@ async def eval_by_ragas(
 
 -出力-\n　"""
 
-        claude_3_opus_user_text = f"""
--標準回答-
-{standard_answer_text}
-
--与えられた回答-
-{claude_3_opus_response}
-
--出力-\n　"""
-
-        claude_3_sonnet_user_text = f"""
--標準回答-
-{standard_answer_text}
-
--与えられた回答-
-{claude_3_sonnet_response}
-
--出力-\n　"""
-
-        claude_3_haiku_user_text = f"""
--標準回答-
-{standard_answer_text}
-
--与えられた回答-
-{claude_3_haiku_response}
-
--出力-\n　"""
-
         eval_xai_grok_3_response = ""
         eval_command_a_response = ""
         eval_command_r_response = ""
-        eval_command_r_plus_response = ""
         eval_llama_4_maverick_response = ""
         eval_llama_4_scout_response = ""
         eval_llama_3_3_70b_response = ""
@@ -5425,16 +5667,12 @@ async def eval_by_ragas(
         eval_openai_gpt4_response = ""
         eval_azure_openai_gpt4o_response = ""
         eval_azure_openai_gpt4_response = ""
-        eval_claude_3_opus_response = ""
-        eval_claude_3_sonnet_response = ""
-        eval_claude_3_haiku_response = ""
 
-        async for xai_grok_3, command_a, command_r, command_r_plus, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4, opus, sonnet, haiku in chat(
+        async for xai_grok_3, command_a, command_r, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
                 system_text,
                 xai_grok_3_user_text,
                 command_a_user_text,
                 command_r_user_text,
-                command_r_plus_user_text,
                 None,
                 llama_4_maverick_user_text,
                 None,
@@ -5446,13 +5684,9 @@ async def eval_by_ragas(
                 openai_gpt4_user_text,
                 azure_openai_gpt4o_user_text,
                 azure_openai_gpt4_user_text,
-                claude_3_opus_user_text,
-                claude_3_sonnet_user_text,
-                claude_3_haiku_user_text,
                 xai_grok_3_checkbox,
                 command_a_checkbox,
                 command_r_checkbox,
-                command_r_plus_checkbox,
                 llama_4_maverick_checkbox,
                 llama_4_scout_checkbox,
                 llama_3_3_70b_checkbox,
@@ -5460,15 +5694,11 @@ async def eval_by_ragas(
                 openai_gpt4o_checkbox,
                 openai_gpt4_checkbox,
                 azure_openai_gpt4o_checkbox,
-                azure_openai_gpt4_checkbox,
-                claude_3_opus_checkbox,
-                claude_3_sonnet_checkbox,
-                claude_3_haiku_checkbox
+                azure_openai_gpt4_checkbox
         ):
             eval_xai_grok_3_response += xai_grok_3
             eval_command_a_response += command_a
             eval_command_r_response += command_r
-            eval_command_r_plus_response += command_r_plus
             eval_llama_4_maverick_response += llama_4_maverick
             eval_llama_4_scout_response += llama_4_scout
             eval_llama_3_3_70b_response += llama_3_3_70b
@@ -5477,14 +5707,10 @@ async def eval_by_ragas(
             eval_openai_gpt4_response += gpt4
             eval_azure_openai_gpt4o_response += azure_gpt4o
             eval_azure_openai_gpt4_response += azure_gpt4
-            eval_claude_3_opus_response += opus
-            eval_claude_3_sonnet_response += sonnet
-            eval_claude_3_haiku_response += haiku
             yield (
                 gr.Markdown(value=eval_xai_grok_3_response),
                 gr.Markdown(value=eval_command_a_response),
                 gr.Markdown(value=eval_command_r_response),
-                gr.Markdown(value=eval_command_r_plus_response),
                 gr.Markdown(value=eval_llama_4_maverick_response),
                 gr.Markdown(value=eval_llama_4_scout_response),
                 gr.Markdown(value=eval_llama_3_3_70b_response),
@@ -5492,10 +5718,7 @@ async def eval_by_ragas(
                 gr.Markdown(value=eval_openai_gpt4o_response),
                 gr.Markdown(value=eval_openai_gpt4_response),
                 gr.Markdown(value=eval_azure_openai_gpt4o_response),
-                gr.Markdown(value=eval_azure_openai_gpt4_response),
-                gr.Markdown(value=eval_claude_3_opus_response),
-                gr.Markdown(value=eval_claude_3_sonnet_response),
-                gr.Markdown(value=eval_claude_3_haiku_response)
+                gr.Markdown(value=eval_azure_openai_gpt4_response)
             )
 
 
@@ -5511,7 +5734,6 @@ def generate_download_file(
         xai_grok_3_response,
         command_a_response,
         command_r_response,
-        command_r_plus_response,
         llama_4_maverick_response,
         llama_4_scout_response,
         llama_3_3_70b_response,
@@ -5520,13 +5742,9 @@ def generate_download_file(
         openai_gpt4_response,
         azure_openai_gpt4o_response,
         azure_openai_gpt4_response,
-        claude_3_opus_response,
-        claude_3_sonnet_response,
-        claude_3_haiku_response,
         xai_grok_3_evaluation,
         command_a_evaluation,
         command_r_evaluation,
-        command_r_plus_evaluation,
         llama_4_maverick_evaluation,
         llama_4_scout_evaluation,
         llama_3_3_70b_evaluation,
@@ -5534,10 +5752,7 @@ def generate_download_file(
         openai_gpt4o_evaluation,
         openai_gpt4_evaluation,
         azure_openai_gpt4o_evaluation,
-        azure_openai_gpt4_evaluation,
-        claude_3_opus_evaluation,
-        claude_3_sonnet_evaluation,
-        claude_3_haiku_evaluation
+        azure_openai_gpt4_evaluation
 ):
     if not query_text:
         return gr.DownloadButton(value=None, visible=False)
@@ -5595,20 +5810,6 @@ def generate_download_file(
         command_r_response = ""
         command_r_evaluation = ""
         command_r_referenced_contexts = ""
-
-    if "cohere/command-r-plus" in llm_answer_checkbox_group:
-        command_r_plus_response = command_r_plus_response
-        command_r_plus_referenced_contexts = ""
-        if include_citation:
-            command_r_plus_response, command_r_plus_referenced_contexts = extract_citation(command_r_plus_response)
-        if llm_evaluation_checkbox:
-            command_r_plus_evaluation = command_r_plus_evaluation
-        else:
-            command_r_plus_evaluation = ""
-    else:
-        command_r_plus_response = ""
-        command_r_plus_evaluation = ""
-        command_r_plus_referenced_contexts = ""
 
     if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox_group:
         llama_4_maverick_response = llama_4_maverick_response
@@ -5726,48 +5927,6 @@ def generate_download_file(
         azure_openai_gpt4_evaluation = ""
         azure_openai_gpt4_referenced_contexts = ""
 
-    if "claude/opus" in llm_answer_checkbox_group:
-        claude_3_opus_response = claude_3_opus_response
-        claude_3_opus_referenced_contexts = ""
-        if include_citation:
-            claude_3_opus_response, claude_3_opus_referenced_contexts = extract_citation(claude_3_opus_response)
-        if llm_evaluation_checkbox:
-            claude_3_opus_evaluation = claude_3_opus_evaluation
-        else:
-            claude_3_opus_evaluation = ""
-    else:
-        claude_3_opus_response = ""
-        claude_3_opus_evaluation = ""
-        claude_3_opus_referenced_contexts = ""
-
-    if "claude/sonnet" in llm_answer_checkbox_group:
-        claude_3_sonnet_response = claude_3_sonnet_response
-        claude_3_sonnet_referenced_contexts = ""
-        if include_citation:
-            claude_3_sonnet_response, claude_3_sonnet_referenced_contexts = extract_citation(claude_3_sonnet_response)
-        if llm_evaluation_checkbox:
-            claude_3_sonnet_evaluation = claude_3_sonnet_evaluation
-        else:
-            claude_3_sonnet_evaluation = ""
-    else:
-        claude_3_sonnet_response = ""
-        claude_3_sonnet_evaluation = ""
-        claude_3_sonnet_referenced_contexts = ""
-
-    if "claude/haiku" in llm_answer_checkbox_group:
-        claude_3_haiku_response = claude_3_haiku_response
-        claude_3_haiku_referenced_contexts = ""
-        if include_citation:
-            claude_3_haiku_response, claude_3_haiku_referenced_contexts = extract_citation(claude_3_haiku_response)
-        if llm_evaluation_checkbox:
-            claude_3_haiku_evaluation = claude_3_haiku_evaluation
-        else:
-            claude_3_haiku_evaluation = ""
-    else:
-        claude_3_haiku_response = ""
-        claude_3_haiku_evaluation = ""
-        claude_3_haiku_referenced_contexts = ""
-
     df3 = pd.DataFrame(
         {
             'LLM モデル':
@@ -5775,7 +5934,6 @@ def generate_download_file(
                     "xai/grok-3",
                     "cohere/command-a",
                     "cohere/command-r",
-                    "cohere/command-r-plus",
                     "meta/llama-4-maverick-17b-128e-instruct-fp8",
                     "meta/llama-4-scout-17b-16e-instruct",
                     "meta/llama-3-3-70b",
@@ -5783,16 +5941,12 @@ def generate_download_file(
                     "openai/gpt-4o",
                     "openai/gpt-4",
                     "azure_openai/gpt-4o",
-                    "azure_openai/gpt-4",
-                    "claude/opus",
-                    "claude/sonnet",
-                    "claude/haiku"
+                    "azure_openai/gpt-4"
                 ],
             'LLM メッセージ': [
                 xai_grok_3_response,
                 command_a_response,
                 command_r_response,
-                command_r_plus_response,
                 llama_4_maverick_response,
                 llama_4_scout_response,
                 llama_3_3_70b_response,
@@ -5800,16 +5954,12 @@ def generate_download_file(
                 openai_gpt4o_response,
                 openai_gpt4_response,
                 azure_openai_gpt4o_response,
-                azure_openai_gpt4_response,
-                claude_3_opus_response,
-                claude_3_sonnet_response,
-                claude_3_haiku_response
+                azure_openai_gpt4_response
             ],
             '引用 Contexts': [
                 xai_grok_3_referenced_contexts,
                 command_a_referenced_contexts,
                 command_r_referenced_contexts,
-                command_r_plus_referenced_contexts,
                 llama_4_maverick_referenced_contexts,
                 llama_4_scout_referenced_contexts,
                 llama_3_3_70b_referenced_contexts,
@@ -5817,16 +5967,12 @@ def generate_download_file(
                 openai_gpt4o_referenced_contexts,
                 openai_gpt4_referenced_contexts,
                 azure_openai_gpt4o_referenced_contexts,
-                azure_openai_gpt4_referenced_contexts,
-                claude_3_opus_referenced_contexts,
-                claude_3_sonnet_referenced_contexts,
-                claude_3_haiku_referenced_contexts
+                azure_openai_gpt4_referenced_contexts
             ],
             'LLM 評価結果': [
                 xai_grok_3_evaluation,
                 command_a_evaluation,
                 command_r_evaluation,
-                command_r_plus_evaluation,
                 llama_4_maverick_evaluation,
                 llama_4_scout_evaluation,
                 llama_3_3_70b_evaluation,
@@ -5834,10 +5980,7 @@ def generate_download_file(
                 openai_gpt4o_evaluation,
                 openai_gpt4_evaluation,
                 azure_openai_gpt4o_evaluation,
-                azure_openai_gpt4_evaluation,
-                claude_3_opus_evaluation,
-                claude_3_sonnet_evaluation,
-                claude_3_haiku_evaluation
+                azure_openai_gpt4_evaluation
             ]
         }
     )
@@ -5942,7 +6085,6 @@ def insert_query_result(
         xai_grok_3_response,
         command_a_response,
         command_r_response,
-        command_r_plus_response,
         llama_4_maverick_response,
         llama_4_scout_response,
         llama_3_3_70b_response,
@@ -5951,13 +6093,9 @@ def insert_query_result(
         openai_gpt4_response,
         azure_openai_gpt4o_response,
         azure_openai_gpt4_response,
-        claude_3_opus_response,
-        claude_3_sonnet_response,
-        claude_3_haiku_response,
         xai_grok_3_evaluation,
         command_a_evaluation,
         command_r_evaluation,
-        command_r_plus_evaluation,
         llama_4_maverick_evaluation,
         llama_4_scout_evaluation,
         llama_3_3_70b_evaluation,
@@ -5965,10 +6103,7 @@ def insert_query_result(
         openai_gpt4o_evaluation,
         openai_gpt4_evaluation,
         azure_openai_gpt4o_evaluation,
-        azure_openai_gpt4_evaluation,
-        claude_3_opus_evaluation,
-        claude_3_sonnet_evaluation,
-        claude_3_haiku_evaluation
+        azure_openai_gpt4_evaluation
 ):
     print("in insert_query_result() start...")
     if not query:
@@ -6082,34 +6217,6 @@ def insert_query_result(
                         "cohere/command-r",
                         command_r_response,
                         command_r_evaluation
-                    ]
-                )
-
-            if "cohere/command-r-plus" in llm_answer_checkbox_group:
-                command_r_plus_response = command_r_plus_response
-                if llm_evaluation_checkbox:
-                    command_r_plus_evaluation = command_r_plus_evaluation
-                else:
-                    command_r_plus_evaluation = ""
-
-                insert_sql = """
-                             INSERT INTO RAG_QA_FEEDBACK (query_id,
-                                                          llm_name,
-                                                          llm_answer,
-                                                          ragas_evaluation_result)
-                             VALUES (:1,
-                                     :2,
-                                     :3,
-                                     :4) \
-                             """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
-                cursor.execute(
-                    insert_sql,
-                    [
-                        query_id,
-                        "cohere/command-r-plus",
-                        command_r_plus_response,
-                        command_r_plus_evaluation
                     ]
                 )
 
@@ -6337,90 +6444,6 @@ def insert_query_result(
                     ]
                 )
 
-            if "claude/opus" in llm_answer_checkbox_group:
-                claude_3_opus_response = claude_3_opus_response
-                if llm_evaluation_checkbox:
-                    claude_3_opus_evaluation = claude_3_opus_evaluation
-                else:
-                    claude_3_opus_evaluation = ""
-
-                insert_sql = """
-                             INSERT INTO RAG_QA_FEEDBACK (query_id,
-                                                          llm_name,
-                                                          llm_answer,
-                                                          ragas_evaluation_result)
-                             VALUES (:1,
-                                     :2,
-                                     :3,
-                                     :4) \
-                             """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
-                cursor.execute(
-                    insert_sql,
-                    [
-                        query_id,
-                        "claude/opus",
-                        claude_3_opus_response,
-                        claude_3_opus_evaluation
-                    ]
-                )
-
-            if "claude/sonnet" in llm_answer_checkbox_group:
-                claude_3_sonnet_response = claude_3_sonnet_response
-                if llm_evaluation_checkbox:
-                    claude_3_sonnet_evaluation = claude_3_sonnet_evaluation
-                else:
-                    claude_3_sonnet_evaluation = ""
-
-                insert_sql = """
-                             INSERT INTO RAG_QA_FEEDBACK (query_id,
-                                                          llm_name,
-                                                          llm_answer,
-                                                          ragas_evaluation_result)
-                             VALUES (:1,
-                                     :2,
-                                     :3,
-                                     :4) \
-                             """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
-                cursor.execute(
-                    insert_sql,
-                    [
-                        query_id,
-                        "claude/sonnet",
-                        claude_3_sonnet_response,
-                        claude_3_sonnet_evaluation
-                    ]
-                )
-
-            if "claude/haiku" in llm_answer_checkbox_group:
-                claude_3_haiku_response = claude_3_haiku_response
-                if llm_evaluation_checkbox:
-                    claude_3_haiku_evaluation = claude_3_haiku_evaluation
-                else:
-                    claude_3_haiku_evaluation = ""
-
-                insert_sql = """
-                             INSERT INTO RAG_QA_FEEDBACK (query_id,
-                                                          llm_name,
-                                                          llm_answer,
-                                                          ragas_evaluation_result)
-                             VALUES (:1,
-                                     :2,
-                                     :3,
-                                     :4) \
-                             """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
-                cursor.execute(
-                    insert_sql,
-                    [
-                        query_id,
-                        "claude/haiku",
-                        claude_3_haiku_response,
-                        claude_3_haiku_evaluation
-                    ]
-                )
-
         conn.commit()
 
 
@@ -6641,18 +6664,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 with gr.Row():
                     with gr.Column():
                         tab_create_azure_openai_cred_button = gr.Button(value="設定/再設定", variant="primary")
-            with gr.TabItem(label="Claudeの設定(オプション)") as tab_create_claude_cred:
-                with gr.Row():
-                    with gr.Column():
-                        tab_create_claude_cred_api_key_text = gr.Textbox(
-                            label="API Key*",
-                            type="password",
-                            lines=1,
-                            interactive=True,
-                        )
-                with gr.Row():
-                    with gr.Column():
-                        tab_create_claude_cred_button = gr.Button(value="設定/再設定", variant="primary")
+
             with gr.TabItem(label="Langfuseの設定(オプション)") as tab_create_langfuse_cred:
                 with gr.Row():
                     with gr.Column():
@@ -6697,10 +6709,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 "openai/gpt-4o",
                                 "openai/gpt-4",
                                 "azure_openai/gpt-4o",
-                                "azure_openai/gpt-4",
-                                "claude/opus",
-                                "claude/sonnet",
-                                "claude/haiku"],
+                                "azure_openai/gpt-4"],
                             label="LLM モデル*",
                             value=[]
                         )
@@ -6737,17 +6746,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         min_height=200,
                         max_height=300
                     )
-                with gr.Accordion(
-                        label="Command-R+ メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_with_llm_command_r_plus_accordion:
-                    tab_chat_with_command_r_plus_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=200,
-                        min_height=200,
-                        max_height=300
-                    )
+
                 with gr.Accordion(
                         label="Llama 4 Maverick 17b メッセージ",
                         visible=False,
@@ -6836,39 +6835,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         min_height=200,
                         max_height=300
                     )
-                with gr.Accordion(
-                        label="Claude 3 Opus メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_with_llm_claude_3_opus_accordion:
-                    tab_chat_with_claude_3_opus_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=200,
-                        min_height=200,
-                        max_height=300
-                    )
-                with gr.Accordion(
-                        label="Claude 3.5 Sonnet メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_with_llm_claude_3_sonnet_accordion:
-                    tab_chat_with_claude_3_sonnet_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=200,
-                        min_height=200,
-                        max_height=300
-                    )
-                with gr.Accordion(
-                        label="Claude 3 Haiku メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_with_llm_claude_3_haiku_accordion:
-                    tab_chat_with_claude_3_haiku_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=200,
-                        min_height=200,
-                        max_height=300
-                    )
+
                 with gr.Accordion(open=False, label="システム・メッセージ"):
                     #                     tab_chat_with_llm_system_text = gr.Textbox(label="システム・メッセージ*", show_label=False, lines=5,
                     #                                                                max_lines=15,
@@ -7226,10 +7193,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 "openai/gpt-4o",
                                 "openai/gpt-4",
                                 "azure_openai/gpt-4o",
-                                "azure_openai/gpt-4",
-                                "claude/opus",
-                                "claude/sonnet",
-                                "claude/haiku"
+                                "azure_openai/gpt-4"
                             ],
                             label="LLM モデル",
                             value=[]
@@ -7392,7 +7356,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 info="RAGの回答時に画像データを使用。ただし、処理する画像数を10個に制限。"
                             )
                         with gr.Column():
-                            gr.Markdown("&nbsp;")
+                            tab_chat_document_single_image_processing_checkbox = gr.Checkbox(
+                                label="1枚ずつ処理",
+                                value=True,
+                                info="チェックすると画像を1枚ずつ処理、チェックしないと全ての画像を一括処理。"
+                            )
                     with gr.Accordion(label="画像 Prompt 設定", open=False,
                                       visible=False) as tab_chat_document_image_prompt_accordion:
                         with gr.Row():
@@ -7736,60 +7704,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             min_height=200,
                             max_height=300
                         )
-                with gr.Accordion(
-                        label="Command-R+ メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_document_llm_command_r_plus_accordion:
-                    tab_chat_document_command_r_plus_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=300,
-                        min_height=300,
-                        max_height=300
-                    )
-                    with gr.Accordion(
-                            label="Human 評価",
-                            visible=True,
-                            open=True
-                    ) as tab_chat_document_llm_command_r_plus_human_evaluation_accordion:
-                        with gr.Row():
-                            tab_chat_document_command_r_plus_answer_human_eval_feedback_radio = gr.Radio(
-                                show_label=False,
-                                choices=[
-                                    ("Good response", "good"),
-                                    ("Neutral response", "neutral"),
-                                    ("Bad response", "bad"),
-                                ],
-                                value="good",
-                                container=False,
-                                interactive=True,
-                            )
-                        with gr.Row():
-                            with gr.Column(scale=11):
-                                tab_chat_document_command_r_plus_answer_human_eval_feedback_text = gr.Textbox(
-                                    show_label=False,
-                                    container=False,
-                                    lines=2,
-                                    interactive=True,
-                                    autoscroll=True,
-                                    placeholder="具体的な意見や感想を自由に書いてください。",
-                                )
-                            with gr.Column(scale=1):
-                                tab_chat_document_command_r_plus_answer_human_eval_feedback_send_button = gr.Button(
-                                    value="送信",
-                                    variant="primary",
-                                )
-                    with gr.Accordion(
-                            label="LLM 評価結果",
-                            visible=False,
-                            open=True
-                    ) as tab_chat_document_llm_command_r_plus_evaluation_accordion:
-                        tab_chat_document_command_r_plus_evaluation_text = gr.Markdown(
-                            show_copy_button=True,
-                            height=200,
-                            min_height=200,
-                            max_height=300
-                        )
+
                 with gr.Accordion(
                         label="Llama 4 Maverick 17b メッセージ",
                         visible=False,
@@ -8275,168 +8190,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             min_height=200,
                             max_height=300
                         )
-                with gr.Accordion(
-                        label="Claude 3 Opus メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_document_llm_claude_3_opus_accordion:
-                    tab_chat_document_claude_3_opus_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=300,
-                        min_height=300,
-                        max_height=300
-                    )
-                    with gr.Accordion(
-                            label="Human 評価",
-                            visible=True,
-                            open=True
-                    ) as tab_chat_document_llm_claude_3_opus_human_evaluation_accordion:
-                        with gr.Row():
-                            tab_chat_document_claude_3_opus_answer_human_eval_feedback_radio = gr.Radio(
-                                show_label=False,
-                                choices=[
-                                    ("Good response", "good"),
-                                    ("Neutral response", "neutral"),
-                                    ("Bad response", "bad"),
-                                ],
-                                value="good",
-                                container=False,
-                                interactive=True,
-                            )
-                        with gr.Row():
-                            with gr.Column(scale=11):
-                                tab_chat_document_claude_3_opus_answer_human_eval_feedback_text = gr.Textbox(
-                                    show_label=False,
-                                    container=False,
-                                    lines=2,
-                                    interactive=True,
-                                    autoscroll=True,
-                                    placeholder="具体的な意見や感想を自由に書いてください。",
-                                )
-                            with gr.Column(scale=1):
-                                tab_chat_document_claude_3_opus_answer_human_eval_feedback_send_button = gr.Button(
-                                    value="送信",
-                                    variant="primary",
-                                )
-                    with gr.Accordion(
-                            label="LLM 評価結果",
-                            visible=False,
-                            open=True
-                    ) as tab_chat_document_llm_claude_3_opus_evaluation_accordion:
-                        tab_chat_document_claude_3_opus_evaluation_text = gr.Markdown(
-                            show_copy_button=True,
-                            height=200,
-                            min_height=200,
-                            max_height=300
-                        )
-                with gr.Accordion(
-                        label="Claude 3.5 Sonnet メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_document_llm_claude_3_sonnet_accordion:
-                    tab_chat_document_claude_3_sonnet_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=300,
-                        min_height=300,
-                        max_height=300
-                    )
-                    with gr.Accordion(
-                            label="Human 評価",
-                            visible=True,
-                            open=True
-                    ) as tab_chat_document_llm_claude_3_sonnet_human_evaluation_accordion:
-                        with gr.Row():
-                            tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_radio = gr.Radio(
-                                show_label=False,
-                                choices=[
-                                    ("Good response", "good"),
-                                    ("Neutral response", "neutral"),
-                                    ("Bad response", "bad"),
-                                ],
-                                value="good",
-                                container=False,
-                                interactive=True,
-                            )
-                        with gr.Row():
-                            with gr.Column(scale=11):
-                                tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_text = gr.Textbox(
-                                    show_label=False,
-                                    container=False,
-                                    lines=2,
-                                    interactive=True,
-                                    autoscroll=True,
-                                    placeholder="具体的な意見や感想を自由に書いてください。",
-                                )
-                            with gr.Column(scale=1):
-                                tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_send_button = gr.Button(
-                                    value="送信",
-                                    variant="primary",
-                                )
-                    with gr.Accordion(
-                            label="LLM 評価結果",
-                            visible=False,
-                            open=True
-                    ) as tab_chat_document_llm_claude_3_sonnet_evaluation_accordion:
-                        tab_chat_document_claude_3_sonnet_evaluation_text = gr.Markdown(
-                            show_copy_button=True,
-                            height=200,
-                            min_height=200,
-                            max_height=300
-                        )
-                with gr.Accordion(
-                        label="Claude 3 Haiku メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_document_llm_claude_3_haiku_accordion:
-                    tab_chat_document_claude_3_haiku_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=300,
-                        min_height=300,
-                        max_height=300
-                    )
-                    with gr.Accordion(
-                            label="Human 評価",
-                            visible=True,
-                            open=True
-                    ) as tab_chat_document_llm_claude_3_haiku_human_evaluation_accordion:
-                        with gr.Row():
-                            tab_chat_document_claude_3_haiku_answer_human_eval_feedback_radio = gr.Radio(
-                                show_label=False,
-                                choices=[
-                                    ("Good response", "good"),
-                                    ("Neutral response", "neutral"),
-                                    ("Bad response", "bad"),
-                                ],
-                                value="good",
-                                container=False,
-                                interactive=True,
-                            )
-                        with gr.Row():
-                            with gr.Column(scale=11):
-                                tab_chat_document_claude_3_haiku_answer_human_eval_feedback_text = gr.Textbox(
-                                    show_label=False,
-                                    container=False,
-                                    lines=2,
-                                    interactive=True,
-                                    autoscroll=True,
-                                    placeholder="具体的な意見や感想を自由に書いてください。",
-                                )
-                            with gr.Column(scale=1):
-                                tab_chat_document_claude_3_haiku_answer_human_eval_feedback_send_button = gr.Button(
-                                    value="送信",
-                                    variant="primary",
-                                )
-                    with gr.Accordion(
-                            label="LLM 評価結果",
-                            visible=False,
-                            open=True
-                    ) as tab_chat_document_llm_claude_3_haiku_evaluation_accordion:
-                        tab_chat_document_claude_3_haiku_evaluation_text = gr.Markdown(
-                            show_copy_button=True,
-                            height=200,
-                            min_height=200,
-                            max_height=300
-                        )
 
             with gr.TabItem(label="Step-5.評価レポートの取得") as tab_download_eval_result:
                 with gr.Row():
@@ -8518,15 +8271,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_create_azure_openai_cred_endpoint_gpt_4_text,
         ]
     )
-    tab_create_claude_cred_button.click(
-        create_claude_cred,
-        inputs=[
-            tab_create_claude_cred_api_key_text
-        ],
-        outputs=[
-            tab_create_claude_cred_api_key_text
-        ]
-    )
+
     tab_create_langfuse_cred_button.click(
         create_langfuse_cred,
         inputs=[
@@ -8549,7 +8294,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_llm_xai_grok_3_accordion,
             tab_chat_with_llm_command_a_accordion,
             tab_chat_with_llm_command_r_accordion,
-            tab_chat_with_llm_command_r_plus_accordion,
             tab_chat_with_llm_llama_4_maverick_accordion,
             tab_chat_with_llm_llama_4_scout_accordion,
             tab_chat_with_llm_llama_3_3_70b_accordion,
@@ -8557,10 +8301,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_llm_openai_gpt4o_accordion,
             tab_chat_with_llm_openai_gpt4_accordion,
             tab_chat_with_llm_azure_openai_gpt4o_accordion,
-            tab_chat_with_llm_azure_openai_gpt4_accordion,
-            tab_chat_with_llm_claude_3_opus_accordion,
-            tab_chat_with_llm_claude_3_sonnet_accordion,
-            tab_chat_with_llm_claude_3_haiku_accordion
+            tab_chat_with_llm_azure_openai_gpt4_accordion
         ]
     )
     tab_chat_with_llm_clear_button.add(
@@ -8571,7 +8312,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_xai_grok_3_answer_text,
             tab_chat_with_command_a_answer_text,
             tab_chat_with_command_r_answer_text,
-            tab_chat_with_command_r_plus_answer_text,
             tab_chat_with_llama_4_maverick_answer_text,
             tab_chat_with_llama_4_scout_answer_text,
             tab_chat_with_llama_3_3_70b_answer_text,
@@ -8579,10 +8319,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_openai_gpt4o_answer_text,
             tab_chat_with_openai_gpt4_answer_text,
             tab_chat_with_azure_openai_gpt4o_answer_text,
-            tab_chat_with_azure_openai_gpt4_answer_text,
-            tab_chat_with_claude_3_opus_answer_text,
-            tab_chat_with_claude_3_sonnet_answer_text,
-            tab_chat_with_claude_3_haiku_answer_text
+            tab_chat_with_azure_openai_gpt4_answer_text
         ]
     )
     tab_chat_with_llm_chat_button.click(
@@ -8597,7 +8334,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_xai_grok_3_answer_text,
             tab_chat_with_command_a_answer_text,
             tab_chat_with_command_r_answer_text,
-            tab_chat_with_command_r_plus_answer_text,
             tab_chat_with_llama_4_maverick_answer_text,
             tab_chat_with_llama_4_scout_answer_text,
             tab_chat_with_llama_3_3_70b_answer_text,
@@ -8605,10 +8341,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_openai_gpt4o_answer_text,
             tab_chat_with_openai_gpt4_answer_text,
             tab_chat_with_azure_openai_gpt4o_answer_text,
-            tab_chat_with_azure_openai_gpt4_answer_text,
-            tab_chat_with_claude_3_opus_answer_text,
-            tab_chat_with_claude_3_sonnet_answer_text,
-            tab_chat_with_claude_3_haiku_answer_text
+            tab_chat_with_azure_openai_gpt4_answer_text
         ]
     )
 
@@ -8819,7 +8552,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_xai_grok_3_accordion,
             tab_chat_document_llm_command_a_accordion,
             tab_chat_document_llm_command_r_accordion,
-            tab_chat_document_llm_command_r_plus_accordion,
             tab_chat_document_llm_llama_4_maverick_accordion,
             tab_chat_document_llm_llama_4_scout_accordion,
             tab_chat_document_llm_llama_3_3_70b_accordion,
@@ -8827,10 +8559,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_openai_gpt4o_accordion,
             tab_chat_document_llm_openai_gpt4_accordion,
             tab_chat_document_llm_azure_openai_gpt4o_accordion,
-            tab_chat_document_llm_azure_openai_gpt4_accordion,
-            tab_chat_document_llm_claude_3_opus_accordion,
-            tab_chat_document_llm_claude_3_sonnet_accordion,
-            tab_chat_document_llm_claude_3_haiku_accordion
+            tab_chat_document_llm_azure_openai_gpt4_accordion
         ]
     ).then(
         set_image_answer_visibility,
@@ -8868,7 +8597,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_xai_grok_3_evaluation_accordion,
             tab_chat_document_llm_command_a_evaluation_accordion,
             tab_chat_document_llm_command_r_evaluation_accordion,
-            tab_chat_document_llm_command_r_plus_evaluation_accordion,
             tab_chat_document_llm_llama_4_maverick_evaluation_accordion,
             tab_chat_document_llm_llama_4_scout_evaluation_accordion,
             tab_chat_document_llm_llama_3_3_70b_evaluation_accordion,
@@ -8876,10 +8604,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_openai_gpt4o_evaluation_accordion,
             tab_chat_document_llm_openai_gpt4_evaluation_accordion,
             tab_chat_document_llm_azure_openai_gpt4o_evaluation_accordion,
-            tab_chat_document_llm_azure_openai_gpt4_evaluation_accordion,
-            tab_chat_document_llm_claude_3_opus_evaluation_accordion,
-            tab_chat_document_llm_claude_3_sonnet_evaluation_accordion,
-            tab_chat_document_llm_claude_3_haiku_evaluation_accordion
+            tab_chat_document_llm_azure_openai_gpt4_evaluation_accordion
         ]
     )
 
@@ -8939,7 +8664,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
-            tab_chat_document_command_r_plus_answer_text,
             tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -8948,9 +8672,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
             tab_chat_document_azure_openai_gpt4_answer_text,
-            tab_chat_document_claude_3_opus_answer_text,
-            tab_chat_document_claude_3_sonnet_answer_text,
-            tab_chat_document_claude_3_haiku_answer_text,
         ]
     ).then(
         reset_image_answers,
@@ -8969,7 +8690,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_xai_grok_3_evaluation_text,
             tab_chat_document_command_a_evaluation_text,
             tab_chat_document_command_r_evaluation_text,
-            tab_chat_document_command_r_plus_evaluation_text,
             tab_chat_document_llama_4_maverick_evaluation_text,
             tab_chat_document_llama_4_scout_evaluation_text,
             tab_chat_document_llama_3_3_70b_evaluation_text,
@@ -8977,10 +8697,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_openai_gpt4o_evaluation_text,
             tab_chat_document_openai_gpt4_evaluation_text,
             tab_chat_document_azure_openai_gpt4o_evaluation_text,
-            tab_chat_document_azure_openai_gpt4_evaluation_text,
-            tab_chat_document_claude_3_opus_evaluation_text,
-            tab_chat_document_claude_3_sonnet_evaluation_text,
-            tab_chat_document_claude_3_haiku_evaluation_text
+            tab_chat_document_azure_openai_gpt4_evaluation_text
         ]
     ).then(
         reset_eval_by_human_result,
@@ -8990,8 +8707,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_command_a_answer_human_eval_feedback_text,
             tab_chat_document_command_r_answer_human_eval_feedback_radio,
             tab_chat_document_command_r_answer_human_eval_feedback_text,
-            tab_chat_document_command_r_plus_answer_human_eval_feedback_radio,
-            tab_chat_document_command_r_plus_answer_human_eval_feedback_text,
             tab_chat_document_llama_4_maverick_answer_human_eval_feedback_radio,
             tab_chat_document_llama_4_maverick_answer_human_eval_feedback_text,
             tab_chat_document_llama_4_scout_answer_human_eval_feedback_radio,
@@ -9008,12 +8723,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_azure_openai_gpt4o_answer_human_eval_feedback_text,
             tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_radio,
             tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_text,
-            tab_chat_document_claude_3_opus_answer_human_eval_feedback_radio,
-            tab_chat_document_claude_3_opus_answer_human_eval_feedback_text,
-            tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_radio,
-            tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_text,
-            tab_chat_document_claude_3_haiku_answer_human_eval_feedback_radio,
-            tab_chat_document_claude_3_haiku_answer_human_eval_feedback_text,
         ]
     ).then(
         generate_query,
@@ -9071,7 +8780,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
-            tab_chat_document_command_r_plus_answer_text,
             tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -9080,9 +8788,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
             tab_chat_document_azure_openai_gpt4_answer_text,
-            tab_chat_document_claude_3_opus_answer_text,
-            tab_chat_document_claude_3_sonnet_answer_text,
-            tab_chat_document_claude_3_haiku_answer_text,
         ]
     ).then(
         append_citation,
@@ -9096,7 +8801,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
-            tab_chat_document_command_r_plus_answer_text,
             tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -9105,15 +8809,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
             tab_chat_document_azure_openai_gpt4_answer_text,
-            tab_chat_document_claude_3_opus_answer_text,
-            tab_chat_document_claude_3_sonnet_answer_text,
-            tab_chat_document_claude_3_haiku_answer_text,
         ],
         outputs=[
             tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
-            tab_chat_document_command_r_plus_answer_text,
             tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -9122,15 +8822,13 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
             tab_chat_document_azure_openai_gpt4_answer_text,
-            tab_chat_document_claude_3_opus_answer_text,
-            tab_chat_document_claude_3_sonnet_answer_text,
-            tab_chat_document_claude_3_haiku_answer_text,
         ]
     ).then(
         process_image_answers_streaming,
         inputs=[
             tab_chat_document_searched_result_dataframe,
             tab_chat_document_use_image_checkbox,
+            tab_chat_document_single_image_processing_checkbox,
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_query_text,
             tab_chat_document_llama_4_maverick_image_answer_text,
@@ -9161,7 +8859,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
-            tab_chat_document_command_r_plus_answer_text,
             tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -9170,15 +8867,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
             tab_chat_document_azure_openai_gpt4_answer_text,
-            tab_chat_document_claude_3_opus_answer_text,
-            tab_chat_document_claude_3_sonnet_answer_text,
-            tab_chat_document_claude_3_haiku_answer_text
         ],
         outputs=[
             tab_chat_document_xai_grok_3_evaluation_text,
             tab_chat_document_command_a_evaluation_text,
             tab_chat_document_command_r_evaluation_text,
-            tab_chat_document_command_r_plus_evaluation_text,
             tab_chat_document_llama_4_maverick_evaluation_text,
             tab_chat_document_llama_4_scout_evaluation_text,
             tab_chat_document_llama_3_3_70b_evaluation_text,
@@ -9187,9 +8880,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_openai_gpt4_evaluation_text,
             tab_chat_document_azure_openai_gpt4o_evaluation_text,
             tab_chat_document_azure_openai_gpt4_evaluation_text,
-            tab_chat_document_claude_3_opus_evaluation_text,
-            tab_chat_document_claude_3_sonnet_evaluation_text,
-            tab_chat_document_claude_3_haiku_evaluation_text
         ]
     ).then(
         generate_download_file,
@@ -9205,7 +8895,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
-            tab_chat_document_command_r_plus_answer_text,
             tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -9214,13 +8903,9 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
             tab_chat_document_azure_openai_gpt4_answer_text,
-            tab_chat_document_claude_3_opus_answer_text,
-            tab_chat_document_claude_3_sonnet_answer_text,
-            tab_chat_document_claude_3_haiku_answer_text,
             tab_chat_document_xai_grok_3_evaluation_text,
             tab_chat_document_command_a_evaluation_text,
             tab_chat_document_command_r_evaluation_text,
-            tab_chat_document_command_r_plus_evaluation_text,
             tab_chat_document_llama_4_maverick_evaluation_text,
             tab_chat_document_llama_4_scout_evaluation_text,
             tab_chat_document_llama_3_3_70b_evaluation_text,
@@ -9229,9 +8914,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_openai_gpt4_evaluation_text,
             tab_chat_document_azure_openai_gpt4o_evaluation_text,
             tab_chat_document_azure_openai_gpt4_evaluation_text,
-            tab_chat_document_claude_3_opus_evaluation_text,
-            tab_chat_document_claude_3_sonnet_evaluation_text,
-            tab_chat_document_claude_3_haiku_evaluation_text
         ],
         outputs=[
             tab_chat_document_download_output_button
@@ -9257,7 +8939,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
             tab_chat_document_command_r_answer_text,
-            tab_chat_document_command_r_plus_answer_text,
             tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -9266,13 +8947,9 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
             tab_chat_document_azure_openai_gpt4_answer_text,
-            tab_chat_document_claude_3_opus_answer_text,
-            tab_chat_document_claude_3_sonnet_answer_text,
-            tab_chat_document_claude_3_haiku_answer_text,
             tab_chat_document_xai_grok_3_evaluation_text,
             tab_chat_document_command_a_evaluation_text,
             tab_chat_document_command_r_evaluation_text,
-            tab_chat_document_command_r_plus_evaluation_text,
             tab_chat_document_llama_4_maverick_evaluation_text,
             tab_chat_document_llama_4_scout_evaluation_text,
             tab_chat_document_llama_3_3_70b_evaluation_text,
@@ -9281,9 +8958,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_openai_gpt4_evaluation_text,
             tab_chat_document_azure_openai_gpt4o_evaluation_text,
             tab_chat_document_azure_openai_gpt4_evaluation_text,
-            tab_chat_document_claude_3_opus_evaluation_text,
-            tab_chat_document_claude_3_sonnet_evaluation_text,
-            tab_chat_document_claude_3_haiku_evaluation_text,
         ],
         outputs=[]
     )
@@ -9327,20 +9001,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_chat_document_command_r_answer_human_eval_feedback_radio,
             tab_chat_document_command_r_answer_human_eval_feedback_text,
-        ]
-    )
-
-    tab_chat_document_command_r_plus_answer_human_eval_feedback_send_button.click(
-        eval_by_human,
-        inputs=[
-            query_id_state,
-            gr.State(value="cohere/command-r-plus"),
-            tab_chat_document_command_r_plus_answer_human_eval_feedback_radio,
-            tab_chat_document_command_r_plus_answer_human_eval_feedback_text,
-        ],
-        outputs=[
-            tab_chat_document_command_r_plus_answer_human_eval_feedback_radio,
-            tab_chat_document_command_r_plus_answer_human_eval_feedback_text,
         ]
     )
 
@@ -9456,48 +9116,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ]
     )
 
-    tab_chat_document_claude_3_opus_answer_human_eval_feedback_send_button.click(
-        eval_by_human,
-        inputs=[
-            query_id_state,
-            gr.State(value="claude/opus"),
-            tab_chat_document_claude_3_opus_answer_human_eval_feedback_radio,
-            tab_chat_document_claude_3_opus_answer_human_eval_feedback_text,
-        ],
-        outputs=[
-            tab_chat_document_claude_3_opus_answer_human_eval_feedback_radio,
-            tab_chat_document_claude_3_opus_answer_human_eval_feedback_text,
-        ]
-    )
-
-    tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_send_button.click(
-        eval_by_human,
-        inputs=[
-            query_id_state,
-            gr.State(value="claude/sonnet"),
-            tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_radio,
-            tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_text,
-        ],
-        outputs=[
-            tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_radio,
-            tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_text,
-        ]
-    )
-
-    tab_chat_document_claude_3_haiku_answer_human_eval_feedback_send_button.click(
-        eval_by_human,
-        inputs=[
-            query_id_state,
-            gr.State(value="claude/haiku"),
-            tab_chat_document_claude_3_haiku_answer_human_eval_feedback_radio,
-            tab_chat_document_claude_3_haiku_answer_human_eval_feedback_text,
-        ],
-        outputs=[
-            tab_chat_document_claude_3_haiku_answer_human_eval_feedback_radio,
-            tab_chat_document_claude_3_haiku_answer_human_eval_feedback_text,
-        ]
-    )
-
     tab_download_eval_result_generate_button.click(
         generate_eval_result_file,
         inputs=[],
@@ -9568,6 +9186,9 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
 
 app.queue()
 if __name__ == "__main__":
+    # リソース警告追跡を有効化
+    enable_resource_warnings()
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", type=str, default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8080)
@@ -9577,5 +9198,5 @@ if __name__ == "__main__":
         server_port=args.port,
         max_threads=200,
         show_api=False,
-        # auth=do_auth,
+        auth=do_auth,
     )
