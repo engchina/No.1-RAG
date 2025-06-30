@@ -106,7 +106,7 @@ CHAT_SYSTEM_MESSAGE = """あなたは役立つアシスタントです。
 MARKITDOWN_LLM_PROMPT = "画像にふさわしい詳細な代替キャプションを書いてください。"
 
 # Image QA prompt template
-IMAGE_QA_PROMPT_TEMPLATE = """## 厳格なコンテキストQAシステムの実行規則
+IMAGE_QA_PROMPT_TEMPLATE_OLD = """## 厳格なコンテキストQAシステムの実行規則
 
 ### 基本原則
 1. 提供された画像を唯一の情報源として使用
@@ -128,7 +128,12 @@ IMAGE_QA_PROMPT_TEMPLATE = """## 厳格なコンテキストQAシステムの実
    情報源: 提供画像」
 
 ### 現在の質問
-{{query_text}}"""
+{query_text}"""
+
+IMAGE_QA_PROMPT_TEMPLATE = """画像をもとに簡潔に質問に答えてください（回答は日本語で）。
+
+Question: {{query_text}}
+"""
 
 # Query generation prompts
 QUERY_GENERATION_PROMPTS = {
@@ -240,21 +245,3 @@ def update_image_qa_prompt(new_prompt):
     """Update Image QA prompt template"""
     global IMAGE_QA_PROMPT_TEMPLATE
     IMAGE_QA_PROMPT_TEMPLATE = new_prompt
-
-# Test function for the custom template functionality
-if __name__ == "__main__":
-    # Test with default template
-    default_result = get_langgpt_rag_prompt("test context", "test query")
-    print("Default template test:")
-    print(default_result[:100] + "...")
-
-    # Test with custom template
-    custom_template = """
-Custom RAG Template:
-Context: {{context}}
-Query: {{query_text}}
-Please answer based on the context.
-"""
-    custom_result = get_langgpt_rag_prompt("test context", "test query", custom_template=custom_template)
-    print("\nCustom template test:")
-    print(custom_result)

@@ -1,12 +1,13 @@
 import argparse
 import base64
 import json
+import logging
 import os
 import platform
 import re
 import shutil
 import time
-from datetime import datetime
+from io import BytesIO
 from itertools import combinations
 from typing import List, Tuple
 
@@ -16,25 +17,23 @@ import oci
 import oracledb
 import pandas as pd
 import requests
+from PIL import Image
 from dotenv import load_dotenv, find_dotenv, set_key, get_key
 from gradio.themes import GoogleFont
 from langchain_anthropic import ChatAnthropic
-# from langchain_community.chat_models import ChatOCIGenAI
-from my_langchain_community.chat_models import ChatOCIGenAI
+from langchain_community.document_loaders import TextLoader
 from langchain_community.embeddings import OCIGenAIEmbeddings
-from langchain_community.vectorstores.utils import DistanceStrategy
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_community.document_loaders import TextLoader
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langfuse.callback import CallbackHandler
 from oracledb import DatabaseError
 from unstructured.partition.auto import partition
-import logging
 
 from markitdown import MarkItDown
-from my_langchain_community.vectorstores import MyOracleVS
+# from langchain_community.chat_models import ChatOCIGenAI
+from my_langchain_community.chat_models import ChatOCIGenAI
 from utils.chunk_util import RecursiveCharacterTextSplitter
 from utils.common_util import get_dict_value
 from utils.css_gradio import custom_css
@@ -43,7 +42,7 @@ from utils.prompts import (
     get_sub_query_prompt, get_rag_fusion_prompt, get_hyde_prompt, get_step_back_prompt,
     get_langgpt_rag_prompt, get_llm_evaluation_system_message, get_chat_system_message,
     get_markitdown_llm_prompt, get_query_generation_prompt, update_langgpt_rag_prompt,
-    update_llm_evaluation_system_message, get_image_qa_prompt, update_image_qa_prompt
+    get_image_qa_prompt, update_image_qa_prompt
 )
 
 # read local .env file
@@ -54,6 +53,179 @@ DEFAULT_COLLECTION_NAME = os.environ["DEFAULT_COLLECTION_NAME"]
 # ログ設定
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
+
+
+def compress_image_for_display(image_url, quality=85, max_width=800, max_height=1200):
+    """
+    画像URLを圧縮して表示用の新しいURLを生成する
+
+    Args:
+        image_url: 元の画像URL（data:image/...;base64,... 形式）
+        quality: JPEG圧縮品質 (1-100)
+        max_width: 最大幅
+        max_height: 最大高さ
+
+    Returns:
+        str: 圧縮された画像のdata URL
+    """
+    output_buffer = None
+    try:
+        # data URLからbase64データを抽出
+        if not image_url.startswith('data:image/'):
+            return image_url
+
+        # base64データ部分を取得
+        header, base64_data = image_url.split(',', 1)
+
+        # base64をデコードして画像データを取得
+        image_data = base64.b64decode(base64_data)
+
+        # PILで画像を開く
+        with Image.open(BytesIO(image_data)) as img:
+            # RGBモードに変換（必要に応じて）
+            if img.mode in ('RGBA', 'LA', 'P'):
+                img = img.convert('RGB')
+
+            # 画像サイズを調整（アスペクト比を保持）
+            original_width, original_height = img.size
+
+            # 縮小が必要かチェック
+            if original_width > max_width or original_height > max_height:
+                # アスペクト比を保持して縮小
+                ratio = min(max_width / original_width, max_height / original_height)
+                new_width = int(original_width * ratio)
+                new_height = int(original_height * ratio)
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                print(f"画像サイズを圧縮: {original_width}x{original_height} -> {new_width}x{new_height}")
+
+            # 圧縮された画像をバイトストリームに保存
+            output_buffer = BytesIO()
+            img.save(output_buffer, format='JPEG', quality=quality, optimize=True)
+            compressed_data = output_buffer.getvalue()
+
+            # base64エンコード
+            compressed_base64 = base64.b64encode(compressed_data).decode('utf-8')
+
+            # 新しいdata URLを生成
+            compressed_url = f"data:image/jpeg;base64,{compressed_base64}"
+
+            # 圧縮率を計算してログ出力
+            original_size = len(base64_data)
+            compressed_size = len(compressed_base64)
+            compression_ratio = (1 - compressed_size / original_size) * 100
+            print(f"画像圧縮完了: {original_size} -> {compressed_size} bytes ({compression_ratio:.1f}% 削減)")
+
+            return compressed_url
+
+    except Exception as e:
+        print(f"画像圧縮中にエラーが発生しました: {e}")
+        return image_url  # エラー時は元の画像URLを返す
+    finally:
+        # BytesIOバッファを明示的に閉じる
+        if output_buffer is not None:
+            try:
+                output_buffer.close()
+            except Exception:
+                pass  # クリーンアップエラーは無視
+
+
+def cleanup_llm_client(llm_client):
+    """
+    LLMクライアントのリソースを安全にクリーンアップする（同期版）
+
+    Args:
+        llm_client: クリーンアップするLLMクライアント
+    """
+    if llm_client is None:
+        return
+
+    try:
+        # OpenAI系クライアントの場合
+        if hasattr(llm_client, 'client'):
+            if hasattr(llm_client.client, 'close'):
+                # 同期的にクローズ
+                if hasattr(llm_client.client.close, '__call__'):
+                    try:
+                        llm_client.client.close()
+                    except Exception as e:
+                        print(f"OpenAI クライアントの同期クローズ中にエラー: {e}")
+
+        # _clientアトリビュートを持つ場合
+        elif hasattr(llm_client, '_client'):
+            if hasattr(llm_client._client, 'close'):
+                try:
+                    llm_client._client.close()
+                except Exception as e:
+                    print(f"_client クローズ中にエラー: {e}")
+
+            # OCI GenAI系クライアントのセッション処理
+            if hasattr(llm_client._client, '_session'):
+                if hasattr(llm_client._client._session, 'close'):
+                    try:
+                        llm_client._client._session.close()
+                    except Exception as e:
+                        print(f"OCI セッションクローズ中にエラー: {e}")
+
+        print(f"LLMクライアント {type(llm_client).__name__} のリソースクリーンアップが完了しました")
+
+    except Exception as cleanup_error:
+        print(f"LLMクライアントのクリーンアップ中に予期しないエラーが発生しました: {cleanup_error}")
+
+
+async def cleanup_llm_client_async(llm_client):
+    """
+    LLMクライアントのリソースを安全にクリーンアップする（非同期版）
+
+    Args:
+        llm_client: クリーンアップするLLMクライアント
+    """
+    if llm_client is None:
+        return
+
+    try:
+        # OpenAI系クライアントの場合（非同期クローズ）
+        if hasattr(llm_client, 'client'):
+            if hasattr(llm_client.client, 'aclose'):
+                try:
+                    await llm_client.client.aclose()
+                except Exception as e:
+                    print(f"OpenAI クライアントの非同期クローズ中にエラー: {e}")
+            elif hasattr(llm_client.client, 'close'):
+                try:
+                    llm_client.client.close()
+                except Exception as e:
+                    print(f"OpenAI クライアントの同期クローズ中にエラー: {e}")
+
+        # _clientアトリビュートを持つ場合
+        elif hasattr(llm_client, '_client'):
+            if hasattr(llm_client._client, 'aclose'):
+                try:
+                    await llm_client._client.aclose()
+                except Exception as e:
+                    print(f"_client 非同期クローズ中にエラー: {e}")
+            elif hasattr(llm_client._client, 'close'):
+                try:
+                    llm_client._client.close()
+                except Exception as e:
+                    print(f"_client クローズ中にエラー: {e}")
+
+            # OCI GenAI系クライアントのセッション処理
+            if hasattr(llm_client._client, '_session'):
+                if hasattr(llm_client._client._session, 'aclose'):
+                    try:
+                        await llm_client._client._session.aclose()
+                    except Exception as e:
+                        print(f"OCI セッション非同期クローズ中にエラー: {e}")
+                elif hasattr(llm_client._client._session, 'close'):
+                    try:
+                        llm_client._client._session.close()
+                    except Exception as e:
+                        print(f"OCI セッションクローズ中にエラー: {e}")
+
+        print(f"LLMクライアント {type(llm_client).__name__} の非同期リソースクリーンアップが完了しました")
+
+    except Exception as cleanup_error:
+        print(f"LLMクライアントの非同期クリーンアップ中に予期しないエラーが発生しました: {cleanup_error}")
 
 
 def check_langfuse_availability():
@@ -147,17 +319,18 @@ def get_safe_stream_config(model_name=None):
         logger.warning(f"Stream設定の作成に失敗しました: {e}")
         return {}
 
+
 if platform.system() == 'Linux':
     oracledb.init_oracle_client(lib_dir=os.environ["ORACLE_CLIENT_LIB_DIR"])
 
-# 初期化一个数据库连接池（增加连接数以避免阻塞）
+# データベース接続プールを初期化（ブロッキングを避けるため接続数を増加）
 pool = oracledb.create_pool(
     dsn=os.environ["ORACLE_23AI_CONNECTION_STRING"],
     min=5,
     max=20,
     increment=2,
-    timeout=30,  # 连接超时30秒
-    getmode=oracledb.POOL_GETMODE_WAIT  # 等待可用连接
+    timeout=30,  # 接続タイムアウト30秒
+    getmode=oracledb.POOL_GETMODE_WAIT  # 利用可能な接続を待機
 )
 
 
@@ -357,7 +530,7 @@ def process_text_chunks(unstructured_chunks):
             'CHUNK_DATA': chunk
         })
 
-        # 更新 ID 和偏移量
+        # IDとオフセットを更新
         chunk_id += 1
         start_offset += chunk_length
 
@@ -372,7 +545,7 @@ async def command_a_task(system_text, query_text, command_a_checkbox):
             provider="cohere",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
         )
         if system_text:
             messages = [
@@ -414,7 +587,10 @@ async def command_r_task(system_text, query_text, command_r_checkbox):
             provider="cohere",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+            temperature=0.0,
+            top_p=0.75,
+            seed=42,
+            model_kwargs={"max_tokens": 3600},
         )
         if system_text:
             messages = [
@@ -454,7 +630,10 @@ async def command_r_plus_task(system_text, query_text, command_r_plus_checkbox):
             provider="cohere",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+            temperature=0.0,
+            top_p=0.75,
+            seed=42,
+            model_kwargs={"max_tokens": 3600},
         )
         if system_text:
             messages = [
@@ -494,7 +673,7 @@ async def xai_grok_3_task(system_text, query_text, xai_grok_3_checkbox):
             provider="xai",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
         )
         if system_text:
             messages = [
@@ -515,8 +694,8 @@ async def xai_grok_3_task(system_text, query_text, xai_grok_3_checkbox):
             async for chunk in xai_grok_3.astream(messages, config=stream_config):
                 yield chunk.content
         except Exception as e:
-            logger.error(f"XAI Grok-3 stream処理中にエラーが発生しました: {e}")
-            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            logger.error(f"XAI Grok-3 ストリーム処理中にエラーが発生しました: {e}")
+            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
@@ -536,7 +715,7 @@ async def llama_3_3_70b_task(system_text, query_text, llama_3_3_70b_checkbox):
             provider="meta",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
         )
         if system_text:
             messages = [
@@ -557,8 +736,8 @@ async def llama_3_3_70b_task(system_text, query_text, llama_3_3_70b_checkbox):
             async for chunk in llama_3_3_70b.astream(messages, config=stream_config):
                 yield chunk.content
         except Exception as e:
-            logger.error(f"Llama-3.3-70B stream処理中にエラーが発生しました: {e}")
-            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            logger.error(f"Llama-3.3-70B ストリーム処理中にエラーが発生しました: {e}")
+            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
@@ -582,7 +761,7 @@ async def llama_3_2_90b_vision_task(system_text, query_image, query_text, llama_
             provider="meta",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42, "presence_penalty": 2, "frequency_penalty": 2},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600, "presence_penalty": 2, "frequency_penalty": 2},
         )
         if query_image:
             base64_image = encode_image(query_image)
@@ -615,8 +794,8 @@ async def llama_3_2_90b_vision_task(system_text, query_image, query_text, llama_
             async for chunk in llama_3_2_90b_vision.astream(messages, config=stream_config):
                 yield chunk.content
         except Exception as e:
-            logger.error(f"Llama-3.2-90B-Vision stream処理中にエラーが発生しました: {e}")
-            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            logger.error(f"Llama-3.2-90B-Vision ストリーム処理中にエラーが発生しました: {e}")
+            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
@@ -640,7 +819,7 @@ async def llama_4_maverick_task(system_text, query_image, query_text, llama_4_ma
             provider="meta",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
         )
         if query_image:
             base64_image = encode_image(query_image)
@@ -673,8 +852,8 @@ async def llama_4_maverick_task(system_text, query_image, query_text, llama_4_ma
             async for chunk in llama_4_maverick.astream(messages, config=stream_config):
                 yield chunk.content
         except Exception as e:
-            logger.error(f"Llama-4-Maverick stream処理中にエラーが発生しました: {e}")
-            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            logger.error(f"Llama-4-Maverick ストリーム処理中にエラーが発生しました: {e}")
+            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
@@ -698,7 +877,7 @@ async def llama_4_scout_task(system_text, query_image, query_text, llama_4_scout
             provider="meta",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
         )
         if query_image:
             base64_image = encode_image(query_image)
@@ -732,8 +911,8 @@ async def llama_4_scout_task(system_text, query_image, query_text, llama_4_scout
             async for chunk in llama_4_scout.astream(messages, config=stream_config):
                 yield chunk.content
         except Exception as e:
-            logger.error(f"Llama-4-Scout stream処理中にエラーが発生しました: {e}")
-            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            logger.error(f"Llama-4-Scout ストリーム処理中にエラーが発生しました: {e}")
+            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
@@ -751,12 +930,13 @@ async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
         openai_gpt4o = ChatOpenAI(
             model="gpt-4o",
             temperature=0,
+            top_p=0.75,
+            seed=42,
             max_tokens=None,
             timeout=None,
             max_retries=2,
             api_key=os.environ["OPENAI_API_KEY"],
             base_url=os.environ["OPENAI_BASE_URL"],
-            model_kwargs={"top_p": 0.75, "seed": 42},
         )
         if system_text:
             messages = [
@@ -777,8 +957,8 @@ async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
             async for chunk in openai_gpt4o.astream(messages, config=stream_config):
                 yield chunk.content
         except Exception as e:
-            logger.error(f"OpenAI GPT-4o stream処理中にエラーが発生しました: {e}")
-            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            logger.error(f"OpenAI GPT-4o ストリーム処理中にエラーが発生しました: {e}")
+            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
@@ -796,12 +976,13 @@ async def openai_gpt4_task(system_text, query_text, openai_gpt4_checkbox):
         openai_gpt4 = ChatOpenAI(
             model="gpt-4",
             temperature=0,
+            top_p=0.75,
+            seed=42,
             max_tokens=None,
             timeout=None,
             max_retries=2,
             api_key=os.environ["OPENAI_API_KEY"],
             base_url=os.environ["OPENAI_BASE_URL"],
-            model_kwargs={"top_p": 0.75, "seed": 42},
         )
         if system_text:
             messages = [
@@ -822,8 +1003,8 @@ async def openai_gpt4_task(system_text, query_text, openai_gpt4_checkbox):
             async for chunk in openai_gpt4.astream(messages, config=stream_config):
                 yield chunk.content
         except Exception as e:
-            logger.error(f"OpenAI GPT-4 stream処理中にエラーが発生しました: {e}")
-            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            logger.error(f"OpenAI GPT-4 ストリーム処理中にエラーが発生しました: {e}")
+            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
@@ -841,13 +1022,14 @@ async def azure_openai_gpt4o_task(system_text, query_text, azure_openai_gpt4o_ch
         azure_openai_gpt4o = AzureChatOpenAI(
             deployment_name="gpt-4o",
             temperature=0,
+            top_p=0.75,
+            seed=42,
             max_tokens=None,
             timeout=None,
             max_retries=2,
             azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT_GPT_4O"],
             openai_api_key=os.environ["AZURE_OPENAI_API_KEY"],
             openai_api_version=os.environ["AZURE_OPENAI_API_VERSION_GPT_4O"],
-            model_kwargs={"top_p": 0.75, "seed": 42},
         )
         if system_text:
             messages = [
@@ -868,8 +1050,8 @@ async def azure_openai_gpt4o_task(system_text, query_text, azure_openai_gpt4o_ch
             async for chunk in azure_openai_gpt4o.astream(messages, config=stream_config):
                 yield chunk.content
         except Exception as e:
-            logger.error(f"Azure OpenAI GPT-4o stream処理中にエラーが発生しました: {e}")
-            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            logger.error(f"Azure OpenAI GPT-4o ストリーム処理中にエラーが発生しました: {e}")
+            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
@@ -887,13 +1069,14 @@ async def azure_openai_gpt4_task(system_text, query_text, azure_openai_gpt4_chec
         azure_openai_gpt4 = AzureChatOpenAI(
             deployment_name="gpt-4",
             temperature=0,
+            top_p=0.75,
+            seed=42,
             max_tokens=None,
             timeout=None,
             max_retries=2,
             azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT_GPT_4"],
             openai_api_key=os.environ["AZURE_OPENAI_API_KEY"],
             openai_api_version=os.environ["AZURE_OPENAI_API_VERSION_GPT_4"],
-            model_kwargs={"top_p": 0.75, "seed": 42},
         )
         if system_text:
             messages = [
@@ -914,8 +1097,8 @@ async def azure_openai_gpt4_task(system_text, query_text, azure_openai_gpt4_chec
             async for chunk in azure_openai_gpt4.astream(messages, config=stream_config):
                 yield chunk.content
         except Exception as e:
-            logger.error(f"Azure OpenAI GPT-4 stream処理中にエラーが発生しました: {e}")
-            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            logger.error(f"Azure OpenAI GPT-4 ストリーム処理中にエラーが発生しました: {e}")
+            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
@@ -956,8 +1139,8 @@ async def claude_3_opus_task(system_text, query_text, claude_3_opus_checkbox):
             async for chunk in claude_3_opus.astream(messages, config=stream_config):
                 yield chunk.content
         except Exception as e:
-            logger.error(f"Claude-3-Opus stream処理中にエラーが発生しました: {e}")
-            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            logger.error(f"Claude-3-Opus ストリーム処理中にエラーが発生しました: {e}")
+            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
@@ -998,8 +1181,8 @@ async def claude_3_sonnet_task(system_text, query_text, claude_3_sonnet_checkbox
             async for chunk in claude_3_sonnet.astream(messages, config=stream_config):
                 yield chunk.content
         except Exception as e:
-            logger.error(f"Claude-3-Sonnet stream処理中にエラーが発生しました: {e}")
-            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            logger.error(f"Claude-3-Sonnet ストリーム処理中にエラーが発生しました: {e}")
+            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
@@ -1040,8 +1223,8 @@ async def claude_3_haiku_task(system_text, query_text, claude_3_haiku_checkbox):
             async for chunk in claude_3_haiku.astream(messages, config=stream_config):
                 yield chunk.content
         except Exception as e:
-            logger.error(f"Claude-3-Haiku stream処理中にエラーが発生しました: {e}")
-            # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
+            logger.error(f"Claude-3-Haiku ストリーム処理中にエラーが発生しました: {e}")
+            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
         end_time = time.time()
         print(f"{end_time=}")
@@ -1259,11 +1442,13 @@ def set_image_answer_visibility(llm_answer_checkbox, use_image):
     """
     画像回答の可視性を制御する関数
     選択されたLLMモデルと「画像を使って回答」の状態に基づいて、
-    対象の3つのモデルの画像回答Accordionの可視性を決定する
+    対象のモデルの画像回答Accordionの可視性を決定する
     """
     llama_4_maverick_image_visible = False
     llama_4_scout_image_visible = False
     llama_3_2_90b_vision_image_visible = False
+    openai_gpt4o_image_visible = False
+    azure_openai_gpt4o_image_visible = False
 
     # 画像を使って回答がオンで、かつ対応するモデルが選択されている場合のみ表示
     if use_image:
@@ -1273,11 +1458,17 @@ def set_image_answer_visibility(llm_answer_checkbox, use_image):
             llama_4_scout_image_visible = True
         if "meta/llama-3-2-90b-vision" in llm_answer_checkbox:
             llama_3_2_90b_vision_image_visible = True
+        if "openai/gpt-4o" in llm_answer_checkbox:
+            openai_gpt4o_image_visible = True
+        if "azure_openai/gpt-4o" in llm_answer_checkbox:
+            azure_openai_gpt4o_image_visible = True
 
     return (
         gr.Accordion(visible=llama_4_maverick_image_visible),
         gr.Accordion(visible=llama_4_scout_image_visible),
-        gr.Accordion(visible=llama_3_2_90b_vision_image_visible)
+        gr.Accordion(visible=llama_3_2_90b_vision_image_visible),
+        gr.Accordion(visible=openai_gpt4o_image_visible),
+        gr.Accordion(visible=azure_openai_gpt4o_image_visible)
     )
 
 
@@ -1457,6 +1648,65 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             gr.Markdown(value=claude_3_sonnet_response),
             gr.Markdown(value=claude_3_haiku_response)
         )
+
+
+def reset_all_llm_messages():
+    """
+    すべてのLLMメッセージをリセットする
+    """
+    return (
+        gr.Markdown(value=""),  # tab_chat_document_xai_grok_3_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_command_a_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_command_r_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_command_r_plus_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_llama_4_maverick_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_llama_4_scout_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_llama_3_3_70b_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_llama_3_2_90b_vision_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_openai_gpt4o_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_openai_gpt4_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_azure_openai_gpt4o_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_azure_openai_gpt4_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_claude_3_opus_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_claude_3_sonnet_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_claude_3_haiku_answer_text
+    )
+
+
+def reset_image_answers():
+    """
+    画像回答をリセットする
+    """
+    return (
+        gr.Markdown(value=""),  # tab_chat_document_llama_4_maverick_image_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_llama_4_scout_image_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_llama_3_2_90b_vision_image_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_openai_gpt4o_image_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_azure_openai_gpt4o_image_answer_text
+    )
+
+
+def reset_llm_evaluations():
+    """
+    LLM評価をリセットする
+    """
+    return (
+        gr.Markdown(value=""),  # tab_chat_document_xai_grok_3_evaluation_text
+        gr.Markdown(value=""),  # tab_chat_document_command_a_evaluation_text
+        gr.Markdown(value=""),  # tab_chat_document_command_r_evaluation_text
+        gr.Markdown(value=""),  # tab_chat_document_command_r_plus_evaluation_text
+        gr.Markdown(value=""),  # tab_chat_document_llama_4_maverick_evaluation_text
+        gr.Markdown(value=""),  # tab_chat_document_llama_4_scout_evaluation_text
+        gr.Markdown(value=""),  # tab_chat_document_llama_3_3_70b_evaluation_text
+        gr.Markdown(value=""),  # tab_chat_document_llama_3_2_90b_vision_evaluation_text
+        gr.Markdown(value=""),  # tab_chat_document_openai_gpt4o_evaluation_text
+        gr.Markdown(value=""),  # tab_chat_document_openai_gpt4_evaluation_text
+        gr.Markdown(value=""),  # tab_chat_document_azure_openai_gpt4o_evaluation_text
+        gr.Markdown(value=""),  # tab_chat_document_azure_openai_gpt4_evaluation_text
+        gr.Markdown(value=""),  # tab_chat_document_claude_3_opus_evaluation_text
+        gr.Markdown(value=""),  # tab_chat_document_claude_3_sonnet_evaluation_text
+        gr.Markdown(value=""),  # tab_chat_document_claude_3_haiku_evaluation_text
+    )
 
 
 def reset_eval_by_human_result():
@@ -2207,7 +2457,7 @@ def convert_to_markdown_document(file_path, use_llm, llm_prompt):
             provider="meta",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
         )
         md = MarkItDown(llm_client=client, llm_model="meta.llama-3.2-90b-vision-instruct")
         result = md.convert(
@@ -2731,10 +2981,10 @@ VALUES (:doc_id, :embed_id, :embed_data) """
                                                                    ).replace(':embed_data', "'...'"
                                                                              ) + ";"
             print(f"{output_sql=}")
-            # 准備批量插入的数据
+            # バッチ挿入用のデータを準備
             data_to_insert = [(doc_id, chunk['CHUNK_ID'], chunk['CHUNK_DATA']) for chunk in chunks]
 
-            # 执行批量插入
+            # バッチ挿入を実行
             cursor.executemany(save_chunks_sql, data_to_insert)
             conn.commit()
 
@@ -2747,8 +2997,8 @@ VALUES (:doc_id, :embed_id, :embed_data) """
 
 def on_select_split_document_chunks_result(evt: gr.SelectData, df: pd.DataFrame):
     print("on_select_split_document_chunks_result() start...")
-    selected_index = evt.index[0]  # 获取选中行的索引
-    selected_row = df.iloc[selected_index]  # 获取选中行的所有数据
+    selected_index = evt.index[0]  # 選択された行のインデックスを取得
+    selected_row = df.iloc[selected_index]  # 選択された行のすべてのデータを取得
     return selected_row['CHUNK_ID'], \
         selected_row['CHUNK_DATA']
 
@@ -2895,7 +3145,7 @@ def generate_query(query_text, generate_query_radio):
             provider="xai",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 600, "seed": 42},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 600},
         )
     else:
         chat_llm = ChatOCIGenAI(
@@ -2903,7 +3153,7 @@ def generate_query(query_text, generate_query_radio):
             provider="cohere",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 600, "seed": 42},
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 600},
         )
 
     # RAG-Fusion
@@ -3075,6 +3325,14 @@ def search_document(
     Retrieve relevant splits for any question using similarity search.
     This is simply "top K" retrieval where we select documents based on embedding similarity to the query.
     """
+    # 画像を使って回答がオンの場合、特定のパラメータ値を強制使用
+    if use_image:
+        answer_by_one_checkbox_input = False
+        extend_first_chunk_size_input = 0
+        extend_around_chunk_size_input = 0
+        print(
+            f"画像回答モード: answer_by_one_checkbox={answer_by_one_checkbox_input}, extend_first_chunk_size={extend_first_chunk_size_input}, extend_around_chunk_size={extend_around_chunk_size_input}")
+
     has_error = False
     if not query_text_input:
         has_error = True
@@ -3112,7 +3370,7 @@ def search_document(
         if not lists or len(lists) == 0:
             return lists
         if len(lists) > limit:
-            # 按字符串长度排序，优先去掉长的字符串
+            # 文字列の長さでソート、長い文字列を優先的に削除
             sorted_indices = sorted(range(len(lists)), key=lambda i: len(lists[i]))
             lists = [lists[i] for i in sorted_indices[:limit]]
 
@@ -3412,8 +3670,8 @@ def search_document(
         if len(search_text) > 0:
             # where_sql += """
             #             AND (""" + search_text + """) """
-            # 注意：这里的where_sql会在不同的表查询中使用，所以不能硬编码表别名
-            # 这部分逻辑将在full_text_search_sql中处理
+            # 注意：ここのwhere_sqlは異なるテーブルクエリで使用されるため、テーブル別名をハードコードできません
+            # この部分のロジックはfull_text_search_sqlで処理されます
             region = get_region()
             if use_image:
                 # 画像を使って回答がオンの場合、image_embeddingテーブルのみを使用
@@ -3798,7 +4056,7 @@ def extract_and_format(input_str, search_result_df):
 
 
 def extract_citation(input_str):
-    # 匹配兩部分內容
+    # 2つの部分の内容をマッチング
     pattern = '^(.*?)\n---回答内で参照されているコンテキスト---\n(.*?)$'
     match = re.search(pattern, input_str, re.DOTALL)
     if match:
@@ -4308,21 +4566,22 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
 
     # 各モデルのタスクジェネレーターを作成
     async def create_model_task(model):
-        if model not in llm_answer_checkbox_group:
-            # 選択されていないモデルは即座に完了を通知
-            yield "TASK_DONE"
-            return
-
-        print(f"\n=== 画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) - {model} での処理 ===")
-
+        llm = None  # LLMインスタンスを初期化
         try:
+            if model not in llm_answer_checkbox_group:
+                # 選択されていないモデルは即座に完了を通知
+                yield "TASK_DONE"
+                return
+
+            print(f"\n=== 画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) - {model} での処理 ===")
+
             if model == "meta/llama-4-maverick-17b-128e-instruct-fp8":
                 llm = ChatOCIGenAI(
                     model_id="meta.llama-4-maverick-17b-128e-instruct-fp8",
                     provider="meta",
                     service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
                     compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
                 )
             elif model == "meta/llama-4-scout-17b-16e-instruct":
                 llm = ChatOCIGenAI(
@@ -4330,7 +4589,7 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
                     provider="meta",
                     service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
                     compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
                 )
             elif model == "meta/llama-3-2-90b-vision":
                 llm = ChatOCIGenAI(
@@ -4338,7 +4597,34 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
                     provider="meta",
                     service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
                     compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "max_tokens": 3600, "seed": 42},
+                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+                )
+            elif model == "openai/gpt-4o":
+                load_dotenv(find_dotenv())
+                llm = ChatOpenAI(
+                    model="gpt-4o",
+                    temperature=0,
+                    top_p=0.75,
+                    seed=42,
+                    max_tokens=None,
+                    timeout=None,
+                    max_retries=2,
+                    api_key=os.environ["OPENAI_API_KEY"],
+                    base_url=os.environ["OPENAI_BASE_URL"],
+                )
+            elif model == "azure_openai/gpt-4o":
+                load_dotenv(find_dotenv())
+                llm = AzureChatOpenAI(
+                    deployment_name="gpt-4o",
+                    temperature=0,
+                    top_p=0.75,
+                    seed=42,
+                    max_tokens=None,
+                    timeout=None,
+                    max_retries=2,
+                    azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT_GPT_4O"],
+                    openai_api_key=os.environ["AZURE_OPENAI_API_KEY"],
+                    openai_api_version=os.environ["AZURE_OPENAI_API_VERSION_GPT_4O"],
                 )
             else:
                 # 未対応のモデルは即座に完了を通知
@@ -4347,6 +4633,7 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
 
             # メッセージを作成
             prompt_text = get_image_qa_prompt(query_text, custom_image_prompt)
+            prompt_text = prompt_text.replace('{{query_text}}', '{query_text}')
             human_message = HumanMessage(content=[
                 {
                     "type": "text",
@@ -4367,9 +4654,12 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
             #     host=os.environ["LANGFUSE_HOST"],
             # )
 
-            # ヘッダー情報を最初にyield（画像も含む）
-            # header_text = f"\n\n**画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) による回答：**\n\n![画像]({image_url})\n\n"
-            header_text = f"\n\n**画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) による回答：**\n\n"
+            # 表示用に画像を圧縮
+            compressed_image_url = compress_image_for_display(image_url)
+
+            # ヘッダー情報を最初にyield（圧縮された画像を使用）
+            header_text = f"\n\n---\n\n![画像]({compressed_image_url})\n\n**画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) による回答：**\n\n"
+            # header_text = f"\n\n**画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) による回答：**\n\n"
             yield header_text
 
             # ストリーミングで回答を取得
@@ -4392,75 +4682,109 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
 
         except Exception as e:
             print(f"エラーが発生しました ({model}): {e}")
-            # error_text = f"\n\n**画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) による回答：**\n\n![画像]({image_url})\n\nエラーが発生しました: {e}\n\n"
-            error_text = f"\n\n**画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) による回答：**\n\nエラーが発生しました: {e}\n\n"
+            # 表示用に画像を圧縮
+            compressed_image_url = compress_image_for_display(image_url)
+            error_text = f"\n\n---\n\n![画像]({compressed_image_url})\n\n**画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) による回答：**\n\nエラーが発生しました: {e}\n\n"
+            # error_text = f"\n\n**画像 {image_index} (doc_id: {doc_id}, img_id: {img_id}) による回答：**\n\nエラーが発生しました: {e}\n\n"
             yield error_text
             yield "TASK_DONE"
+        finally:
+            # リソースクリーンアップ：LLMクライアントの接続を適切に閉じる
+            await cleanup_llm_client_async(llm)
+            llm = None  # 参照をクリア
 
     # 各モデルのジェネレーターを作成
     llama_4_maverick_gen = create_model_task("meta/llama-4-maverick-17b-128e-instruct-fp8")
     llama_4_scout_gen = create_model_task("meta/llama-4-scout-17b-16e-instruct")
     llama_3_2_90b_vision_gen = create_model_task("meta/llama-3-2-90b-vision")
+    openai_gpt4o_gen = create_model_task("openai/gpt-4o")
+    azure_openai_gpt4o_gen = create_model_task("azure_openai/gpt-4o")
 
     # 各モデルの応答を蓄積
     llama_4_maverick_response = ""
     llama_4_scout_response = ""
     llama_3_2_90b_vision_response = ""
+    openai_gpt4o_response = ""
+    azure_openai_gpt4o_response = ""
 
     # 各モデルの状態を追跡
-    responses_status = ["", "", ""]
+    responses_status = ["", "", "", "", ""]
 
     # タイムアウト設定（最大5分）
     import asyncio
     timeout_seconds = 300
     start_time = time.time()
 
-    while True:
-        # タイムアウトチェック
-        if time.time() - start_time > timeout_seconds:
-            print(f"画像処理がタイムアウトしました（{timeout_seconds}秒）")
-            break
+    try:
+        while True:
+            # タイムアウトチェック
+            if time.time() - start_time > timeout_seconds:
+                print(f"画像処理がタイムアウトしました（{timeout_seconds}秒）")
+                break
 
-        responses = ["", "", ""]
-        generators = [llama_4_maverick_gen, llama_4_scout_gen, llama_3_2_90b_vision_gen]
+            responses = ["", "", "", "", ""]
+            generators = [llama_4_maverick_gen, llama_4_scout_gen, llama_3_2_90b_vision_gen, openai_gpt4o_gen,
+                          azure_openai_gpt4o_gen]
 
+            for i, gen in enumerate(generators):
+                if responses_status[i] == "TASK_DONE":
+                    continue
+
+                try:
+                    # タイムアウト付きでanextを実行
+                    response = await asyncio.wait_for(anext(gen), timeout=30.0)
+                    if response:
+                        if response == "TASK_DONE":
+                            responses_status[i] = response
+                        else:
+                            responses[i] = response
+                except StopAsyncIteration:
+                    responses_status[i] = "TASK_DONE"
+                except asyncio.TimeoutError:
+                    print(f"モデル {i} の処理がタイムアウトしました")
+                    responses_status[i] = "TASK_DONE"
+                except Exception as e:
+                    print(f"モデル {i} の処理中にエラーが発生しました: {e}")
+                    responses_status[i] = "TASK_DONE"
+
+            # 応答を蓄積
+            llama_4_maverick_response += responses[0]
+            llama_4_scout_response += responses[1]
+            llama_3_2_90b_vision_response += responses[2]
+            openai_gpt4o_response += responses[3]
+            azure_openai_gpt4o_response += responses[4]
+
+            # 現在の状態をyield
+            yield {
+                "meta/llama-4-maverick-17b-128e-instruct-fp8": llama_4_maverick_response,
+                "meta/llama-4-scout-17b-16e-instruct": llama_4_scout_response,
+                "meta/llama-3-2-90b-vision": llama_3_2_90b_vision_response,
+                "openai/gpt-4o": openai_gpt4o_response,
+                "azure_openai/gpt-4o": azure_openai_gpt4o_response
+            }
+
+            # すべてのタスクが完了したかチェック
+            if all(response_status == "TASK_DONE" for response_status in responses_status):
+                print("All image processing tasks completed")
+                break
+
+    finally:
+        # 最終的なリソースクリーンアップ：すべてのジェネレーターを適切に閉じる
+        generators = [llama_4_maverick_gen, llama_4_scout_gen, llama_3_2_90b_vision_gen, openai_gpt4o_gen,
+                      azure_openai_gpt4o_gen]
         for i, gen in enumerate(generators):
-            if responses_status[i] == "TASK_DONE":
-                continue
-
             try:
-                # タイムアウト付きでanextを実行
-                response = await asyncio.wait_for(anext(gen), timeout=30.0)
-                if response:
-                    if response == "TASK_DONE":
-                        responses_status[i] = response
-                    else:
-                        responses[i] = response
-            except StopAsyncIteration:
-                responses_status[i] = "TASK_DONE"
-            except asyncio.TimeoutError:
-                print(f"モデル {i} の処理がタイムアウトしました")
-                responses_status[i] = "TASK_DONE"
-            except Exception as e:
-                print(f"モデル {i} の処理中にエラーが発生しました: {e}")
-                responses_status[i] = "TASK_DONE"
+                if hasattr(gen, 'aclose'):
+                    await gen.aclose()
+                elif hasattr(gen, 'close'):
+                    gen.close()
+            except Exception as cleanup_error:
+                print(f"ジェネレーター {i} のクリーンアップ中にエラーが発生しました: {cleanup_error}")
 
-        # 応答を蓄積
-        llama_4_maverick_response += responses[0]
-        llama_4_scout_response += responses[1]
-        llama_3_2_90b_vision_response += responses[2]
-
-        # 現在の状態をyield
-        yield {
-            "meta/llama-4-maverick-17b-128e-instruct-fp8": llama_4_maverick_response,
-            "meta/llama-4-scout-17b-16e-instruct": llama_4_scout_response,
-            "meta/llama-3-2-90b-vision": llama_3_2_90b_vision_response
-        }
-
-        # すべてのタスクが完了したかチェック
-        if all(response_status == "TASK_DONE" for response_status in responses_status):
-            print("All image processing tasks completed")
-            break
+        # ガベージコレクションを強制実行してリソースを解放
+        import gc
+        gc.collect()
+        print("リソースクリーンアップが完了しました")
 
 
 async def process_image_answers_streaming(
@@ -4471,11 +4795,21 @@ async def process_image_answers_streaming(
         llama_4_maverick_image_answer_text,
         llama_4_scout_image_answer_text,
         llama_3_2_90b_vision_image_answer_text,
+        openai_gpt4o_image_answer_text,
+        azure_openai_gpt4o_image_answer_text,
         custom_image_prompt=None
 ):
     """
     画像を使って回答がオンの場合、検索結果から画像データを取得し、
     選択されたLLMモデルで画像処理を行い、ストリーミング形式で回答を出力する
+
+    処理の流れ：
+    1. 検索結果からdoc_idとembed_idのペアを抽出
+    2. データベースから対応する画像のbase64データを取得（最大10個まで）
+    3. 取得した画像を各選択されたLLMモデルで並行処理
+    4. ストリーミング形式で回答を出力
+
+    注意：パフォーマンスと応答時間を考慮し、処理する画像数は最大10個に制限されています。
 
     Args:
         search_result: 検索結果
@@ -4485,6 +4819,8 @@ async def process_image_answers_streaming(
         llama_4_maverick_image_answer_text: Llama 4 Maverick の画像回答テキスト
         llama_4_scout_image_answer_text: Llama 4 Scout の画像回答テキスト
         llama_3_2_90b_vision_image_answer_text: Llama 3.2 90B Vision の画像回答テキスト
+        openai_gpt4o_image_answer_text: OpenAI GPT-4o の画像回答テキスト
+        azure_openai_gpt4o_image_answer_text: Azure OpenAI GPT-4o の画像回答テキスト
         custom_image_prompt: カスタム画像プロンプトテンプレート
 
     Yields:
@@ -4498,7 +4834,9 @@ async def process_image_answers_streaming(
         yield (
             gr.Markdown(value=llama_4_maverick_image_answer_text),
             gr.Markdown(value=llama_4_scout_image_answer_text),
-            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text)
+            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text),
+            gr.Markdown(value=openai_gpt4o_image_answer_text),
+            gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
         )
         return
 
@@ -4508,7 +4846,9 @@ async def process_image_answers_streaming(
         yield (
             gr.Markdown(value=llama_4_maverick_image_answer_text),
             gr.Markdown(value=llama_4_scout_image_answer_text),
-            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text)
+            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text),
+            gr.Markdown(value=openai_gpt4o_image_answer_text),
+            gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
         )
         return
 
@@ -4518,7 +4858,9 @@ async def process_image_answers_streaming(
         yield (
             gr.Markdown(value=llama_4_maverick_image_answer_text),
             gr.Markdown(value=llama_4_scout_image_answer_text),
-            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text)
+            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text),
+            gr.Markdown(value=openai_gpt4o_image_answer_text),
+            gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
         )
         return
 
@@ -4526,7 +4868,9 @@ async def process_image_answers_streaming(
     target_models = [
         "meta/llama-4-maverick-17b-128e-instruct-fp8",
         "meta/llama-4-scout-17b-16e-instruct",
-        "meta/llama-3-2-90b-vision"
+        "meta/llama-3-2-90b-vision",
+        "openai/gpt-4o",
+        "azure_openai/gpt-4o"
     ]
 
     # llm_answer_checkbox_groupに指定されたモデルのいずれかが含まれているかチェック
@@ -4534,11 +4878,13 @@ async def process_image_answers_streaming(
 
     if not has_target_model:
         print(
-            "対象のLLMモデル（llama-4-maverick, llama-4-scout, llama-3-2-90b-vision）がチェックされていないため、base64_data取得をスキップします")
+            "対象のLLMモデル（llama-4-maverick, llama-4-scout, llama-3-2-90b-vision, gpt-4o）がチェックされていないため、base64_data取得をスキップします")
         yield (
             gr.Markdown(value=llama_4_maverick_image_answer_text),
             gr.Markdown(value=llama_4_scout_image_answer_text),
-            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text)
+            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text),
+            gr.Markdown(value=openai_gpt4o_image_answer_text),
+            gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
         )
         return
 
@@ -4561,7 +4907,9 @@ async def process_image_answers_streaming(
             yield (
                 gr.Markdown(value=llama_4_maverick_image_answer_text),
                 gr.Markdown(value=llama_4_scout_image_answer_text),
-                gr.Markdown(value=llama_3_2_90b_vision_image_answer_text)
+                gr.Markdown(value=llama_3_2_90b_vision_image_answer_text),
+                gr.Markdown(value=openai_gpt4o_image_answer_text),
+                gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
             )
             return
 
@@ -4605,7 +4953,9 @@ async def process_image_answers_streaming(
                         yield (
                             gr.Markdown(value=llama_4_maverick_image_answer_text),
                             gr.Markdown(value=llama_4_scout_image_answer_text),
-                            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text)
+                            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text),
+                            gr.Markdown(value=openai_gpt4o_image_answer_text),
+                            gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
                         )
                         return
 
@@ -4618,7 +4968,8 @@ async def process_image_answers_streaming(
 
                     img_where_clause = " OR ".join(img_where_conditions)
 
-                    # Oracle不允许对CLOB字段使用DISTINCT，所以直接获取前20条记录（因为可能有重复）
+                    # Oracle制限：CLOBフィールドにはDISTINCTが使用できないため、
+                    # 重複の可能性を考慮して20件取得し、後でアプリケーション側で10件に絞り込む
                     select_sql = f"""
                     SELECT base64_data, doc_id, img_id
                     FROM {DEFAULT_COLLECTION_NAME}_image
@@ -4643,7 +4994,8 @@ async def process_image_answers_streaming(
                                         base64_string = row[0].read()
                                         # 非常に大きなデータの場合は制限
                                         if len(base64_string) > 10 * 1024 * 1024:  # 10MB制限
-                                            print(f"Base64データが大きすぎます（{len(base64_string)}文字）、スキップします")
+                                            print(
+                                                f"Base64データが大きすぎます（{len(base64_string)}文字）、スキップします")
                                             continue
                                     except Exception as clob_e:
                                         print(f"CLOB読み取りエラー: {clob_e}")
@@ -4660,7 +5012,8 @@ async def process_image_answers_streaming(
                                     base64_data_set.add(base64_prefix)
                                 base64_data_list.append((base64_string, doc_id, img_id))
 
-                                # 10個に達したら終了
+                                # パフォーマンス最適化：処理する画像数を10個に制限
+                                # 大量の画像処理による応答時間の増大とメモリ使用量の増加を防ぐため
                                 if len(base64_data_list) >= 10:
                                     break
                             except (TimeoutError, Exception) as e:
@@ -4673,6 +5026,8 @@ async def process_image_answers_streaming(
                     accumulated_llama_4_maverick_text = llama_4_maverick_image_answer_text
                     accumulated_llama_4_scout_text = llama_4_scout_image_answer_text
                     accumulated_llama_3_2_90b_vision_text = llama_3_2_90b_vision_image_answer_text
+                    accumulated_openai_gpt4o_text = openai_gpt4o_image_answer_text
+                    accumulated_azure_openai_gpt4o_text = azure_openai_gpt4o_image_answer_text
 
                     # 各base64_dataに対してLLMで処理
                     for i, (base64_data, doc_id, img_id) in enumerate(base64_data_list, 1):
@@ -4685,21 +5040,24 @@ async def process_image_answers_streaming(
                         current_image_llama_4_maverick = ""
                         current_image_llama_4_scout = ""
                         current_image_llama_3_2_90b_vision = ""
+                        current_image_openai_gpt4o = ""
+                        current_image_azure_openai_gpt4o = ""
 
                         # 選択されたLLMモデルに対して処理を実行し、結果をストリーミングで取得
                         async for llm_results in process_single_image_streaming(
-                            image_url,
-                            query_text,
-                            llm_answer_checkbox_group,
-                            target_models,
-                            i,
-                            doc_id,
-                            img_id,
-                            custom_image_prompt
+                                image_url,
+                                query_text,
+                                llm_answer_checkbox_group,
+                                target_models,
+                                i,
+                                doc_id,
+                                img_id,
+                                custom_image_prompt
                         ):
                             # 各LLMの結果を現在の画像の回答として更新
                             if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_results:
-                                current_image_llama_4_maverick = llm_results["meta/llama-4-maverick-17b-128e-instruct-fp8"]
+                                current_image_llama_4_maverick = llm_results[
+                                    "meta/llama-4-maverick-17b-128e-instruct-fp8"]
 
                             if "meta/llama-4-scout-17b-16e-instruct" in llm_results:
                                 current_image_llama_4_scout = llm_results["meta/llama-4-scout-17b-16e-instruct"]
@@ -4707,22 +5065,34 @@ async def process_image_answers_streaming(
                             if "meta/llama-3-2-90b-vision" in llm_results:
                                 current_image_llama_3_2_90b_vision = llm_results["meta/llama-3-2-90b-vision"]
 
+                            if "openai/gpt-4o" in llm_results:
+                                current_image_openai_gpt4o = llm_results["openai/gpt-4o"]
+
+                            if "azure_openai/gpt-4o" in llm_results:
+                                current_image_azure_openai_gpt4o = llm_results["azure_openai/gpt-4o"]
+
                             # 累積テキストと現在の画像の回答を結合して表示
                             current_llama_4_maverick_text = accumulated_llama_4_maverick_text + current_image_llama_4_maverick
                             current_llama_4_scout_text = accumulated_llama_4_scout_text + current_image_llama_4_scout
                             current_llama_3_2_90b_vision_text = accumulated_llama_3_2_90b_vision_text + current_image_llama_3_2_90b_vision
+                            current_openai_gpt4o_text = accumulated_openai_gpt4o_text + current_image_openai_gpt4o
+                            current_azure_openai_gpt4o_text = accumulated_azure_openai_gpt4o_text + current_image_azure_openai_gpt4o
 
                             # 更新された画像回答結果をyield
                             yield (
                                 gr.Markdown(value=current_llama_4_maverick_text),
                                 gr.Markdown(value=current_llama_4_scout_text),
-                                gr.Markdown(value=current_llama_3_2_90b_vision_text)
+                                gr.Markdown(value=current_llama_3_2_90b_vision_text),
+                                gr.Markdown(value=current_openai_gpt4o_text),
+                                gr.Markdown(value=current_azure_openai_gpt4o_text)
                             )
 
                         # 現在の画像の処理が完了したら、累積テキストに追加
                         accumulated_llama_4_maverick_text += current_image_llama_4_maverick
                         accumulated_llama_4_scout_text += current_image_llama_4_scout
                         accumulated_llama_3_2_90b_vision_text += current_image_llama_3_2_90b_vision
+                        accumulated_openai_gpt4o_text += current_image_openai_gpt4o
+                        accumulated_azure_openai_gpt4o_text += current_image_azure_openai_gpt4o
 
         except Exception as db_e:
             print(f"データベース操作中にエラーが発生しました: {db_e}")
@@ -4730,7 +5100,9 @@ async def process_image_answers_streaming(
             yield (
                 gr.Markdown(value=llama_4_maverick_image_answer_text),
                 gr.Markdown(value=llama_4_scout_image_answer_text),
-                gr.Markdown(value=llama_3_2_90b_vision_image_answer_text)
+                gr.Markdown(value=llama_3_2_90b_vision_image_answer_text),
+                gr.Markdown(value=openai_gpt4o_image_answer_text),
+                gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
             )
             return
 
@@ -4740,7 +5112,9 @@ async def process_image_answers_streaming(
         yield (
             gr.Markdown(value=llama_4_maverick_image_answer_text),
             gr.Markdown(value=llama_4_scout_image_answer_text),
-            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text)
+            gr.Markdown(value=llama_3_2_90b_vision_image_answer_text),
+            gr.Markdown(value=openai_gpt4o_image_answer_text),
+            gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
         )
 
     print("process_image_answers_streaming() 完了")
@@ -5171,7 +5545,7 @@ def generate_download_file(
         return gr.DownloadButton(value=None, visible=False)
     if search_result.empty or (len(search_result) > 0 and search_result.iloc[0]['CONTENT'] == ''):
         return gr.DownloadButton(value=None, visible=False)
-    # 创建一些示例 DataFrame
+    # サンプルDataFrameを作成
     if llm_evaluation_checkbox:
         standard_answer_text = standard_answer_text
     else:
@@ -5468,16 +5842,16 @@ def generate_download_file(
         }
     )
 
-    # 定义文件路径
+    # ファイルパスを定義
     filepath = '/tmp/query_result.xlsx'
 
-    # 使用 ExcelWriter 将多个 DataFrame 写入不同的 sheet
+    # ExcelWriterを使用して複数のDataFrameを異なるシートに書き込み
     with pd.ExcelWriter(filepath) as writer:
         df1.to_excel(writer, sheet_name='Sheet1', index=False)
         df2.to_excel(writer, sheet_name='Sheet2', index=False)
         df3.to_excel(writer, sheet_name='Sheet3', index=False)
 
-    print(f"Excel 文件已保存到 {filepath}")
+    print(f"Excelファイルが {filepath} に保存されました")
     return gr.DownloadButton(value=filepath, visible=True)
 
 
@@ -5506,20 +5880,20 @@ def generate_eval_result_file():
 
             cursor.execute(select_sql)
 
-            # 获取列名
+            # 列名を取得
             columns = [col[0] for col in cursor.description]
 
-            # 获取数据
+            # データを取得
             data = cursor.fetchall()
 
             print(f"{columns=}")
 
-            # 将数据转换为DataFrame
+            # データをDataFrameに変換
             result_df = pd.DataFrame(data, columns=columns)
 
             print(f"{result_df=}")
 
-            # 修改列名为日文
+            # 列名を日文に変更
             result_df.rename(columns={
                 'QUERY_ID': 'クエリID',
                 'QUERY': 'クエリ',
@@ -5535,17 +5909,17 @@ def generate_eval_result_file():
 
             print(f"{result_df=}")
 
-            # 如果需要将 created_date 列转换为 datetime 类型
+            # 必要に応じてcreated_date列をdatetime型に変換
             result_df['作成日時'] = pd.to_datetime(result_df['作成日時'], format='%Y-%m-%d %H:%M:%S')
 
-            # 定义文件路径
+            # ファイルパスを定義
             filepath = '/tmp/evaluation_result.xlsx'
 
-            # 使用 ExcelWriter 将多个 DataFrame 写入不同的 sheet
+            # ExcelWriterを使用して複数のDataFrameを異なるシートに書き込み
             with pd.ExcelWriter(filepath) as writer:
                 result_df.to_excel(writer, sheet_name='Sheet1', index=False)
 
-            print(f"Excel 文件已保存到 {filepath}")
+            print(f"Excelファイルが {filepath} に保存されました")
             gr.Info("評価レポートの生成が完了しました")
             return gr.DownloadButton(value=filepath, visible=True)
 
@@ -5605,7 +5979,7 @@ def insert_query_result(
         return
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
-            # 如果不存在记录，执行插入操作
+            # レコードが存在しない場合、挿入操作を実行
             insert_sql = """
                          INSERT INTO RAG_QA_RESULT (query_id,
                                                     query,
@@ -6922,40 +7296,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 with gr.Accordion("Advanced Settings", open=False):
                     with gr.Row():
                         with gr.Column():
-                            tab_chat_document_use_image_checkbox = gr.Checkbox(
-                                label="画像を使って回答",
-                                value=False,
-                                info="RAGの回答時に画像データを使用。"
-                            )
-                        with gr.Column():
-                            gr.Markdown("&nbsp;")
-                    with gr.Accordion(label="画像 Prompt 設定", open=False, visible=False) as tab_chat_document_image_prompt_accordion:
-                        with gr.Row():
-                            with gr.Column():
-                                tab_chat_document_image_prompt_text = gr.Textbox(
-                                    label="画像 Prompt テンプレート",
-                                    lines=15,
-                                    max_lines=25,
-                                    interactive=True,
-                                    show_copy_button=True,
-                                    value=get_image_qa_prompt("{{query_text}}"),
-                                    info="画像処理で使用されるpromptテンプレートです。{{query_text}}は実行時に置換されます。"
-                                )
-                        with gr.Row():
-                            with gr.Column(scale=1):
-                                tab_chat_document_image_prompt_reset_button = gr.Button(
-                                    value="デフォルトに戻す",
-                                    variant="secondary"
-                                )
-                            with gr.Column(scale=1):
-                                gr.Markdown("&nbsp;")
-                                # tab_chat_document_image_prompt_save_button = gr.Button(
-                                #     value="保存",
-                                #     variant="primary",
-                                #     visible=False,
-                                # )
-                    with gr.Row():
-                        with gr.Column():
                             tab_chat_document_answer_by_one_checkbox = gr.Checkbox(
                                 label="Highest-Ranked-One 文書による回答",
                                 value=False,
@@ -7044,6 +7384,41 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 value=False,
                                 info="Promptに回答時の現在の時間を含めます。"
                             )
+                    with gr.Row():
+                        with gr.Column():
+                            tab_chat_document_use_image_checkbox = gr.Checkbox(
+                                label="画像を使って回答",
+                                value=False,
+                                info="RAGの回答時に画像データを使用。ただし、処理する画像数を10個に制限。"
+                            )
+                        with gr.Column():
+                            gr.Markdown("&nbsp;")
+                    with gr.Accordion(label="画像 Prompt 設定", open=False,
+                                      visible=False) as tab_chat_document_image_prompt_accordion:
+                        with gr.Row():
+                            with gr.Column():
+                                tab_chat_document_image_prompt_text = gr.Textbox(
+                                    label="画像 Prompt テンプレート",
+                                    lines=15,
+                                    max_lines=25,
+                                    interactive=True,
+                                    show_copy_button=True,
+                                    value=get_image_qa_prompt("{{query_text}}"),
+                                    info="画像処理で使用されるpromptテンプレートです。{{query_text}}は実行時に置換されます。"
+                                )
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                tab_chat_document_image_prompt_reset_button = gr.Button(
+                                    value="デフォルトに戻す",
+                                    variant="secondary"
+                                )
+                            with gr.Column(scale=1):
+                                gr.Markdown("&nbsp;")
+                                # tab_chat_document_image_prompt_save_button = gr.Button(
+                                #     value="保存",
+                                #     variant="primary",
+                                #     visible=False,
+                                # )
                     with gr.Row():
                         with gr.Column():
                             tab_chat_document_document_metadata_text = gr.Textbox(
@@ -7433,9 +7808,9 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     ) as tab_chat_document_llm_llama_4_maverick_image_accordion:
                         tab_chat_document_llama_4_maverick_image_answer_text = gr.Markdown(
                             show_copy_button=True,
-                            height=300,
-                            min_height=300,
-                            max_height=300
+                            height=600,
+                            min_height=600,
+                            max_height=600
                         )
                     with gr.Accordion(
                             label="Human 評価",
@@ -7498,9 +7873,9 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     ) as tab_chat_document_llm_llama_4_scout_image_accordion:
                         tab_chat_document_llama_4_scout_image_answer_text = gr.Markdown(
                             show_copy_button=True,
-                            height=300,
-                            min_height=300,
-                            max_height=300
+                            height=600,
+                            min_height=600,
+                            max_height=600
                         )
                     with gr.Accordion(
                             label="Human 評価",
@@ -7617,9 +7992,9 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     ) as tab_chat_document_llm_llama_3_2_90b_vision_image_accordion:
                         tab_chat_document_llama_3_2_90b_vision_image_answer_text = gr.Markdown(
                             show_copy_button=True,
-                            height=300,
-                            min_height=300,
-                            max_height=300
+                            height=600,
+                            min_height=600,
+                            max_height=600
                         )
                     with gr.Accordion(
                             label="Human 評価",
@@ -7673,6 +8048,17 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         min_height=300,
                         max_height=300
                     )
+                    with gr.Accordion(
+                            label="画像回答",
+                            visible=False,
+                            open=True
+                    ) as tab_chat_document_llm_openai_gpt4o_image_accordion:
+                        tab_chat_document_openai_gpt4o_image_answer_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=600,
+                            min_height=600,
+                            max_height=600
+                        )
                     with gr.Accordion(
                             label="Human 評価",
                             visible=True,
@@ -7781,6 +8167,17 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         min_height=300,
                         max_height=300
                     )
+                    with gr.Accordion(
+                            label="画像回答",
+                            visible=False,
+                            open=True
+                    ) as tab_chat_document_llm_azure_openai_gpt4o_image_accordion:
+                        tab_chat_document_azure_openai_gpt4o_image_answer_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=600,
+                            min_height=600,
+                            max_height=600
+                        )
                     with gr.Accordion(
                             label="Human 評価",
                             visible=True,
@@ -8444,7 +8841,9 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_chat_document_llm_llama_4_maverick_image_accordion,
             tab_chat_document_llm_llama_4_scout_image_accordion,
-            tab_chat_document_llm_llama_3_2_90b_vision_image_accordion
+            tab_chat_document_llm_llama_3_2_90b_vision_image_accordion,
+            tab_chat_document_llm_openai_gpt4o_image_accordion,
+            tab_chat_document_llm_azure_openai_gpt4o_image_accordion
         ]
     )
     tab_chat_document_llm_evaluation_checkbox.change(
@@ -8500,24 +8899,9 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
 
     # 画像を使って回答チェックボックスの変更イベント
     tab_chat_document_use_image_checkbox.change(
-        lambda x: (
-            # 画像使用時の設定
-            gr.Checkbox(value=False, interactive=False),  # Highest-Ranked-One OFF、修正可能
-            gr.Slider(value=0, interactive=False),  # Extend-First-K 0、修正可能
-            gr.Slider(value=0, interactive=False),  # Extend-Around-K 2、修正可能
-            gr.Accordion(visible=True)  # 画像 Prompt 設定を表示
-        ) if x else (
-            # 通常時の設定
-            gr.Checkbox(value=False, interactive=True),  # Highest-Ranked-One デフォルト
-            gr.Slider(value=0, interactive=True),  # Extend-First-K デフォルト
-            gr.Slider(value=2, interactive=True),  # Extend-Around-K デフォルト
-            gr.Accordion(visible=False)  # 画像 Prompt 設定を非表示
-        ),
+        lambda x: gr.Accordion(visible=True) if x else gr.Accordion(visible=False),  # 画像 Prompt 設定の表示/非表示のみ制御
         inputs=[tab_chat_document_use_image_checkbox],
         outputs=[
-            tab_chat_document_answer_by_one_checkbox,
-            tab_chat_document_extend_first_chunk_size,
-            tab_chat_document_extend_around_chunk_size,
             tab_chat_document_image_prompt_accordion
         ]
     ).then(
@@ -8529,11 +8913,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_chat_document_llm_llama_4_maverick_image_accordion,
             tab_chat_document_llm_llama_4_scout_image_accordion,
-            tab_chat_document_llm_llama_3_2_90b_vision_image_accordion
+            tab_chat_document_llm_llama_3_2_90b_vision_image_accordion,
+            tab_chat_document_llm_openai_gpt4o_image_accordion,
+            tab_chat_document_llm_azure_openai_gpt4o_image_accordion
         ]
     )
-
-
 
     # tab_chat_document_chat_document_button.click(
     #     check_chat_document_input,
@@ -8549,15 +8933,54 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         lambda: gr.DownloadButton(visible=False),
         outputs=[tab_chat_document_download_output_button]
     ).then(
-        generate_query,
-        inputs=[
-            tab_chat_document_query_text,
-            tab_chat_document_generate_query_radio
-        ],
+        reset_all_llm_messages,
+        inputs=[],
         outputs=[
-            tab_chat_document_sub_query1_text,
-            tab_chat_document_sub_query2_text,
-            tab_chat_document_sub_query3_text,
+            tab_chat_document_xai_grok_3_answer_text,
+            tab_chat_document_command_a_answer_text,
+            tab_chat_document_command_r_answer_text,
+            tab_chat_document_command_r_plus_answer_text,
+            tab_chat_document_llama_4_maverick_answer_text,
+            tab_chat_document_llama_4_scout_answer_text,
+            tab_chat_document_llama_3_3_70b_answer_text,
+            tab_chat_document_llama_3_2_90b_vision_answer_text,
+            tab_chat_document_openai_gpt4o_answer_text,
+            tab_chat_document_openai_gpt4_answer_text,
+            tab_chat_document_azure_openai_gpt4o_answer_text,
+            tab_chat_document_azure_openai_gpt4_answer_text,
+            tab_chat_document_claude_3_opus_answer_text,
+            tab_chat_document_claude_3_sonnet_answer_text,
+            tab_chat_document_claude_3_haiku_answer_text,
+        ]
+    ).then(
+        reset_image_answers,
+        inputs=[],
+        outputs=[
+            tab_chat_document_llama_4_maverick_image_answer_text,
+            tab_chat_document_llama_4_scout_image_answer_text,
+            tab_chat_document_llama_3_2_90b_vision_image_answer_text,
+            tab_chat_document_openai_gpt4o_image_answer_text,
+            tab_chat_document_azure_openai_gpt4o_image_answer_text
+        ]
+    ).then(
+        reset_llm_evaluations,
+        inputs=[],
+        outputs=[
+            tab_chat_document_xai_grok_3_evaluation_text,
+            tab_chat_document_command_a_evaluation_text,
+            tab_chat_document_command_r_evaluation_text,
+            tab_chat_document_command_r_plus_evaluation_text,
+            tab_chat_document_llama_4_maverick_evaluation_text,
+            tab_chat_document_llama_4_scout_evaluation_text,
+            tab_chat_document_llama_3_3_70b_evaluation_text,
+            tab_chat_document_llama_3_2_90b_vision_evaluation_text,
+            tab_chat_document_openai_gpt4o_evaluation_text,
+            tab_chat_document_openai_gpt4_evaluation_text,
+            tab_chat_document_azure_openai_gpt4o_evaluation_text,
+            tab_chat_document_azure_openai_gpt4_evaluation_text,
+            tab_chat_document_claude_3_opus_evaluation_text,
+            tab_chat_document_claude_3_sonnet_evaluation_text,
+            tab_chat_document_claude_3_haiku_evaluation_text
         ]
     ).then(
         reset_eval_by_human_result,
@@ -8591,6 +9014,17 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_claude_3_sonnet_answer_human_eval_feedback_text,
             tab_chat_document_claude_3_haiku_answer_human_eval_feedback_radio,
             tab_chat_document_claude_3_haiku_answer_human_eval_feedback_text,
+        ]
+    ).then(
+        generate_query,
+        inputs=[
+            tab_chat_document_query_text,
+            tab_chat_document_generate_query_radio
+        ],
+        outputs=[
+            tab_chat_document_sub_query1_text,
+            tab_chat_document_sub_query2_text,
+            tab_chat_document_sub_query3_text,
         ]
     ).then(
         search_document,
@@ -8702,12 +9136,16 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llama_4_maverick_image_answer_text,
             tab_chat_document_llama_4_scout_image_answer_text,
             tab_chat_document_llama_3_2_90b_vision_image_answer_text,
+            tab_chat_document_openai_gpt4o_image_answer_text,
+            tab_chat_document_azure_openai_gpt4o_image_answer_text,
             tab_chat_document_image_prompt_text
         ],
         outputs=[
             tab_chat_document_llama_4_maverick_image_answer_text,
             tab_chat_document_llama_4_scout_image_answer_text,
-            tab_chat_document_llama_3_2_90b_vision_image_answer_text
+            tab_chat_document_llama_3_2_90b_vision_image_answer_text,
+            tab_chat_document_openai_gpt4o_image_answer_text,
+            tab_chat_document_azure_openai_gpt4o_image_answer_text
         ]
     ).then(
         eval_by_ragas,
@@ -9098,6 +9536,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[tab_chat_document_rag_prompt_text]
     )
 
+
     # 画像 Prompt 設定のイベントハンドラー
     def save_image_prompt(prompt_text):
         """画像 promptを保存する"""
@@ -9107,11 +9546,13 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         except Exception as e:
             return gr.Warning(f"画像 Promptの保存に失敗しました: {str(e)}")
 
+
     def reset_image_prompt():
         """画像 promptをデフォルトに戻す"""
         default_prompt = get_image_qa_prompt("{{query_text}}")
         update_image_qa_prompt(default_prompt)
         return default_prompt
+
 
     # tab_chat_document_image_prompt_save_button.click(
     #     save_image_prompt,
