@@ -20,7 +20,6 @@ import requests
 from PIL import Image
 from dotenv import load_dotenv, find_dotenv, set_key, get_key
 from gradio.themes import GoogleFont
-
 from langchain_community.document_loaders import TextLoader
 from langchain_community.embeddings import OCIGenAIEmbeddings
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -847,46 +846,6 @@ async def command_a_task(system_text, query_text, command_a_checkbox):
         yield "TASK_DONE"
 
 
-async def command_r_task(system_text, query_text, command_r_checkbox):
-    region = get_region()
-    if command_r_checkbox:
-        command_r_16k = ChatOCIGenAI(
-            model_id="cohere.command-r-08-2024",
-            provider="cohere",
-            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
-            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
-        )
-        if system_text:
-            messages = [
-                SystemMessage(content=system_text),
-                HumanMessage(content=query_text),
-            ]
-        else:
-            messages = [
-                HumanMessage(content=query_text),
-            ]
-        start_time = time.time()
-        print(f"{start_time=}")
-        langfuse_handler = CallbackHandler(
-            secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-            public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-            host=os.environ["LANGFUSE_HOST"],
-        )
-        async for chunk in command_r_16k.astream(messages, config={"callbacks": [langfuse_handler],
-                                                                   "metadata": {
-                                                                       "ls_model_name": "cohere.command-r-08-2024"}}):
-            yield chunk.content
-        end_time = time.time()
-        print(f"{end_time=}")
-        inference_time = end_time - start_time
-        print(f"\n\n推論時間: {inference_time:.2f}秒")
-        yield f"\n\n推論時間: {inference_time:.2f}秒"
-        yield "TASK_DONE"
-    else:
-        yield "TASK_DONE"
-
-
 async def xai_grok_3_task(system_text, query_text, xai_grok_3_checkbox):
     region = get_region()
     if xai_grok_3_checkbox:
@@ -1337,7 +1296,6 @@ async def chat(
         system_text,
         xai_grok_3_user_text,
         command_a_user_text,
-        command_r_user_text,
         llama_4_maverick_user_image,
         llama_4_maverick_user_text,
         llama_4_scout_user_image,
@@ -1351,7 +1309,6 @@ async def chat(
         azure_openai_gpt4_user_text,
         xai_grok_3_checkbox,
         command_a_checkbox,
-        command_r_checkbox,
         llama_4_maverick_checkbox,
         llama_4_scout_checkbox,
         llama_3_3_70b_checkbox,
@@ -1363,7 +1320,6 @@ async def chat(
 ):
     xai_grok_3_gen = xai_grok_3_task(system_text, xai_grok_3_user_text, xai_grok_3_checkbox)
     command_a_gen = command_a_task(system_text, command_a_user_text, command_a_checkbox)
-    command_r_gen = command_r_task(system_text, command_r_user_text, command_r_checkbox)
     llama_4_maverick_gen = llama_4_maverick_task(system_text, llama_4_maverick_user_image,
                                                  llama_4_maverick_user_text, llama_4_maverick_checkbox)
     llama_4_scout_gen = llama_4_scout_task(system_text, llama_4_scout_user_image,
@@ -1379,10 +1335,10 @@ async def chat(
     azure_openai_gpt4_gen = azure_openai_gpt4_task(system_text, azure_openai_gpt4_user_text,
                                                    azure_openai_gpt4_gen_checkbox)
 
-    responses_status = ["", "", "", "", "", "", "", "", "", "", ""]
+    responses_status = ["", "", "", "", "", "", "", "", "", ""]
     while True:
-        responses = ["", "", "", "", "", "", "", "", "", "", ""]
-        generators = [xai_grok_3_gen, command_a_gen, command_r_gen,
+        responses = ["", "", "", "", "", "", "", "", "", ""]
+        generators = [xai_grok_3_gen, command_a_gen,
                       llama_4_maverick_gen, llama_4_scout_gen,
                       llama_3_3_70b_gen, llama_3_2_90b_vision_gen,
                       openai_gpt4o_gen, openai_gpt4_gen,
@@ -1409,7 +1365,6 @@ async def chat(
 def set_chat_llm_answer(llm_answer_checkbox):
     xai_grok_3_answer_visible = False
     command_a_answer_visible = False
-    command_r_answer_visible = False
     llama_4_maverick_answer_visible = False
     llama_4_scout_answer_visible = False
     llama_3_3_70b_answer_visible = False
@@ -1422,8 +1377,6 @@ def set_chat_llm_answer(llm_answer_checkbox):
         xai_grok_3_answer_visible = True
     if "cohere/command-a" in llm_answer_checkbox:
         command_a_answer_visible = True
-    if "cohere/command-r" in llm_answer_checkbox:
-        command_r_answer_visible = True
     if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox:
         llama_4_maverick_answer_visible = True
     if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
@@ -1443,7 +1396,6 @@ def set_chat_llm_answer(llm_answer_checkbox):
     return (
         gr.Accordion(visible=xai_grok_3_answer_visible),
         gr.Accordion(visible=command_a_answer_visible),
-        gr.Accordion(visible=command_r_answer_visible),
         gr.Accordion(visible=llama_4_maverick_answer_visible),
         gr.Accordion(visible=llama_4_scout_answer_visible),
         gr.Accordion(visible=llama_3_3_70b_answer_visible),
@@ -1458,7 +1410,6 @@ def set_chat_llm_answer(llm_answer_checkbox):
 def set_chat_llm_evaluation(llm_evaluation_checkbox):
     xai_grok_3_evaluation_visible = False
     command_a_evaluation_visible = False
-    command_r_evaluation_visible = False
     llama_4_maverick_evaluation_visible = False
     llama_4_scout_evaluation_visible = False
     llama_3_3_70b_evaluation_visible = False
@@ -1470,7 +1421,6 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
     if llm_evaluation_checkbox:
         xai_grok_3_evaluation_visible = True
         command_a_evaluation_visible = True
-        command_r_evaluation_visible = True
         llama_4_maverick_evaluation_visible = True
         llama_4_scout_evaluation_visible = True
         llama_3_3_70b_evaluation_visible = True
@@ -1482,7 +1432,6 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
     return (
         gr.Accordion(visible=xai_grok_3_evaluation_visible),
         gr.Accordion(visible=command_a_evaluation_visible),
-        gr.Accordion(visible=command_r_evaluation_visible),
         gr.Accordion(visible=llama_4_maverick_evaluation_visible),
         gr.Accordion(visible=llama_4_scout_evaluation_visible),
         gr.Accordion(visible=llama_3_3_70b_evaluation_visible),
@@ -1548,14 +1497,11 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             "",
             "",
             "",
-            "",
-            "",
             ""
         )
         return
     xai_grok_3_user_text = query_text
     command_a_user_text = query_text
-    command_r_user_text = query_text
     llama_4_maverick_user_image = query_image
     llama_4_maverick_user_text = query_text
     llama_4_scout_user_image = query_image
@@ -1569,7 +1515,6 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     azure_openai_gpt4_user_text = query_text
     xai_grok_3_checkbox = False
     command_a_checkbox = False
-    command_r_checkbox = False
     llama_4_maverick_checkbox = False
     llama_4_scout_checkbox = False
     llama_3_3_70b_checkbox = False
@@ -1582,8 +1527,6 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
         xai_grok_3_checkbox = True
     if "cohere/command-a" in llm_answer_checkbox:
         command_a_checkbox = True
-    if "cohere/command-r" in llm_answer_checkbox:
-        command_r_checkbox = True
     if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox:
         llama_4_maverick_checkbox = True
     if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
@@ -1603,7 +1546,6 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     # ChatOCIGenAI
     xai_grok_3_response = ""
     command_a_response = ""
-    command_r_response = ""
     llama_4_maverick_response = ""
     llama_4_scout_response = ""
     llama_3_3_70b_response = ""
@@ -1612,11 +1554,10 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     openai_gpt4_response = ""
     azure_openai_gpt4o_response = ""
     azure_openai_gpt4_response = ""
-    async for xai_grok_3, command_a, command_r, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
+    async for xai_grok_3, command_a, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
             system_text,
             xai_grok_3_user_text,
             command_a_user_text,
-            command_r_user_text,
             llama_4_maverick_user_image,
             llama_4_maverick_user_text,
             llama_4_scout_user_image,
@@ -1630,7 +1571,6 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             azure_openai_gpt4_user_text,
             xai_grok_3_checkbox,
             command_a_checkbox,
-            command_r_checkbox,
             llama_4_maverick_checkbox,
             llama_4_scout_checkbox,
             llama_3_3_70b_checkbox,
@@ -1642,7 +1582,6 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     ):
         xai_grok_3_response += xai_grok_3
         command_a_response += command_a
-        command_r_response += command_r
         llama_4_maverick_response += llama_4_maverick
         llama_4_scout_response += llama_4_scout
         llama_3_3_70b_response += llama_3_3_70b
@@ -1654,7 +1593,6 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
         yield (
             gr.Markdown(value=xai_grok_3_response),
             gr.Markdown(value=command_a_response),
-            gr.Markdown(value=command_r_response),
             gr.Markdown(value=llama_4_maverick_response),
             gr.Markdown(value=llama_4_scout_response),
             gr.Markdown(value=llama_3_3_70b_response),
@@ -1673,7 +1611,6 @@ def reset_all_llm_messages():
     return (
         gr.Markdown(value=""),  # tab_chat_document_xai_grok_3_answer_text
         gr.Markdown(value=""),  # tab_chat_document_command_a_answer_text
-        gr.Markdown(value=""),  # tab_chat_document_command_r_answer_text
         gr.Markdown(value=""),  # tab_chat_document_llama_4_maverick_answer_text
         gr.Markdown(value=""),  # tab_chat_document_llama_4_scout_answer_text
         gr.Markdown(value=""),  # tab_chat_document_llama_3_3_70b_answer_text
@@ -1705,7 +1642,6 @@ def reset_llm_evaluations():
     return (
         gr.Markdown(value=""),  # tab_chat_document_xai_grok_3_evaluation_text
         gr.Markdown(value=""),  # tab_chat_document_command_a_evaluation_text
-        gr.Markdown(value=""),  # tab_chat_document_command_r_evaluation_text
         gr.Markdown(value=""),  # tab_chat_document_llama_4_maverick_evaluation_text
         gr.Markdown(value=""),  # tab_chat_document_llama_4_scout_evaluation_text
         gr.Markdown(value=""),  # tab_chat_document_llama_3_3_70b_evaluation_text
@@ -1719,10 +1655,6 @@ def reset_llm_evaluations():
 
 def reset_eval_by_human_result():
     return (
-        gr.Radio(value="good"),
-        gr.Textbox(value=""),
-        gr.Radio(value="good"),
-        gr.Textbox(value=""),
         gr.Radio(value="good"),
         gr.Textbox(value=""),
         gr.Radio(value="good"),
@@ -4186,7 +4118,6 @@ async def chat_document(
 
     xai_grok_3_response = ""
     command_a_response = ""
-    command_r_response = ""
     llama_4_maverick_response = ""
     llama_4_scout_response = ""
     llama_3_3_70b_response = ""
@@ -4198,7 +4129,6 @@ async def chat_document(
 
     xai_grok_3_checkbox = False
     command_a_checkbox = False
-    command_r_checkbox = False
     llama_4_maverick_checkbox = False
     llama_4_scout_checkbox = False
     llama_3_3_70b_checkbox = False
@@ -4211,8 +4141,6 @@ async def chat_document(
         xai_grok_3_checkbox = True
     if "cohere/command-a" in llm_answer_checkbox:
         command_a_checkbox = True
-    if "cohere/command-r" in llm_answer_checkbox:
-        command_r_checkbox = True
     if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox:
         llama_4_maverick_checkbox = True
     if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
@@ -4304,7 +4232,6 @@ async def chat_document(
 
     xai_grok_3_user_text = user_text
     command_a_user_text = user_text
-    command_r_user_text = user_text
 
     llama_4_maverick_user_text = user_text
     llama_4_scout_user_text = user_text
@@ -4315,11 +4242,10 @@ async def chat_document(
     azure_openai_gpt4o_user_text = user_text
     azure_openai_gpt4_user_text = user_text
 
-    async for xai_grok_3, command_a, command_r, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
+    async for xai_grok_3, command_a, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
             system_text,
             xai_grok_3_user_text,
             command_a_user_text,
-            command_r_user_text,
             None,
             llama_4_maverick_user_text,
             None,
@@ -4333,7 +4259,6 @@ async def chat_document(
             azure_openai_gpt4_user_text,
             xai_grok_3_checkbox,
             command_a_checkbox,
-            command_r_checkbox,
             llama_4_maverick_checkbox,
             llama_4_scout_checkbox,
             llama_3_3_70b_checkbox,
@@ -4345,7 +4270,6 @@ async def chat_document(
     ):
         xai_grok_3_response += xai_grok_3
         command_a_response += command_a
-        command_r_response += command_r
         llama_4_maverick_response += llama_4_maverick
         llama_4_scout_response += llama_4_scout
         llama_3_3_70b_response += llama_3_3_70b
@@ -4357,7 +4281,6 @@ async def chat_document(
         yield (
             gr.Markdown(value=xai_grok_3_response),
             gr.Markdown(value=command_a_response),
-            gr.Markdown(value=command_r_response),
             gr.Markdown(value=llama_4_maverick_response),
             gr.Markdown(value=llama_4_scout_response),
             gr.Markdown(value=llama_3_3_70b_response),
@@ -4378,7 +4301,6 @@ async def append_citation(
         doc_id_checkbox_group_input,
         xai_grok_3_answer_text,
         command_a_answer_text,
-        command_r_answer_text,
         llama_4_maverick_answer_text,
         llama_4_scout_answer_text,
         llama_3_3_70b_answer_text,
@@ -4402,7 +4324,6 @@ async def append_citation(
         yield (
             gr.Markdown(value=xai_grok_3_answer_text),
             gr.Markdown(value=command_a_answer_text),
-            gr.Markdown(value=command_r_answer_text),
             gr.Markdown(value=llama_4_maverick_answer_text),
             gr.Markdown(value=llama_4_scout_answer_text),
             gr.Markdown(value=llama_3_3_70b_answer_text),
@@ -4418,7 +4339,6 @@ async def append_citation(
         yield (
             gr.Markdown(value=xai_grok_3_answer_text),
             gr.Markdown(value=command_a_answer_text),
-            gr.Markdown(value=command_r_answer_text),
             gr.Markdown(value=llama_4_maverick_answer_text),
             gr.Markdown(value=llama_4_scout_answer_text),
             gr.Markdown(value=llama_3_3_70b_answer_text),
@@ -4434,8 +4354,6 @@ async def append_citation(
         xai_grok_3_answer_text = extract_and_format(xai_grok_3_answer_text, search_result)
     if "cohere/command-a" in llm_answer_checkbox:
         command_a_answer_text = extract_and_format(command_a_answer_text, search_result)
-    if "cohere/command-r" in llm_answer_checkbox:
-        command_r_answer_text = extract_and_format(command_r_answer_text, search_result)
     if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox:
         llama_4_maverick_answer_text = extract_and_format(llama_4_maverick_answer_text, search_result)
     if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
@@ -4455,7 +4373,6 @@ async def append_citation(
     yield (
         gr.Markdown(value=xai_grok_3_answer_text),
         gr.Markdown(value=command_a_answer_text),
-        gr.Markdown(value=command_r_answer_text),
         gr.Markdown(value=llama_4_maverick_answer_text),
         gr.Markdown(value=llama_4_scout_answer_text),
         gr.Markdown(value=llama_3_3_70b_answer_text),
@@ -5160,10 +5077,19 @@ async def process_image_answers_streaming(
 
                     # _image_embeddingテーブルからimg_idを取得
                     get_img_ids_sql = f"""
-                    SELECT DISTINCT doc_id, embed_id, img_id
-                    FROM {DEFAULT_COLLECTION_NAME}_image_embedding
-                    WHERE ({embed_where_clause})
-                    AND img_id IS NOT NULL
+                        SELECT doc_id, embed_id, img_id
+                        FROM (
+                            SELECT
+                                doc_id,
+                                embed_id,
+                                img_id,
+                                ROW_NUMBER() OVER (PARTITION BY doc_id, img_id ORDER BY embed_id ASC) as rn
+                            FROM {DEFAULT_COLLECTION_NAME}_image_embedding
+                            WHERE ({embed_where_clause})
+                            AND img_id IS NOT NULL
+                        ) subquery
+                        WHERE rn = 1
+                        ORDER BY doc_id, img_id ASC
                     """
 
                     print(f"img_id取得SQL: {get_img_ids_sql}")
@@ -5199,59 +5125,39 @@ async def process_image_answers_streaming(
 
                     img_where_clause = " OR ".join(img_where_conditions)
 
-                    # Oracle制限：CLOBフィールドにはDISTINCTが使用できないため、
-                    # 重複の可能性を考慮して20件取得し、後でアプリケーション側で10件に絞り込む
+                    # base64画像データを取得（最大10件まで）
                     select_sql = f"""
                     SELECT base64_data, doc_id, img_id
                     FROM {DEFAULT_COLLECTION_NAME}_image
                     WHERE ({img_where_clause})
                     AND base64_data IS NOT NULL
-                    AND ROWNUM <= 20
+                    FETCH FIRST 10 ROWS ONLY
                     """
 
                     print(f"実行するSQL: {select_sql}")
                     cursor.execute(select_sql)
 
-                    base64_data_set = set()  # 重複を避けるためにsetを使用
                     base64_data_list = []
-
                     for row in cursor:
                         if row[0] is not None:
                             try:
-                                # CLOBオブジェクトの場合はread()メソッドを使用（安全な読み取り）
+                                # CLOBオブジェクトの読み取り
                                 if hasattr(row[0], 'read'):
-                                    # CLOB読み取りを安全に実行
-                                    try:
-                                        base64_string = row[0].read()
-                                        # 非常に大きなデータの場合は制限
-                                        if len(base64_string) > 10 * 1024 * 1024:  # 10MB制限
-                                            print(
-                                                f"Base64データが大きすぎます（{len(base64_string)}文字）、スキップします")
-                                            continue
-                                    except Exception as clob_e:
-                                        print(f"CLOB読み取りエラー: {clob_e}")
+                                    base64_string = row[0].read()
+                                    # 10MB制限チェック
+                                    if len(base64_string) > 10 * 1024 * 1024:
+                                        print(f"Base64データが大きすぎます（{len(base64_string)}文字）、スキップします")
                                         continue
                                 else:
                                     base64_string = str(row[0])
 
-                                doc_id = row[1]
-                                img_id = row[2]
+                                base64_data_list.append((base64_string, row[1], row[2]))
 
-                                # 重複チェック（最初の100文字で判定）
-                                base64_prefix = base64_string[:100] if len(base64_string) > 100 else base64_string
-                                if base64_prefix not in base64_data_set:
-                                    base64_data_set.add(base64_prefix)
-                                base64_data_list.append((base64_string, doc_id, img_id))
-
-                                # パフォーマンス最適化：処理する画像数を10個に制限
-                                # 大量の画像処理による応答時間の増大とメモリ使用量の増加を防ぐため
-                                if len(base64_data_list) >= 10:
-                                    break
-                            except (TimeoutError, Exception) as e:
-                                print(f"CLOB読み取り中にエラーが発生しました: {e}")
+                            except Exception as e:
+                                print(f"CLOB読み取りエラー: {e}")
                                 continue
 
-                    print(f"取得したdistinct base64_dataの数: {len(base64_data_list)}")
+                    print(f"取得したbase64_dataの数: {len(base64_data_list)}")
 
                     # 初期化：現在の画像回答テキストを保持（累積用）
                     accumulated_llama_4_maverick_text = llama_4_maverick_image_answer_text
@@ -5426,7 +5332,6 @@ async def eval_by_ragas(
         standard_answer_text,
         xai_grok_3_response,
         command_a_response,
-        command_r_response,
         llama_4_maverick_response,
         llama_4_scout_response,
         llama_3_3_70b_response,
@@ -5457,7 +5362,6 @@ async def eval_by_ragas(
         gr.Warning("LLM 評価をオンにする場合、LLM 評価の標準回答を入力してください")
     if has_error:
         yield (
-            gr.Markdown(value=""),
             gr.Markdown(value=""),
             gr.Markdown(value=""),
             gr.Markdown(value=""),
@@ -5502,15 +5406,11 @@ async def eval_by_ragas(
             gr.Markdown(value=""),
             gr.Markdown(value=""),
             gr.Markdown(value=""),
-            gr.Markdown(value=""),
-            gr.Markdown(value=""),
             gr.Markdown(value="")
         )
     else:
         xai_grok_3_checkbox = False
         command_a_checkbox = False
-        command_r_checkbox = False
-        command_r_plus_checkbox = False
         llama_4_maverick_checkbox = False
         llama_4_scout_checkbox = False
         llama_3_3_70b_checkbox = False
@@ -5523,10 +5423,6 @@ async def eval_by_ragas(
             xai_grok_3_checkbox = True
         if "cohere/command-a" in llm_answer_checkbox_group:
             command_a_checkbox = True
-        if "cohere/command-r" in llm_answer_checkbox_group:
-            command_r_checkbox = True
-        if "cohere/command-r-plus" in llm_answer_checkbox_group:
-            command_r_plus_checkbox = True
         if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox_group:
             llama_4_maverick_checkbox = True
         if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox_group:
@@ -5546,8 +5442,6 @@ async def eval_by_ragas(
 
         xai_grok_3_response = remove_last_line(xai_grok_3_response)
         command_a_response = remove_last_line(command_a_response)
-        command_r_response = remove_last_line(command_r_response)
-
         llama_4_maverick_response = remove_last_line(llama_4_maverick_response)
         llama_4_scout_response = remove_last_line(llama_4_scout_response)
         llama_3_3_70b_response = remove_last_line(llama_3_3_70b_response)
@@ -5575,14 +5469,7 @@ async def eval_by_ragas(
 
 -出力-\n　"""
 
-        command_r_user_text = f"""
--標準回答-
- {standard_answer_text}
 
--与えられた回答-
- {command_r_response}
-
--出力-\n　"""
 
         llama_4_maverick_user_text = f"""
 -標準回答-
@@ -5658,7 +5545,6 @@ async def eval_by_ragas(
 
         eval_xai_grok_3_response = ""
         eval_command_a_response = ""
-        eval_command_r_response = ""
         eval_llama_4_maverick_response = ""
         eval_llama_4_scout_response = ""
         eval_llama_3_3_70b_response = ""
@@ -5668,11 +5554,10 @@ async def eval_by_ragas(
         eval_azure_openai_gpt4o_response = ""
         eval_azure_openai_gpt4_response = ""
 
-        async for xai_grok_3, command_a, command_r, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
+        async for xai_grok_3, command_a, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
                 system_text,
                 xai_grok_3_user_text,
                 command_a_user_text,
-                command_r_user_text,
                 None,
                 llama_4_maverick_user_text,
                 None,
@@ -5686,7 +5571,6 @@ async def eval_by_ragas(
                 azure_openai_gpt4_user_text,
                 xai_grok_3_checkbox,
                 command_a_checkbox,
-                command_r_checkbox,
                 llama_4_maverick_checkbox,
                 llama_4_scout_checkbox,
                 llama_3_3_70b_checkbox,
@@ -5698,7 +5582,6 @@ async def eval_by_ragas(
         ):
             eval_xai_grok_3_response += xai_grok_3
             eval_command_a_response += command_a
-            eval_command_r_response += command_r
             eval_llama_4_maverick_response += llama_4_maverick
             eval_llama_4_scout_response += llama_4_scout
             eval_llama_3_3_70b_response += llama_3_3_70b
@@ -5710,7 +5593,6 @@ async def eval_by_ragas(
             yield (
                 gr.Markdown(value=eval_xai_grok_3_response),
                 gr.Markdown(value=eval_command_a_response),
-                gr.Markdown(value=eval_command_r_response),
                 gr.Markdown(value=eval_llama_4_maverick_response),
                 gr.Markdown(value=eval_llama_4_scout_response),
                 gr.Markdown(value=eval_llama_3_3_70b_response),
@@ -5733,7 +5615,6 @@ def generate_download_file(
         standard_answer_text,
         xai_grok_3_response,
         command_a_response,
-        command_r_response,
         llama_4_maverick_response,
         llama_4_scout_response,
         llama_3_3_70b_response,
@@ -5744,7 +5625,6 @@ def generate_download_file(
         azure_openai_gpt4_response,
         xai_grok_3_evaluation,
         command_a_evaluation,
-        command_r_evaluation,
         llama_4_maverick_evaluation,
         llama_4_scout_evaluation,
         llama_3_3_70b_evaluation,
@@ -5797,19 +5677,7 @@ def generate_download_file(
         command_a_evaluation = ""
         command_a_referenced_contexts = ""
 
-    if "cohere/command-r" in llm_answer_checkbox_group:
-        command_r_response = command_r_response
-        command_r_referenced_contexts = ""
-        if include_citation:
-            command_r_response, command_r_referenced_contexts = extract_citation(command_r_response)
-        if llm_evaluation_checkbox:
-            command_r_evaluation = command_r_evaluation
-        else:
-            command_r_evaluation = ""
-    else:
-        command_r_response = ""
-        command_r_evaluation = ""
-        command_r_referenced_contexts = ""
+
 
     if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox_group:
         llama_4_maverick_response = llama_4_maverick_response
@@ -5933,7 +5801,6 @@ def generate_download_file(
                 [
                     "xai/grok-3",
                     "cohere/command-a",
-                    "cohere/command-r",
                     "meta/llama-4-maverick-17b-128e-instruct-fp8",
                     "meta/llama-4-scout-17b-16e-instruct",
                     "meta/llama-3-3-70b",
@@ -5946,7 +5813,6 @@ def generate_download_file(
             'LLM メッセージ': [
                 xai_grok_3_response,
                 command_a_response,
-                command_r_response,
                 llama_4_maverick_response,
                 llama_4_scout_response,
                 llama_3_3_70b_response,
@@ -5959,7 +5825,6 @@ def generate_download_file(
             '引用 Contexts': [
                 xai_grok_3_referenced_contexts,
                 command_a_referenced_contexts,
-                command_r_referenced_contexts,
                 llama_4_maverick_referenced_contexts,
                 llama_4_scout_referenced_contexts,
                 llama_3_3_70b_referenced_contexts,
@@ -5972,7 +5837,6 @@ def generate_download_file(
             'LLM 評価結果': [
                 xai_grok_3_evaluation,
                 command_a_evaluation,
-                command_r_evaluation,
                 llama_4_maverick_evaluation,
                 llama_4_scout_evaluation,
                 llama_3_3_70b_evaluation,
@@ -6084,7 +5948,7 @@ def insert_query_result(
         standard_answer_text,
         xai_grok_3_response,
         command_a_response,
-        command_r_response,
+
         llama_4_maverick_response,
         llama_4_scout_response,
         llama_3_3_70b_response,
@@ -6095,7 +5959,7 @@ def insert_query_result(
         azure_openai_gpt4_response,
         xai_grok_3_evaluation,
         command_a_evaluation,
-        command_r_evaluation,
+
         llama_4_maverick_evaluation,
         llama_4_scout_evaluation,
         llama_3_3_70b_evaluation,
@@ -6192,33 +6056,6 @@ def insert_query_result(
                     ]
                 )
 
-            if "cohere/command-r" in llm_answer_checkbox_group:
-                command_r_response = command_r_response
-                if llm_evaluation_checkbox:
-                    command_r_evaluation = command_r_evaluation
-                else:
-                    command_r_evaluation = ""
-
-                insert_sql = """
-                             INSERT INTO RAG_QA_FEEDBACK (query_id,
-                                                          llm_name,
-                                                          llm_answer,
-                                                          ragas_evaluation_result)
-                             VALUES (:1,
-                                     :2,
-                                     :3,
-                                     :4) \
-                             """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
-                cursor.execute(
-                    insert_sql,
-                    [
-                        query_id,
-                        "cohere/command-r",
-                        command_r_response,
-                        command_r_evaluation
-                    ]
-                )
 
             if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox_group:
                 llama_4_maverick_response = llama_4_maverick_response
@@ -6700,8 +6537,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             [
                                 "xai/grok-3",
                                 "cohere/command-a",
-                                "cohere/command-r",
-                                # "cohere/command-r-plus",
                                 "meta/llama-4-maverick-17b-128e-instruct-fp8",
                                 "meta/llama-4-scout-17b-16e-instruct",
                                 "meta/llama-3-3-70b",
@@ -6735,17 +6570,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         min_height=200,
                         max_height=300
                     )
-                with gr.Accordion(
-                        label="Command-R メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_with_llm_command_r_accordion:
-                    tab_chat_with_command_r_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=200,
-                        min_height=200,
-                        max_height=300
-                    )
+
 
                 with gr.Accordion(
                         label="Llama 4 Maverick 17b メッセージ",
@@ -7184,8 +7009,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             [
                                 "xai/grok-3",
                                 "cohere/command-a",
-                                "cohere/command-r",
-                                # "cohere/command-r-plus",
                                 "meta/llama-4-maverick-17b-128e-instruct-fp8",
                                 "meta/llama-4-scout-17b-16e-instruct",
                                 "meta/llama-3-3-70b",
@@ -7650,60 +7473,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             min_height=200,
                             max_height=300
                         )
-                with gr.Accordion(
-                        label="Command-R メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_document_llm_command_r_accordion:
-                    tab_chat_document_command_r_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=300,
-                        min_height=300,
-                        max_height=300
-                    )
-                    with gr.Accordion(
-                            label="Human 評価",
-                            visible=True,
-                            open=True
-                    ) as tab_chat_document_llm_command_r_human_evaluation_accordion:
-                        with gr.Row():
-                            tab_chat_document_command_r_answer_human_eval_feedback_radio = gr.Radio(
-                                show_label=False,
-                                choices=[
-                                    ("Good response", "good"),
-                                    ("Neutral response", "neutral"),
-                                    ("Bad response", "bad"),
-                                ],
-                                value="good",
-                                container=False,
-                                interactive=True,
-                            )
-                        with gr.Row():
-                            with gr.Column(scale=11):
-                                tab_chat_document_command_r_answer_human_eval_feedback_text = gr.Textbox(
-                                    show_label=False,
-                                    container=False,
-                                    lines=2,
-                                    interactive=True,
-                                    autoscroll=True,
-                                    placeholder="具体的な意見や感想を自由に書いてください。",
-                                )
-                            with gr.Column(scale=1):
-                                tab_chat_document_command_r_answer_human_eval_feedback_send_button = gr.Button(
-                                    value="送信",
-                                    variant="primary",
-                                )
-                    with gr.Accordion(
-                            label="LLM 評価結果",
-                            visible=False,
-                            open=True
-                    ) as tab_chat_document_llm_command_r_evaluation_accordion:
-                        tab_chat_document_command_r_evaluation_text = gr.Markdown(
-                            show_copy_button=True,
-                            height=200,
-                            min_height=200,
-                            max_height=300
-                        )
+
 
                 with gr.Accordion(
                         label="Llama 4 Maverick 17b メッセージ",
@@ -8293,7 +8063,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_chat_with_llm_xai_grok_3_accordion,
             tab_chat_with_llm_command_a_accordion,
-            tab_chat_with_llm_command_r_accordion,
             tab_chat_with_llm_llama_4_maverick_accordion,
             tab_chat_with_llm_llama_4_scout_accordion,
             tab_chat_with_llm_llama_3_3_70b_accordion,
@@ -8311,7 +8080,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_llm_answer_checkbox_group,
             tab_chat_with_xai_grok_3_answer_text,
             tab_chat_with_command_a_answer_text,
-            tab_chat_with_command_r_answer_text,
             tab_chat_with_llama_4_maverick_answer_text,
             tab_chat_with_llama_4_scout_answer_text,
             tab_chat_with_llama_3_3_70b_answer_text,
@@ -8333,7 +8101,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_chat_with_xai_grok_3_answer_text,
             tab_chat_with_command_a_answer_text,
-            tab_chat_with_command_r_answer_text,
             tab_chat_with_llama_4_maverick_answer_text,
             tab_chat_with_llama_4_scout_answer_text,
             tab_chat_with_llama_3_3_70b_answer_text,
@@ -8551,7 +8318,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_chat_document_llm_xai_grok_3_accordion,
             tab_chat_document_llm_command_a_accordion,
-            tab_chat_document_llm_command_r_accordion,
             tab_chat_document_llm_llama_4_maverick_accordion,
             tab_chat_document_llm_llama_4_scout_accordion,
             tab_chat_document_llm_llama_3_3_70b_accordion,
@@ -8596,7 +8362,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_chat_document_llm_xai_grok_3_evaluation_accordion,
             tab_chat_document_llm_command_a_evaluation_accordion,
-            tab_chat_document_llm_command_r_evaluation_accordion,
             tab_chat_document_llm_llama_4_maverick_evaluation_accordion,
             tab_chat_document_llm_llama_4_scout_evaluation_accordion,
             tab_chat_document_llm_llama_3_3_70b_evaluation_accordion,
@@ -8663,7 +8428,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
-            tab_chat_document_command_r_answer_text,
             tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -8689,7 +8453,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_chat_document_xai_grok_3_evaluation_text,
             tab_chat_document_command_a_evaluation_text,
-            tab_chat_document_command_r_evaluation_text,
             tab_chat_document_llama_4_maverick_evaluation_text,
             tab_chat_document_llama_4_scout_evaluation_text,
             tab_chat_document_llama_3_3_70b_evaluation_text,
@@ -8705,8 +8468,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_chat_document_command_a_answer_human_eval_feedback_radio,
             tab_chat_document_command_a_answer_human_eval_feedback_text,
-            tab_chat_document_command_r_answer_human_eval_feedback_radio,
-            tab_chat_document_command_r_answer_human_eval_feedback_text,
             tab_chat_document_llama_4_maverick_answer_human_eval_feedback_radio,
             tab_chat_document_llama_4_maverick_answer_human_eval_feedback_text,
             tab_chat_document_llama_4_scout_answer_human_eval_feedback_radio,
@@ -8779,7 +8540,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
-            tab_chat_document_command_r_answer_text,
             tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -8800,7 +8560,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_doc_id_checkbox_group,
             tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
-            tab_chat_document_command_r_answer_text,
             tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -8813,7 +8572,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
-            tab_chat_document_command_r_answer_text,
             tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -8858,7 +8616,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_standard_answer_text,
             tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
-            tab_chat_document_command_r_answer_text,
             tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -8871,7 +8628,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_chat_document_xai_grok_3_evaluation_text,
             tab_chat_document_command_a_evaluation_text,
-            tab_chat_document_command_r_evaluation_text,
             tab_chat_document_llama_4_maverick_evaluation_text,
             tab_chat_document_llama_4_scout_evaluation_text,
             tab_chat_document_llama_3_3_70b_evaluation_text,
@@ -8894,7 +8650,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_standard_answer_text,
             tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
-            tab_chat_document_command_r_answer_text,
             tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -8905,7 +8660,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_azure_openai_gpt4_answer_text,
             tab_chat_document_xai_grok_3_evaluation_text,
             tab_chat_document_command_a_evaluation_text,
-            tab_chat_document_command_r_evaluation_text,
             tab_chat_document_llama_4_maverick_evaluation_text,
             tab_chat_document_llama_4_scout_evaluation_text,
             tab_chat_document_llama_3_3_70b_evaluation_text,
@@ -8938,7 +8692,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_standard_answer_text,
             tab_chat_document_xai_grok_3_answer_text,
             tab_chat_document_command_a_answer_text,
-            tab_chat_document_command_r_answer_text,
             tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
             tab_chat_document_llama_3_3_70b_answer_text,
@@ -8949,7 +8702,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_azure_openai_gpt4_answer_text,
             tab_chat_document_xai_grok_3_evaluation_text,
             tab_chat_document_command_a_evaluation_text,
-            tab_chat_document_command_r_evaluation_text,
             tab_chat_document_llama_4_maverick_evaluation_text,
             tab_chat_document_llama_4_scout_evaluation_text,
             tab_chat_document_llama_3_3_70b_evaluation_text,
@@ -8990,19 +8742,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ]
     )
 
-    tab_chat_document_command_r_answer_human_eval_feedback_send_button.click(
-        eval_by_human,
-        inputs=[
-            query_id_state,
-            gr.State(value="cohere/command-r"),
-            tab_chat_document_command_r_answer_human_eval_feedback_radio,
-            tab_chat_document_command_r_answer_human_eval_feedback_text,
-        ],
-        outputs=[
-            tab_chat_document_command_r_answer_human_eval_feedback_radio,
-            tab_chat_document_command_r_answer_human_eval_feedback_text,
-        ]
-    )
 
     tab_chat_document_llama_4_maverick_answer_human_eval_feedback_send_button.click(
         eval_by_human,
@@ -9198,5 +8937,5 @@ if __name__ == "__main__":
         server_port=args.port,
         max_threads=200,
         show_api=False,
-        auth=do_auth,
+        # auth=do_auth,
     )
