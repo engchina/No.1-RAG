@@ -1445,9 +1445,9 @@ def set_chat_llm_evaluation(llm_evaluation_checkbox):
 
 def set_image_answer_visibility(llm_answer_checkbox, use_image):
     """
-    画像回答の可視性を制御する関数
+    Vision 回答の可視性を制御する関数
     選択されたLLMモデルと「画像を使って回答」の状態に基づいて、
-    対象のモデルの画像回答Accordionの可視性を決定する
+    対象のモデルのVision 回答Accordionの可視性を決定する
     """
     llama_4_maverick_image_visible = False
     llama_4_scout_image_visible = False
@@ -1624,7 +1624,7 @@ def reset_all_llm_messages():
 
 def reset_image_answers():
     """
-    画像回答をリセットする
+    Vision 回答をリセットする
     """
     return (
         gr.Markdown(value=""),  # tab_chat_document_llama_4_maverick_image_answer_text
@@ -2122,6 +2122,7 @@ CREATE TABLE IF NOT EXISTS {DEFAULT_COLLECTION_NAME}_image_embedding (
                                         100
                                     ),
         llm_answer CLOB,
+        vlm_answer CLOB,
         ragas_evaluation_result CLOB,
         human_evaluation_result VARCHAR2
                                     (
@@ -2845,14 +2846,10 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
         prev_page_number = 0
         table_idx = 1
         for el in elements:
-            # print(f"{el.category=}")
-            # print(f"{el.text=}")
-            # print(f"{el.metadata.page_number=}")
             page_number = el.metadata.page_number
             if prev_page_number != page_number:
                 prev_page_number = page_number
                 table_idx = 1
-            # print(f"{type(el.category)=}")
             if el.category == "Table":
                 table_id = f"page_{page_number}_table_{table_idx}"
                 print(f"{table_id=}")
@@ -3244,13 +3241,13 @@ def search_document(
     Retrieve relevant splits for any question using similarity search.
     This is simply "top K" retrieval where we select documents based on embedding similarity to the query.
     """
-    # 画像を使って回答がオンの場合、特定のパラメータ値を強制使用
+    # Vision 回答がオンの場合、特定のパラメータ値を強制使用
     if use_image:
         answer_by_one_checkbox_input = False
         extend_first_chunk_size_input = 0
         extend_around_chunk_size_input = 0
         print(
-            f"画像回答モード: answer_by_one_checkbox={answer_by_one_checkbox_input}, extend_first_chunk_size={extend_first_chunk_size_input}, extend_around_chunk_size={extend_around_chunk_size_input}")
+            f"Vision 回答モード: answer_by_one_checkbox={answer_by_one_checkbox_input}, extend_first_chunk_size={extend_first_chunk_size_input}, extend_around_chunk_size={extend_around_chunk_size_input}")
 
     has_error = False
     if not query_text_input:
@@ -3377,9 +3374,9 @@ def search_document(
     # v4
     region = get_region()
 
-    # 画像を使って回答がオンの場合、image_embeddingテーブルを使用、オフの場合はembeddingテーブルを使用
+    # Vision 回答がオンの場合、image_embeddingテーブルを使用、オフの場合はembeddingテーブルを使用
     if use_image:
-        # 画像を使って回答がオンの場合、image_embeddingテーブルのみを使用
+        # Vision 回答がオンの場合、image_embeddingテーブルのみを使用
         base_sql = f"""
                         SELECT ie.doc_id doc_id, ie.embed_id embed_id, vector_distance(ie.embed_vector, (
                                 SELECT to_vector(et.embed_vector) embed_vector
@@ -3421,7 +3418,7 @@ def search_document(
                                 ) <= :threshold_value
                         ORDER BY vector_distance """
     else:
-        # 画像を使って回答がオフの場合、embeddingテーブルのみを使用
+        # Vision 回答がオフの場合、embeddingテーブルのみを使用
         base_sql = f"""
                         SELECT de.doc_id doc_id, de.embed_id embed_id, vector_distance(de.embed_vector, (
                                 SELECT to_vector(et.embed_vector) embed_vector
@@ -3483,7 +3480,7 @@ def search_document(
             ON s1.adjusted_embed_id = s2.embed_id AND s1.doc_id = s2.doc_id
     ),"""
     if use_image:
-        # 画像を使って回答がオンの場合、image_embeddingテーブルを使用
+        # Vision 回答がオンの場合、image_embeddingテーブルを使用
         select_sql += f"""
     aggregated_results AS
     (
@@ -3593,7 +3590,7 @@ def search_document(
             # この部分のロジックはfull_text_search_sqlで処理されます
             region = get_region()
             if use_image:
-                # 画像を使って回答がオンの場合、image_embeddingテーブルのみを使用
+                # Vision 回答がオンの場合、image_embeddingテーブルのみを使用
                 full_text_search_sql = f"""
                             SELECT ie.doc_id doc_id, ie.embed_id embed_id, vector_distance(ie.embed_vector, (
                                     SELECT to_vector(et.embed_vector) embed_vector
@@ -3621,7 +3618,7 @@ def search_document(
                             ) """ if not doc_id_all_checkbox_input else "") + where_metadata_sql + """
                             ORDER BY SCORE(1) DESC FETCH FIRST :top_k ROWS ONLY """
             else:
-                # 画像を使って回答がオフの場合、embeddingテーブルのみを使用
+                # Vision 回答がオフの場合、embeddingテーブルのみを使用
                 full_text_search_sql = f"""
                             SELECT de.doc_id doc_id, de.embed_id embed_id, vector_distance(de.embed_vector, (
                                     SELECT to_vector(et.embed_vector) embed_vector
@@ -3920,9 +3917,9 @@ def extract_and_format(input_str, search_result_df):
     if not json_arrays:
         return (
                 input_str +
-                f"\n"
+                f"\n\n"
                 f"---回答内で参照されているコンテキスト---"
-                f"\n"
+                f"\n\n"
                 f"回答にコンテキストが存在しないか、コンテキストの形式が正しくありません。"
         )
 
@@ -3943,9 +3940,9 @@ def extract_and_format(input_str, search_result_df):
 
     formatted = (
             input_str +
-            f"\n"
+            f"\n\n"
             f"---回答内で参照されているコンテキスト---"
-            f"\n"
+            f"\n\n"
     )
     formatted += "[\n"
     for item in extracted:
@@ -3976,7 +3973,7 @@ def extract_and_format(input_str, search_result_df):
 
 def extract_citation(input_str):
     # 2つの部分の内容をマッチング
-    pattern = '^(.*?)\n---回答内で参照されているコンテキスト---\n(.*?)$'
+    pattern = '^(.*?)\n\n---回答内で参照されているコンテキスト---\n\n(.*?)$'
     match = re.search(pattern, input_str, re.DOTALL)
     if match:
         part1 = match.group(1).strip()
@@ -4085,6 +4082,12 @@ async def chat_document(
         doc_id_checkbox_group_input,
         rag_prompt_template
 ):
+    # Vision 回答がオンの場合、引用と時間の設定を固定でFalseにする
+    if use_image:
+        include_citation = False
+        include_current_time = False
+        print("Vision 回答がオンのため、include_citation=False, include_current_time=Falseに設定されました")
+
     has_error = False
     if not query_text:
         has_error = True
@@ -4228,7 +4231,18 @@ async def chat_document(
     # """
 
     system_text = ""
-    user_text = get_langgpt_rag_prompt(context, query_text, include_citation, include_current_time, rag_prompt_template)
+
+    # Vision 回答がオンの場合、固定メッセージを設定
+    if use_image:
+        fixed_image_message = """Vision 回答モードが有効です。
+
+画像データをVisionモデルで解析して回答します。
+
+テキストベースの回答をご希望の場合は、Vision 回答をオフにしてください。"""
+
+        user_text = fixed_image_message
+    else:
+        user_text = get_langgpt_rag_prompt(context, query_text, include_citation, include_current_time, rag_prompt_template)
 
     xai_grok_3_user_text = user_text
     command_a_user_text = user_text
@@ -4242,42 +4256,31 @@ async def chat_document(
     azure_openai_gpt4o_user_text = user_text
     azure_openai_gpt4_user_text = user_text
 
-    async for xai_grok_3, command_a, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
-            system_text,
-            xai_grok_3_user_text,
-            command_a_user_text,
-            None,
-            llama_4_maverick_user_text,
-            None,
-            llama_4_scout_user_text,
-            llama_3_3_70b_user_text,
-            None,
-            llama_3_2_90b_vision_user_text,
-            openai_gpt4o_user_text,
-            openai_gpt4_user_text,
-            azure_openai_gpt4o_user_text,
-            azure_openai_gpt4_user_text,
-            xai_grok_3_checkbox,
-            command_a_checkbox,
-            llama_4_maverick_checkbox,
-            llama_4_scout_checkbox,
-            llama_3_3_70b_checkbox,
-            llama_3_2_90b_vision_checkbox,
-            openai_gpt4o_checkbox,
-            openai_gpt4_checkbox,
-            azure_openai_gpt4o_checkbox,
-            azure_openai_gpt4_checkbox
-    ):
-        xai_grok_3_response += xai_grok_3
-        command_a_response += command_a
-        llama_4_maverick_response += llama_4_maverick
-        llama_4_scout_response += llama_4_scout
-        llama_3_3_70b_response += llama_3_3_70b
-        llama_3_2_90b_vision_response += llama_3_2_90b_vision
-        openai_gpt4o_response += gpt4o
-        openai_gpt4_response += gpt4
-        azure_openai_gpt4o_response += azure_gpt4o
-        azure_openai_gpt4_response += azure_gpt4
+    # Vision 回答がオンの場合、固定メッセージを即座に返す
+    if use_image:
+        # 選択されたLLMに対してのみ固定メッセージを設定
+        if xai_grok_3_checkbox:
+            xai_grok_3_response = fixed_image_message
+        if command_a_checkbox:
+            command_a_response = fixed_image_message
+        if llama_4_maverick_checkbox:
+            llama_4_maverick_response = fixed_image_message
+        if llama_4_scout_checkbox:
+            llama_4_scout_response = fixed_image_message
+        if llama_3_3_70b_checkbox:
+            llama_3_3_70b_response = fixed_image_message
+        if llama_3_2_90b_vision_checkbox:
+            llama_3_2_90b_vision_response = fixed_image_message
+        if openai_gpt4o_checkbox:
+            openai_gpt4o_response = fixed_image_message
+        if openai_gpt4_checkbox:
+            openai_gpt4_response = fixed_image_message
+        if azure_openai_gpt4o_checkbox:
+            azure_openai_gpt4o_response = fixed_image_message
+        if azure_openai_gpt4_checkbox:
+            azure_openai_gpt4_response = fixed_image_message
+
+        # 固定メッセージを一度だけ返す
         yield (
             gr.Markdown(value=xai_grok_3_response),
             gr.Markdown(value=command_a_response),
@@ -4290,12 +4293,63 @@ async def chat_document(
             gr.Markdown(value=azure_openai_gpt4o_response),
             gr.Markdown(value=azure_openai_gpt4_response)
         )
+    else:
+        # 通常のLLM処理
+        async for xai_grok_3, command_a, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
+                system_text,
+                xai_grok_3_user_text,
+                command_a_user_text,
+                None,
+                llama_4_maverick_user_text,
+                None,
+                llama_4_scout_user_text,
+                llama_3_3_70b_user_text,
+                None,
+                llama_3_2_90b_vision_user_text,
+                openai_gpt4o_user_text,
+                openai_gpt4_user_text,
+                azure_openai_gpt4o_user_text,
+                azure_openai_gpt4_user_text,
+                xai_grok_3_checkbox,
+                command_a_checkbox,
+                llama_4_maverick_checkbox,
+                llama_4_scout_checkbox,
+                llama_3_3_70b_checkbox,
+                llama_3_2_90b_vision_checkbox,
+                openai_gpt4o_checkbox,
+                openai_gpt4_checkbox,
+                azure_openai_gpt4o_checkbox,
+                azure_openai_gpt4_checkbox
+        ):
+            xai_grok_3_response += xai_grok_3
+            command_a_response += command_a
+            llama_4_maverick_response += llama_4_maverick
+            llama_4_scout_response += llama_4_scout
+            llama_3_3_70b_response += llama_3_3_70b
+            llama_3_2_90b_vision_response += llama_3_2_90b_vision
+            openai_gpt4o_response += gpt4o
+            openai_gpt4_response += gpt4
+            azure_openai_gpt4o_response += azure_gpt4o
+            azure_openai_gpt4_response += azure_gpt4
+            yield (
+                gr.Markdown(value=xai_grok_3_response),
+                gr.Markdown(value=command_a_response),
+                gr.Markdown(value=llama_4_maverick_response),
+                gr.Markdown(value=llama_4_scout_response),
+                gr.Markdown(value=llama_3_3_70b_response),
+                gr.Markdown(value=llama_3_2_90b_vision_response),
+                gr.Markdown(value=openai_gpt4o_response),
+                gr.Markdown(value=openai_gpt4_response),
+                gr.Markdown(value=azure_openai_gpt4o_response),
+                gr.Markdown(value=azure_openai_gpt4_response)
+            )
 
 
 async def append_citation(
         search_result,
         llm_answer_checkbox,
         include_citation,
+        use_image,
         query_text,
         doc_id_all_checkbox_input,
         doc_id_checkbox_group_input,
@@ -4310,6 +4364,11 @@ async def append_citation(
         azure_openai_gpt4o_answer_text,
         azure_openai_gpt4_answer_text
 ):
+    # Vision 回答がオンの場合、引用設定を固定でFalseにする
+    if use_image:
+        include_citation = False
+        print("Vision 回答がオンのため、append_citation内でinclude_citation=Falseに設定されました")
+
     has_error = False
     if not query_text:
         has_error = True
@@ -4945,34 +5004,37 @@ async def process_image_answers_streaming(
         llama_3_2_90b_vision_image_answer_text,
         openai_gpt4o_image_answer_text,
         azure_openai_gpt4o_image_answer_text,
-        custom_image_prompt=None
+        image_limit_k=5,
+        custom_image_prompt=None,
 ):
     """
-    画像を使って回答がオンの場合、検索結果から画像データを取得し、
-    選択されたLLMモデルで画像処理を行い、ストリーミング形式で回答を出力する
+    Vision 回答がオンの場合、検索結果から画像データを取得し、
+    選択されたVisionモデルで画像処理を行い、ストリーミング形式で回答を出力する
 
     処理の流れ：
     1. 検索結果からdoc_idとembed_idのペアを抽出
-    2. データベースから対応する画像のbase64データを取得（最大10個まで）
+    2. データベースから対応する画像のbase64データを取得（指定されたlimit-k数まで）
     3. 取得した画像を各選択されたLLMモデルで並行処理
     4. ストリーミング形式で回答を出力
 
-    注意：パフォーマンスと応答時間を考慮し、処理する画像数は最大10個に制限されています。
+    注意：パフォーマンスと応答時間を考慮し、処理する画像数はimage_limit_kパラメータで制限されています。
 
     Args:
         search_result: 検索結果
-        use_image: 画像を使って回答するかどうか
+        use_image: Vision 回答するかどうか
+        single_image_processing: 画像を1枚ずつ処理するかどうか
         llm_answer_checkbox_group: 選択されたLLMモデルのリスト
         query_text: クエリテキスト
-        llama_4_maverick_image_answer_text: Llama 4 Maverick の画像回答テキスト
-        llama_4_scout_image_answer_text: Llama 4 Scout の画像回答テキスト
-        llama_3_2_90b_vision_image_answer_text: Llama 3.2 90B Vision の画像回答テキスト
-        openai_gpt4o_image_answer_text: OpenAI GPT-4o の画像回答テキスト
-        azure_openai_gpt4o_image_answer_text: Azure OpenAI GPT-4o の画像回答テキスト
+        llama_4_maverick_image_answer_text: Llama 4 Maverick のVision 回答テキスト
+        llama_4_scout_image_answer_text: Llama 4 Scout のVision 回答テキスト
+        llama_3_2_90b_vision_image_answer_text: Llama 3.2 90B Vision のVision 回答テキスト
+        openai_gpt4o_image_answer_text: OpenAI GPT-4o のVision 回答テキスト
+        azure_openai_gpt4o_image_answer_text: Azure OpenAI GPT-4o のVision 回答テキスト
+        image_limit_k: 処理する画像の最大数（1-10）
         custom_image_prompt: カスタム画像プロンプトテンプレート
 
     Yields:
-        tuple: 各モデルの更新された画像回答を含むGradio Markdownコンポーネントのタプル
+        tuple: 各モデルの更新されたVision 回答を含むGradio Markdownコンポーネントのタプル
     """
     print("process_image_answers_streaming() 開始...")
 
@@ -4988,9 +5050,9 @@ async def process_image_answers_streaming(
         )
         return
 
-    # 画像を使って回答がオフの場合は何もしない
+    # Vision 回答がオフの場合は何もしない
     if not use_image:
-        print("画像を使って回答がオフのため、base64_data取得をスキップします")
+        print("Vision 回答がオフのため、base64_data取得をスキップします")
         yield (
             gr.Markdown(value=llama_4_maverick_image_answer_text),
             gr.Markdown(value=llama_4_scout_image_answer_text),
@@ -5125,13 +5187,14 @@ async def process_image_answers_streaming(
 
                     img_where_clause = " OR ".join(img_where_conditions)
 
-                    # base64画像データを取得（最大10件まで）
+                    # base64画像データを取得（指定されたlimit-k件まで）
                     select_sql = f"""
                     SELECT base64_data, doc_id, img_id
                     FROM {DEFAULT_COLLECTION_NAME}_image
                     WHERE ({img_where_clause})
                     AND base64_data IS NOT NULL
-                    FETCH FIRST 10 ROWS ONLY
+                    ORDER BY doc_id, img_id ASC
+                    FETCH FIRST {image_limit_k} ROWS ONLY
                     """
 
                     print(f"実行するSQL: {select_sql}")
@@ -5151,24 +5214,27 @@ async def process_image_answers_streaming(
                                 else:
                                     base64_string = str(row[0])
 
-                                base64_data_list.append((base64_string, row[1], row[2]))
+                                if row[2] is not None:
+                                    # img_idはNUMBER型なので、直接使用するか安全に変換
+                                    img_id = row[2] if isinstance(row[2], (int, float)) else int(row[2])
+                                    base64_data_list.append((base64_string, row[1], img_id))
 
                             except Exception as e:
-                                print(f"CLOB読み取りエラー: {e}")
+                                print(f"CLOB読み取りまたはimg_id処理エラー: {e}")
                                 continue
 
                     print(f"取得したbase64_dataの数: {len(base64_data_list)}")
 
-                    # 初期化：現在の画像回答テキストを保持（累積用）
+                    # 初期化：現在のVision 回答テキストを保持（累積用）
                     accumulated_llama_4_maverick_text = llama_4_maverick_image_answer_text
                     accumulated_llama_4_scout_text = llama_4_scout_image_answer_text
                     accumulated_llama_3_2_90b_vision_text = llama_3_2_90b_vision_image_answer_text
                     accumulated_openai_gpt4o_text = openai_gpt4o_image_answer_text
                     accumulated_azure_openai_gpt4o_text = azure_openai_gpt4o_image_answer_text
 
-                    # 処理方式を選択：1枚ずつ処理 vs 一括処理
+                    # 処理方式を選択：1枚ずつ処理 vs 全画像まとめて処理 vs ファイル単位で処理
                     if base64_data_list:
-                        if single_image_processing:
+                        if single_image_processing == "1枚ずつ処理":
                             # 1枚ずつ処理モード
                             print(f"単一画像処理開始: {len(base64_data_list)}枚の画像を1枚ずつ処理中...")
 
@@ -5221,7 +5287,7 @@ async def process_image_answers_streaming(
                                     current_openai_gpt4o_text = accumulated_openai_gpt4o_text + current_image_openai_gpt4o
                                     current_azure_openai_gpt4o_text = accumulated_azure_openai_gpt4o_text + current_image_azure_openai_gpt4o
 
-                                    # 更新された画像回答結果をyield
+                                    # 更新されたVision 回答結果をyield
                                     yield (
                                         gr.Markdown(value=current_llama_4_maverick_text),
                                         gr.Markdown(value=current_llama_4_scout_text),
@@ -5236,8 +5302,8 @@ async def process_image_answers_streaming(
                                 accumulated_llama_3_2_90b_vision_text += current_image_llama_3_2_90b_vision
                                 accumulated_openai_gpt4o_text += current_image_openai_gpt4o
                                 accumulated_azure_openai_gpt4o_text += current_image_azure_openai_gpt4o
-                        else:
-                            # 一括処理モード
+                        elif single_image_processing == "全画像まとめて処理":
+                            # 全画像まとめて処理モード
                             print(f"複数画像一括処理開始: {len(base64_data_list)}枚の画像を一括処理中...")
 
                             # 各モデルの回答を保持
@@ -5279,7 +5345,7 @@ async def process_image_answers_streaming(
                                 current_openai_gpt4o_text = accumulated_openai_gpt4o_text + current_openai_gpt4o
                                 current_azure_openai_gpt4o_text = accumulated_azure_openai_gpt4o_text + current_azure_openai_gpt4o
 
-                                # 更新された画像回答結果をyield
+                                # 更新されたVision 回答結果をyield
                                 yield (
                                     gr.Markdown(value=current_llama_4_maverick_text),
                                     gr.Markdown(value=current_llama_4_scout_text),
@@ -5287,6 +5353,362 @@ async def process_image_answers_streaming(
                                     gr.Markdown(value=current_openai_gpt4o_text),
                                     gr.Markdown(value=current_azure_openai_gpt4o_text)
                                 )
+                        elif single_image_processing == "ファイル単位で処理":
+                            # ファイル単位で処理モード
+                            print(f"ファイル単位処理開始: {len(base64_data_list)}枚の画像をファイル単位で処理中...")
+
+                            # doc_idでグループ化
+                            file_groups = {}
+                            for base64_data, doc_id, img_id in base64_data_list:
+                                if doc_id not in file_groups:
+                                    file_groups[doc_id] = []
+                                file_groups[doc_id].append((base64_data, doc_id, img_id))
+
+                            print(f"ファイルグループ数: {len(file_groups)}")
+
+                            # 各ファイルグループを順次処理
+                            for file_index, (doc_id, file_images) in enumerate(file_groups.items(), 1):
+                                print(f"ファイル {file_index}/{len(file_groups)} (doc_id: {doc_id}) を処理中: {len(file_images)}枚の画像")
+
+                                # 各モデルの現在のファイルに対する回答を保持
+                                current_file_llama_4_maverick = ""
+                                current_file_llama_4_scout = ""
+                                current_file_llama_3_2_90b_vision = ""
+                                current_file_openai_gpt4o = ""
+                                current_file_azure_openai_gpt4o = ""
+
+                                # 現在のファイルの画像を一括処理
+                                async for llm_results in process_multiple_images_streaming(
+                                        file_images,
+                                        query_text,
+                                        llm_answer_checkbox_group,
+                                        target_models,
+                                        custom_image_prompt
+                                ):
+                                    # 各LLMの結果を現在のファイルの回答として更新
+                                    if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_results:
+                                        current_file_llama_4_maverick = llm_results[
+                                            "meta/llama-4-maverick-17b-128e-instruct-fp8"]
+
+                                    if "meta/llama-4-scout-17b-16e-instruct" in llm_results:
+                                        current_file_llama_4_scout = llm_results["meta/llama-4-scout-17b-16e-instruct"]
+
+                                    if "meta/llama-3-2-90b-vision" in llm_results:
+                                        current_file_llama_3_2_90b_vision = llm_results["meta/llama-3-2-90b-vision"]
+
+                                    if "openai/gpt-4o" in llm_results:
+                                        current_file_openai_gpt4o = llm_results["openai/gpt-4o"]
+
+                                    if "azure_openai/gpt-4o" in llm_results:
+                                        current_file_azure_openai_gpt4o = llm_results["azure_openai/gpt-4o"]
+
+                                    # 累積テキストと現在のファイルの回答を結合して表示
+                                    current_llama_4_maverick_text = accumulated_llama_4_maverick_text + current_file_llama_4_maverick
+                                    current_llama_4_scout_text = accumulated_llama_4_scout_text + current_file_llama_4_scout
+                                    current_llama_3_2_90b_vision_text = accumulated_llama_3_2_90b_vision_text + current_file_llama_3_2_90b_vision
+                                    current_openai_gpt4o_text = accumulated_openai_gpt4o_text + current_file_openai_gpt4o
+                                    current_azure_openai_gpt4o_text = accumulated_azure_openai_gpt4o_text + current_file_azure_openai_gpt4o
+
+                                    # 更新されたVision 回答結果をyield
+                                    yield (
+                                        gr.Markdown(value=current_llama_4_maverick_text),
+                                        gr.Markdown(value=current_llama_4_scout_text),
+                                        gr.Markdown(value=current_llama_3_2_90b_vision_text),
+                                        gr.Markdown(value=current_openai_gpt4o_text),
+                                        gr.Markdown(value=current_azure_openai_gpt4o_text)
+                                    )
+
+                                # 現在のファイルの処理が完了したら、累積テキストに追加
+                                accumulated_llama_4_maverick_text += current_file_llama_4_maverick
+                                accumulated_llama_4_scout_text += current_file_llama_4_scout
+                                accumulated_llama_3_2_90b_vision_text += current_file_llama_3_2_90b_vision
+                                accumulated_openai_gpt4o_text += current_file_openai_gpt4o
+                                accumulated_azure_openai_gpt4o_text += current_file_azure_openai_gpt4o
+
+                        elif single_image_processing == "ファイル単位で処理+最初・最後":
+                            # ファイル単位で処理+最初・最後モード
+                            print(f"ファイル単位+最初・最後処理開始: {len(base64_data_list)}枚の画像を拡張処理中...")
+
+                            # doc_idでグループ化
+                            file_groups = {}
+                            for base64_data, doc_id, img_id in base64_data_list:
+                                if doc_id not in file_groups:
+                                    file_groups[doc_id] = []
+                                file_groups[doc_id].append((base64_data, doc_id, img_id))
+
+                            print(f"ファイルグループ数: {len(file_groups)}")
+
+                            # 各ファイルグループを順次処理
+                            for file_index, (doc_id, file_images) in enumerate(file_groups.items(), 1):
+                                print(f"ファイル {file_index}/{len(file_groups)} (doc_id: {doc_id}) を拡張処理中...")
+
+                                # 現在のファイルの検索された画像のimg_idを取得
+                                searched_img_ids = [int(img_id) for _, _, img_id in file_images if img_id is not None]
+                                print(f"検索された画像のimg_id: {searched_img_ids}")
+
+                                # 追加で取得する画像を決定（最初と最後の画像のみ）
+                                additional_images = []
+
+                                # 最初と最後の画像を取得
+                                try:
+                                    with pool.acquire() as conn:
+                                        with conn.cursor() as cursor:
+                                            # 最初と最後の画像を取得
+                                            first_last_sql = f"""
+                                            SELECT base64_data, doc_id, img_id
+                                            FROM {DEFAULT_COLLECTION_NAME}_image
+                                            WHERE doc_id = :doc_id
+                                            AND base64_data IS NOT NULL
+                                            AND (img_id = (SELECT MIN(img_id) FROM {DEFAULT_COLLECTION_NAME}_image WHERE doc_id = :doc_id)
+                                                 OR img_id = (SELECT MAX(img_id) FROM {DEFAULT_COLLECTION_NAME}_image WHERE doc_id = :doc_id))
+                                            ORDER BY img_id ASC
+                                            """
+                                            cursor.execute(first_last_sql, {'doc_id': doc_id})
+                                            first_last_results = cursor.fetchall()
+
+                                            for row in first_last_results:
+                                                base64_data = row[0].read() if hasattr(row[0], 'read') else row[0]
+                                                img_id = int(row[2]) if row[2] is not None else None
+                                                if base64_data and img_id is not None and img_id not in searched_img_ids:
+                                                    additional_images.append((base64_data, row[1], img_id))
+                                                    print(f"最初/最後の画像を追加: img_id={img_id}")
+
+                                except Exception as e:
+                                    print(f"追加画像取得中にエラー: {e}")
+
+                                # 検索された画像と追加画像を結合（重複を除去）
+                                all_images = file_images.copy()
+                                existing_img_ids = {img_id for _, _, img_id in all_images}
+
+                                for additional_image in additional_images:
+                                    if additional_image[2] not in existing_img_ids:
+                                        all_images.append(additional_image)
+                                        existing_img_ids.add(additional_image[2])
+
+                                # img_idでソート
+                                all_images.sort(key=lambda x: x[2])
+
+                                print(f"処理対象画像数: {len(all_images)}枚 (検索: {len(file_images)}枚 + 追加: {len(additional_images)}枚)")
+
+                                # 各モデルの現在のファイルに対する回答を保持
+                                current_file_llama_4_maverick = ""
+                                current_file_llama_4_scout = ""
+                                current_file_llama_3_2_90b_vision = ""
+                                current_file_openai_gpt4o = ""
+                                current_file_azure_openai_gpt4o = ""
+
+                                # 現在のファイルの全画像を一括処理
+                                async for llm_results in process_multiple_images_streaming(
+                                        all_images,
+                                        query_text,
+                                        llm_answer_checkbox_group,
+                                        target_models,
+                                        custom_image_prompt
+                                ):
+                                    # 各LLMの結果を現在のファイルの回答として更新
+                                    if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_results:
+                                        current_file_llama_4_maverick = llm_results[
+                                            "meta/llama-4-maverick-17b-128e-instruct-fp8"]
+
+                                    if "meta/llama-4-scout-17b-16e-instruct" in llm_results:
+                                        current_file_llama_4_scout = llm_results["meta/llama-4-scout-17b-16e-instruct"]
+
+                                    if "meta/llama-3-2-90b-vision" in llm_results:
+                                        current_file_llama_3_2_90b_vision = llm_results["meta/llama-3-2-90b-vision"]
+
+                                    if "openai/gpt-4o" in llm_results:
+                                        current_file_openai_gpt4o = llm_results["openai/gpt-4o"]
+
+                                    if "azure_openai/gpt-4o" in llm_results:
+                                        current_file_azure_openai_gpt4o = llm_results["azure_openai/gpt-4o"]
+
+                                    # 累積テキストと現在のファイルの回答を結合して表示
+                                    current_llama_4_maverick_text = accumulated_llama_4_maverick_text + current_file_llama_4_maverick
+                                    current_llama_4_scout_text = accumulated_llama_4_scout_text + current_file_llama_4_scout
+                                    current_llama_3_2_90b_vision_text = accumulated_llama_3_2_90b_vision_text + current_file_llama_3_2_90b_vision
+                                    current_openai_gpt4o_text = accumulated_openai_gpt4o_text + current_file_openai_gpt4o
+                                    current_azure_openai_gpt4o_text = accumulated_azure_openai_gpt4o_text + current_file_azure_openai_gpt4o
+
+                                    # 更新されたVision 回答結果をyield
+                                    yield (
+                                        gr.Markdown(value=current_llama_4_maverick_text),
+                                        gr.Markdown(value=current_llama_4_scout_text),
+                                        gr.Markdown(value=current_llama_3_2_90b_vision_text),
+                                        gr.Markdown(value=current_openai_gpt4o_text),
+                                        gr.Markdown(value=current_azure_openai_gpt4o_text)
+                                    )
+
+                                # 現在のファイルの処理が完了したら、累積テキストに追加
+                                accumulated_llama_4_maverick_text += current_file_llama_4_maverick
+                                accumulated_llama_4_scout_text += current_file_llama_4_scout
+                                accumulated_llama_3_2_90b_vision_text += current_file_llama_3_2_90b_vision
+                                accumulated_openai_gpt4o_text += current_file_openai_gpt4o
+                                accumulated_azure_openai_gpt4o_text += current_file_azure_openai_gpt4o
+
+                        else:
+                            # ファイル単位で処理+最初・最後・前後画像モード
+                            print(f"ファイル単位+最初・最後・前後画像処理開始: {len(base64_data_list)}枚の画像を拡張処理中...")
+
+                            # doc_idでグループ化
+                            file_groups = {}
+                            for base64_data, doc_id, img_id in base64_data_list:
+                                if doc_id not in file_groups:
+                                    file_groups[doc_id] = []
+                                file_groups[doc_id].append((base64_data, doc_id, img_id))
+
+                            print(f"ファイルグループ数: {len(file_groups)}")
+
+                            # 各ファイルグループを順次処理
+                            for file_index, (doc_id, file_images) in enumerate(file_groups.items(), 1):
+                                print(f"ファイル {file_index}/{len(file_groups)} (doc_id: {doc_id}) を拡張処理中...")
+
+                                # 現在のファイルの検索された画像のimg_idを取得
+                                searched_img_ids = [int(img_id) for _, _, img_id in file_images if img_id is not None]
+                                print(f"検索された画像のimg_id: {searched_img_ids}")
+
+                                # 追加で取得する画像を決定
+                                additional_images = []
+
+                                # 1. 最初と最後の画像を取得
+                                try:
+                                    with pool.acquire() as conn:
+                                        with conn.cursor() as cursor:
+                                            # 最初と最後の画像を取得
+                                            first_last_sql = f"""
+                                            SELECT base64_data, doc_id, img_id
+                                            FROM {DEFAULT_COLLECTION_NAME}_image
+                                            WHERE doc_id = :doc_id
+                                            AND base64_data IS NOT NULL
+                                            AND (img_id = (SELECT MIN(img_id) FROM {DEFAULT_COLLECTION_NAME}_image WHERE doc_id = :doc_id)
+                                                 OR img_id = (SELECT MAX(img_id) FROM {DEFAULT_COLLECTION_NAME}_image WHERE doc_id = :doc_id))
+                                            ORDER BY img_id ASC
+                                            """
+                                            cursor.execute(first_last_sql, {'doc_id': doc_id})
+                                            first_last_results = cursor.fetchall()
+
+                                            for row in first_last_results:
+                                                base64_data = row[0].read() if hasattr(row[0], 'read') else row[0]
+                                                # img_idはNUMBER型なので、直接使用するか安全に変換
+                                                img_id = row[2] if isinstance(row[2], (int, float)) and row[2] is not None else (int(row[2]) if row[2] is not None else None)
+                                                if base64_data and img_id is not None and img_id not in searched_img_ids:
+                                                    additional_images.append((base64_data, row[1], img_id))
+                                                    print(f"最初/最後の画像を追加: img_id={img_id}")
+
+                                            # 2. 検索された画像の前後の画像を取得
+                                            for searched_img_id in searched_img_ids:
+                                                # img_idを整数に変換（NUMBER型対応）
+                                                try:
+                                                    searched_img_id_int = searched_img_id if isinstance(searched_img_id, (int, float)) else int(searched_img_id)
+                                                except (ValueError, TypeError):
+                                                    print(f"img_idの変換に失敗: {searched_img_id}")
+                                                    continue
+
+                                                # 前の画像
+                                                prev_sql = f"""
+                                                SELECT base64_data, doc_id, img_id
+                                                FROM {DEFAULT_COLLECTION_NAME}_image
+                                                WHERE doc_id = :doc_id
+                                                AND img_id = :prev_img_id
+                                                AND base64_data IS NOT NULL
+                                                """
+                                                cursor.execute(prev_sql, {'doc_id': doc_id, 'prev_img_id': searched_img_id_int - 1})
+                                                prev_result = cursor.fetchone()
+                                                if prev_result:
+                                                    base64_data = prev_result[0].read() if hasattr(prev_result[0], 'read') else prev_result[0]
+                                                    img_id = int(prev_result[2]) if prev_result[2] is not None else None
+                                                    if base64_data and img_id is not None and img_id not in searched_img_ids:
+                                                        additional_images.append((base64_data, prev_result[1], img_id))
+                                                        print(f"前の画像を追加: img_id={img_id}")
+
+                                                # 後の画像
+                                                next_sql = f"""
+                                                SELECT base64_data, doc_id, img_id
+                                                FROM {DEFAULT_COLLECTION_NAME}_image
+                                                WHERE doc_id = :doc_id
+                                                AND img_id = :next_img_id
+                                                AND base64_data IS NOT NULL
+                                                """
+                                                cursor.execute(next_sql, {'doc_id': doc_id, 'next_img_id': searched_img_id_int + 1})
+                                                next_result = cursor.fetchone()
+                                                if next_result:
+                                                    base64_data = next_result[0].read() if hasattr(next_result[0], 'read') else next_result[0]
+                                                    # img_idはNUMBER型なので、直接使用するか安全に変換
+                                                    img_id = next_result[2] if isinstance(next_result[2], (int, float)) and next_result[2] is not None else (int(next_result[2]) if next_result[2] is not None else None)
+                                                    if base64_data and img_id is not None and img_id not in searched_img_ids:
+                                                        additional_images.append((base64_data, next_result[1], img_id))
+                                                        print(f"後の画像を追加: img_id={img_id}")
+
+                                except Exception as e:
+                                    print(f"追加画像取得中にエラー: {e}")
+
+                                # 検索された画像と追加画像を結合（重複を除去）
+                                all_images = file_images.copy()
+                                existing_img_ids = {img_id for _, _, img_id in all_images}
+
+                                for additional_image in additional_images:
+                                    if additional_image[2] not in existing_img_ids:
+                                        all_images.append(additional_image)
+                                        existing_img_ids.add(additional_image[2])
+
+                                # img_idでソート
+                                all_images.sort(key=lambda x: x[2])
+
+                                print(f"処理対象画像数: {len(all_images)}枚 (検索: {len(file_images)}枚 + 追加: {len(additional_images)}枚)")
+
+                                # 各モデルの現在のファイルに対する回答を保持
+                                current_file_llama_4_maverick = ""
+                                current_file_llama_4_scout = ""
+                                current_file_llama_3_2_90b_vision = ""
+                                current_file_openai_gpt4o = ""
+                                current_file_azure_openai_gpt4o = ""
+
+                                # 現在のファイルの全画像を一括処理
+                                async for llm_results in process_multiple_images_streaming(
+                                        all_images,
+                                        query_text,
+                                        llm_answer_checkbox_group,
+                                        target_models,
+                                        custom_image_prompt
+                                ):
+                                    # 各LLMの結果を現在のファイルの回答として更新
+                                    if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_results:
+                                        current_file_llama_4_maverick = llm_results[
+                                            "meta/llama-4-maverick-17b-128e-instruct-fp8"]
+
+                                    if "meta/llama-4-scout-17b-16e-instruct" in llm_results:
+                                        current_file_llama_4_scout = llm_results["meta/llama-4-scout-17b-16e-instruct"]
+
+                                    if "meta/llama-3-2-90b-vision" in llm_results:
+                                        current_file_llama_3_2_90b_vision = llm_results["meta/llama-3-2-90b-vision"]
+
+                                    if "openai/gpt-4o" in llm_results:
+                                        current_file_openai_gpt4o = llm_results["openai/gpt-4o"]
+
+                                    if "azure_openai/gpt-4o" in llm_results:
+                                        current_file_azure_openai_gpt4o = llm_results["azure_openai/gpt-4o"]
+
+                                    # 累積テキストと現在のファイルの回答を結合して表示
+                                    current_llama_4_maverick_text = accumulated_llama_4_maverick_text + current_file_llama_4_maverick
+                                    current_llama_4_scout_text = accumulated_llama_4_scout_text + current_file_llama_4_scout
+                                    current_llama_3_2_90b_vision_text = accumulated_llama_3_2_90b_vision_text + current_file_llama_3_2_90b_vision
+                                    current_openai_gpt4o_text = accumulated_openai_gpt4o_text + current_file_openai_gpt4o
+                                    current_azure_openai_gpt4o_text = accumulated_azure_openai_gpt4o_text + current_file_azure_openai_gpt4o
+
+                                    # 更新されたVision 回答結果をyield
+                                    yield (
+                                        gr.Markdown(value=current_llama_4_maverick_text),
+                                        gr.Markdown(value=current_llama_4_scout_text),
+                                        gr.Markdown(value=current_llama_3_2_90b_vision_text),
+                                        gr.Markdown(value=current_openai_gpt4o_text),
+                                        gr.Markdown(value=current_azure_openai_gpt4o_text)
+                                    )
+
+                                # 現在のファイルの処理が完了したら、累積テキストに追加
+                                accumulated_llama_4_maverick_text += current_file_llama_4_maverick
+                                accumulated_llama_4_scout_text += current_file_llama_4_scout
+                                accumulated_llama_3_2_90b_vision_text += current_file_llama_3_2_90b_vision
+                                accumulated_openai_gpt4o_text += current_file_openai_gpt4o
+                                accumulated_azure_openai_gpt4o_text += current_file_azure_openai_gpt4o
 
         except Exception as db_e:
             print(f"データベース操作中にエラーが発生しました: {db_e}")
@@ -5328,6 +5750,7 @@ async def eval_by_ragas(
         search_result,
         llm_answer_checkbox_group,
         llm_evaluation_checkbox,
+        use_image,
         system_text,
         standard_answer_text,
         xai_grok_3_response,
@@ -5341,6 +5764,23 @@ async def eval_by_ragas(
         azure_openai_gpt4o_response,
         azure_openai_gpt4_response
 ):
+    # Vision回答がONの場合、LLM評価をスキップ
+    if use_image:
+        print("Vision回答がオンのため、LLM評価をスキップします")
+        yield (
+            gr.Markdown(value=""),  # xai_grok_3_evaluation
+            gr.Markdown(value=""),  # command_a_evaluation
+            gr.Markdown(value=""),  # llama_4_maverick_evaluation
+            gr.Markdown(value=""),  # llama_4_scout_evaluation
+            gr.Markdown(value=""),  # llama_3_3_70b_evaluation
+            gr.Markdown(value=""),  # llama_3_2_90b_vision_evaluation
+            gr.Markdown(value=""),  # openai_gpt4o_evaluation
+            gr.Markdown(value=""),  # openai_gpt4_evaluation
+            gr.Markdown(value=""),  # azure_openai_gpt4o_evaluation
+            gr.Markdown(value="")   # azure_openai_gpt4_evaluation
+        )
+        return
+
     has_error = False
     if not query_text:
         has_error = True
@@ -5468,8 +5908,6 @@ async def eval_by_ragas(
  {command_a_response}
 
 -出力-\n　"""
-
-
 
         llama_4_maverick_user_text = f"""
 -標準回答-
@@ -5604,10 +6042,43 @@ async def eval_by_ragas(
             )
 
 
+def remove_base64_images_from_text(text):
+    """
+    テキストからbase64画像情報を削除する
+
+    Args:
+        text: 処理対象のテキスト
+
+    Returns:
+        base64画像情報が削除されたテキスト
+    """
+    if not text or not isinstance(text, str):
+        return text
+
+    import re
+
+    # base64画像のパターンを定義（data:image/で始まるもの）
+    base64_image_pattern = r'data:image/[^;]+;base64,[A-Za-z0-9+/=]+'
+
+    # Markdown形式の画像（![alt](data:image/...)）を削除
+    markdown_image_pattern = r'!\[[^\]]*\]\(data:image/[^;]+;base64,[A-Za-z0-9+/=]+\)'
+
+    # HTML形式の画像（<img src="data:image/...">）を削除
+    html_image_pattern = r'<img[^>]*src=["\']data:image/[^;]+;base64,[A-Za-z0-9+/=]+["\'][^>]*>'
+
+    # 各パターンを削除
+    text = re.sub(markdown_image_pattern, '', text)
+    text = re.sub(html_image_pattern, '', text)
+    text = re.sub(base64_image_pattern, '', text)
+
+    return text
+
+
 def generate_download_file(
         search_result,
         llm_answer_checkbox_group,
         include_citation,
+        use_image,
         llm_evaluation_checkbox,
         query_text,
         doc_id_all_checkbox_input,
@@ -5632,8 +6103,18 @@ def generate_download_file(
         openai_gpt4o_evaluation,
         openai_gpt4_evaluation,
         azure_openai_gpt4o_evaluation,
-        azure_openai_gpt4_evaluation
+        azure_openai_gpt4_evaluation,
+        llama_4_maverick_image_response,
+        llama_4_scout_image_response,
+        llama_3_2_90b_vision_image_response,
+        openai_gpt4o_image_response,
+        azure_openai_gpt4o_image_response
 ):
+    # Vision 回答がオンの場合、引用設定を固定でFalseにする
+    if use_image:
+        include_citation = False
+        print("Vision 回答がオンのため、generate_download_file内でinclude_citation=Falseに設定されました")
+
     if not query_text:
         return gr.DownloadButton(value=None, visible=False)
     if not doc_id_all_checkbox_input and (not doc_id_checkbox_group_input or doc_id_checkbox_group_input == [""]):
@@ -5676,8 +6157,6 @@ def generate_download_file(
         command_a_response = ""
         command_a_evaluation = ""
         command_a_referenced_contexts = ""
-
-
 
     if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox_group:
         llama_4_maverick_response = llama_4_maverick_response
@@ -5822,6 +6301,18 @@ def generate_download_file(
                 azure_openai_gpt4o_response,
                 azure_openai_gpt4_response
             ],
+            'Vision 回答': [
+                "",  # xai/grok-3 (Vision機能なし)
+                "",  # cohere/command-a (Vision機能なし)
+                remove_base64_images_from_text(llama_4_maverick_image_response),
+                remove_base64_images_from_text(llama_4_scout_image_response),
+                "",  # meta/llama-3-3-70b (Vision機能なし)
+                remove_base64_images_from_text(llama_3_2_90b_vision_image_response),
+                remove_base64_images_from_text(openai_gpt4o_image_response),
+                "",  # openai/gpt-4 (Vision機能なし)
+                remove_base64_images_from_text(azure_openai_gpt4o_image_response),
+                ""   # azure_openai/gpt-4 (Vision機能なし)
+            ],
             '引用 Contexts': [
                 xai_grok_3_referenced_contexts,
                 command_a_referenced_contexts,
@@ -5874,6 +6365,7 @@ def generate_eval_result_file():
                                 r.sql,
                                 f.llm_name,
                                 f.llm_answer,
+                                f.vlm_answer,
                                 f.ragas_evaluation_result,
                                 f.human_evaluation_result,
                                 f.user_comment,
@@ -5908,6 +6400,7 @@ def generate_eval_result_file():
                 'SQL': '使用されたSQL',
                 'LLM_NAME': 'LLM モデル',
                 'LLM_ANSWER': 'LLM メッセージ',
+                'VLM_ANSWER': 'Vision 回答',
                 'RAGAS_EVALUATION_RESULT': 'LLM 評価結果',
                 'HUMAN_EVALUATION_RESULT': 'Human 評価結果',
                 'USER_COMMENT': 'Human コメント',
@@ -5918,6 +6411,12 @@ def generate_eval_result_file():
 
             # 必要に応じてcreated_date列をdatetime型に変換
             result_df['作成日時'] = pd.to_datetime(result_df['作成日時'], format='%Y-%m-%d %H:%M:%S')
+
+            # Vision回答からbase64画像情報を削除
+            if 'Vision 回答' in result_df.columns:
+                result_df['Vision 回答'] = result_df['Vision 回答'].apply(
+                    lambda x: remove_base64_images_from_text(x) if pd.notna(x) else x
+                )
 
             # ファイルパスを定義
             filepath = '/tmp/evaluation_result.xlsx'
@@ -5967,7 +6466,12 @@ def insert_query_result(
         openai_gpt4o_evaluation,
         openai_gpt4_evaluation,
         azure_openai_gpt4o_evaluation,
-        azure_openai_gpt4_evaluation
+        azure_openai_gpt4_evaluation,
+        llama_4_maverick_image_response,
+        llama_4_scout_image_response,
+        llama_3_2_90b_vision_image_response,
+        openai_gpt4o_image_response,
+        azure_openai_gpt4o_image_response
 ):
     print("in insert_query_result() start...")
     if not query:
@@ -6011,19 +6515,22 @@ def insert_query_result(
                              INSERT INTO RAG_QA_FEEDBACK (query_id,
                                                           llm_name,
                                                           llm_answer,
+                                                          vlm_answer,
                                                           ragas_evaluation_result)
                              VALUES (:1,
                                      :2,
                                      :3,
-                                     :4) \
+                                     :4,
+                                     :5) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
                         query_id,
                         "xai/grok-3",
                         xai_grok_3_response,
+                        "",  # Vision機能なし
                         xai_grok_3_evaluation
                     ]
                 )
@@ -6039,23 +6546,25 @@ def insert_query_result(
                              INSERT INTO RAG_QA_FEEDBACK (query_id,
                                                           llm_name,
                                                           llm_answer,
+                                                          vlm_answer,
                                                           ragas_evaluation_result)
                              VALUES (:1,
                                      :2,
                                      :3,
-                                     :4) \
+                                     :4,
+                                     :5) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
                         query_id,
                         "cohere/command-a",
                         command_a_response,
+                        "",  # Vision機能なし
                         command_a_evaluation
                     ]
                 )
-
 
             if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox_group:
                 llama_4_maverick_response = llama_4_maverick_response
@@ -6068,19 +6577,22 @@ def insert_query_result(
                              INSERT INTO RAG_QA_FEEDBACK (query_id,
                                                           llm_name,
                                                           llm_answer,
+                                                          vlm_answer,
                                                           ragas_evaluation_result)
                              VALUES (:1,
                                      :2,
                                      :3,
-                                     :4) \
+                                     :4,
+                                     :5) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
                         query_id,
                         "meta/llama-4-maverick-17b-128e-instruct-fp8",
                         llama_4_maverick_response,
+                        remove_base64_images_from_text(llama_4_maverick_image_response),
                         llama_4_maverick_evaluation
                     ]
                 )
@@ -6096,19 +6608,22 @@ def insert_query_result(
                              INSERT INTO RAG_QA_FEEDBACK (query_id,
                                                           llm_name,
                                                           llm_answer,
+                                                          vlm_answer,
                                                           ragas_evaluation_result)
                              VALUES (:1,
                                      :2,
                                      :3,
-                                     :4) \
+                                     :4,
+                                     :5) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
                         query_id,
                         "meta/llama-4-scout-17b-16e-instruct",
                         llama_4_scout_response,
+                        remove_base64_images_from_text(llama_4_scout_image_response),
                         llama_4_scout_evaluation
                     ]
                 )
@@ -6124,19 +6639,22 @@ def insert_query_result(
                              INSERT INTO RAG_QA_FEEDBACK (query_id,
                                                           llm_name,
                                                           llm_answer,
+                                                          vlm_answer,
                                                           ragas_evaluation_result)
                              VALUES (:1,
                                      :2,
                                      :3,
-                                     :4) \
+                                     :4,
+                                     :5) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
                         query_id,
                         "meta/llama-3-3-70b",
                         llama_3_3_70b_response,
+                        "",  # Vision機能なし
                         llama_3_3_70b_evaluation
                     ]
                 )
@@ -6152,19 +6670,22 @@ def insert_query_result(
                              INSERT INTO RAG_QA_FEEDBACK (query_id,
                                                           llm_name,
                                                           llm_answer,
+                                                          vlm_answer,
                                                           ragas_evaluation_result)
                              VALUES (:1,
                                      :2,
                                      :3,
-                                     :4) \
+                                     :4,
+                                     :5) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
                         query_id,
                         "meta/llama-3-2-90b-vision",
                         llama_3_2_90b_vision_response,
+                        remove_base64_images_from_text(llama_3_2_90b_vision_image_response),
                         llama_3_2_90b_vision_evaluation
                     ]
                 )
@@ -6180,19 +6701,22 @@ def insert_query_result(
                              INSERT INTO RAG_QA_FEEDBACK (query_id,
                                                           llm_name,
                                                           llm_answer,
+                                                          vlm_answer,
                                                           ragas_evaluation_result)
                              VALUES (:1,
                                      :2,
                                      :3,
-                                     :4) \
+                                     :4,
+                                     :5) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
                         query_id,
                         "openai/gpt-4o",
                         openai_gpt4o_response,
+                        remove_base64_images_from_text(openai_gpt4o_image_response),
                         openai_gpt4o_evaluation
                     ]
                 )
@@ -6208,19 +6732,22 @@ def insert_query_result(
                              INSERT INTO RAG_QA_FEEDBACK (query_id,
                                                           llm_name,
                                                           llm_answer,
+                                                          vlm_answer,
                                                           ragas_evaluation_result)
                              VALUES (:1,
                                      :2,
                                      :3,
-                                     :4) \
+                                     :4,
+                                     :5) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
                         query_id,
                         "openai/gpt-4",
                         openai_gpt4_response,
+                        "",  # Vision機能なし
                         openai_gpt4_evaluation
                     ]
                 )
@@ -6236,19 +6763,22 @@ def insert_query_result(
                              INSERT INTO RAG_QA_FEEDBACK (query_id,
                                                           llm_name,
                                                           llm_answer,
+                                                          vlm_answer,
                                                           ragas_evaluation_result)
                              VALUES (:1,
                                      :2,
                                      :3,
-                                     :4) \
+                                     :4,
+                                     :5) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
                         query_id,
                         "azure_openai/gpt-4o",
                         azure_openai_gpt4o_response,
+                        remove_base64_images_from_text(azure_openai_gpt4o_image_response),
                         azure_openai_gpt4o_evaluation
                     ]
                 )
@@ -6264,19 +6794,22 @@ def insert_query_result(
                              INSERT INTO RAG_QA_FEEDBACK (query_id,
                                                           llm_name,
                                                           llm_answer,
+                                                          vlm_answer,
                                                           ragas_evaluation_result)
                              VALUES (:1,
                                      :2,
                                      :3,
-                                     :4) \
+                                     :4,
+                                     :5) \
                              """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB)
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB, oracledb.CLOB)
                 cursor.execute(
                     insert_sql,
                     [
                         query_id,
                         "azure_openai/gpt-4",
                         azure_openai_gpt4_response,
+                        "",  # Vision機能なし
                         azure_openai_gpt4_evaluation
                     ]
                 )
@@ -6570,7 +7103,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         min_height=200,
                         max_height=300
                     )
-
 
                 with gr.Accordion(
                         label="Llama 4 Maverick 17b メッセージ",
@@ -7022,23 +7554,15 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             value=[]
                         )
                 with gr.Row():
-                    with gr.Column():
+                    with gr.Column(scale=1):
                         tab_chat_document_question_embedding_model_checkbox_group = gr.CheckboxGroup(
                             ["cohere/embed-multilingual-v3.0"],
                             label="Embedding モデル*",
                             value="cohere/embed-multilingual-v3.0",
                             interactive=False
                         )
-                    with gr.Column():
-                        tab_chat_document_reranker_model_radio = gr.Radio(
-                            [
-                                "None",
-                                # "cohere/rerank-multilingual-v3.1",
-                                # "cohere/rerank-english-v3.1",
-                                "cohere/rerank-multilingual-v3.0",
-                                "cohere/rerank-english-v3.0",
-                            ],
-                            label="Rerank モデル*", value="None")
+                    with gr.Column(scale=1):
+                        gr.Markdown("&nbsp;")
                 with gr.Row():
                     with gr.Column():
                         tab_chat_document_top_k_slider = gr.Slider(
@@ -7059,6 +7583,19 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             step=0.05,
                             value=0.55
                         )
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        tab_chat_document_reranker_model_radio = gr.Radio(
+                            [
+                                "None",
+                                # "cohere/rerank-multilingual-v3.1",
+                                # "cohere/rerank-english-v3.1",
+                                "cohere/rerank-multilingual-v3.0",
+                                "cohere/rerank-english-v3.0",
+                            ],
+                            label="Rerank モデル*", value="None")
+                    with gr.Column(scale=1):
+                        gr.Markdown("&nbsp;")
                 with gr.Row():
                     with gr.Column():
                         tab_chat_document_reranker_top_k_slider = gr.Slider(
@@ -7127,7 +7664,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             )
                         with gr.Column():
                             tab_chat_document_text_search_k_slider = gr.Slider(
-                                label="テキスト検索Limit-K",
+                                label="テキスト検索 Limit-K",
                                 minimum=1,
                                 maximum=10,
                                 step=1,
@@ -7172,30 +7709,43 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 info="Promptに回答時の現在の時間を含めます。"
                             )
                     with gr.Row():
-                        with gr.Column():
+                        with gr.Column(scale=1):
                             tab_chat_document_use_image_checkbox = gr.Checkbox(
-                                label="画像を使って回答",
+                                label="Vision 回答",
                                 value=False,
-                                info="RAGの回答時に画像データを使用。ただし、処理する画像数を10個に制限。"
+                                info="検索された画像データを専用のVisionモデルで解析し、より正確な回答を提供。オンの場合、Highest-Ranked-One、Extend-First-K、Extend-Around-K、回答に引用を含める、Promptに現在の時間を含める、LLM 評価の設定は無視される。"
                             )
+                        with gr.Column(scale=1):
+                            tab_chat_document_image_limit_k_slider = gr.Slider(
+                                label="画像 Limit-K",
+                                minimum=1,
+                                maximum=10,
+                                step=1,
+                                value=5,
+                                visible=False,
+                                info="Vision 回答で使用する画像の最大数（1-10）"
+                            )
+                    with gr.Row():
                         with gr.Column():
-                            tab_chat_document_single_image_processing_checkbox = gr.Checkbox(
-                                label="1枚ずつ処理",
-                                value=True,
-                                info="チェックすると画像を1枚ずつ処理、チェックしないと全ての画像を一括処理。"
+                            tab_chat_document_single_image_processing_radio = gr.Radio(
+                                label="画像処理方式",
+                                choices=["1枚ずつ処理", "全画像まとめて処理", "ファイル単位で処理", "ファイル単位で処理+最初・最後", "ファイル単位で処理+最初・最後・前後画像"],
+                                value="1枚ずつ処理",
+                                visible=False,
+                                info="Default value: ファイル単位で処理+最初・最後。1枚ずつ処理: 各画像を個別に分析。全画像まとめて処理: 全ての画像を一度に送信。ファイル単位で処理: 同一ファイルの画像をまとめて処理。ファイル単位で処理+最初・最後: 各ファイルの最初と最後の画像を含めて処理。ファイル単位で処理+最初・最後・前後画像: 各ファイルの最初と最後の画像及び検索された画像の前後を含めて処理。"
                             )
-                    with gr.Accordion(label="画像 Prompt 設定", open=False,
+                    with gr.Accordion(label="Vision 回答 Prompt 設定", open=False,
                                       visible=False) as tab_chat_document_image_prompt_accordion:
                         with gr.Row():
                             with gr.Column():
                                 tab_chat_document_image_prompt_text = gr.Textbox(
-                                    label="画像 Prompt テンプレート",
+                                    label="VisionPromptテンプレート",
                                     lines=15,
                                     max_lines=25,
                                     interactive=True,
                                     show_copy_button=True,
                                     value=get_image_qa_prompt("{{query_text}}"),
-                                    info="画像処理で使用されるpromptテンプレートです。{{query_text}}は実行時に置換されます。"
+                                    info="Vision処理で使用されるPromptテンプレートです。{{query_text}}は実行時に置換されます。"
                                 )
                         with gr.Row():
                             with gr.Column(scale=1):
@@ -7234,43 +7784,27 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         interactive=True
                     )
                 with gr.Row():
-                    tab_chat_document_llm_evaluation_checkbox = gr.Checkbox(
-                        label="LLM 評価",
-                        show_label=True,
-                        interactive=True,
-                        value=False,
-                    )
-                with gr.Row():
-                    #                     tab_chat_document_system_message_text = gr.Textbox(label="システム・メッセージ*", lines=15,
-                    #                                                                        max_lines=20,
-                    #                                                                        interactive=True,
-                    #                                                                        visible=False,
-                    #                                                                        value=f"""You are an ANSWER EVALUATOR.
-                    # Your task is to compare a given answer to a standard answer and evaluate its quality.
-                    # Respond with a score from 0 to 10 for each of the following criteria:
-                    # 1. Correctness (0 being completely incorrect, 10 being perfectly correct)
-                    # 2. Completeness (0 being entirely incomplete, 10 being fully complete)
-                    # 3. Clarity (0 being very unclear, 10 being extremely clear)
-                    # 4. Conciseness (0 being extremely verbose, 10 being optimally concise)
-                    #
-                    # After providing scores, give a brief explanation for each score.
-                    # Finally, provide an overall score from 0 to 10 and a summary of the evaluation.
-                    # Please respond to me in the same language I use for my messages.
-                    # If I switch languages, please switch your responses accordingly.
-                    #                 """)
+                    with gr.Column(scale=1):
+                        tab_chat_document_llm_evaluation_checkbox = gr.Checkbox(
+                            label="LLM 評価",
+                            show_label=True,
+                            interactive=True,
+                            value=False,
+                        )
+                    with gr.Column(scale=1):
+                        gr.Markdown("&nbsp;")
+                with gr.Row(visible=False) as tab_chat_document_system_message_row:
                     tab_chat_document_system_message_text = gr.Textbox(
                         label="システム・メッセージ*",
                         lines=15,
                         max_lines=20,
                         interactive=True,
-                        visible=False,
                         value=get_llm_evaluation_system_message())
-                with gr.Row():
+                with gr.Row(visible=False) as tab_chat_document_standard_answer_row:
                     tab_chat_document_standard_answer_text = gr.Textbox(
                         label="標準回答*",
                         lines=2,
-                        interactive=True,
-                        visible=False
+                        interactive=True
                     )
                 with gr.Accordion("ドキュメント*", open=True):
                     with gr.Row():
@@ -7474,7 +8008,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             max_height=300
                         )
 
-
                 with gr.Accordion(
                         label="Llama 4 Maverick 17b メッセージ",
                         visible=False,
@@ -7487,7 +8020,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         max_height=300
                     )
                     with gr.Accordion(
-                            label="画像回答",
+                            label="Vision 回答",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_llama_4_maverick_image_accordion:
@@ -7552,7 +8085,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         max_height=300
                     )
                     with gr.Accordion(
-                            label="画像回答",
+                            label="Vision 回答",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_llama_4_scout_image_accordion:
@@ -7671,7 +8204,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         max_height=300
                     )
                     with gr.Accordion(
-                            label="画像回答",
+                            label="Vision 回答",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_llama_3_2_90b_vision_image_accordion:
@@ -7734,7 +8267,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         max_height=300
                     )
                     with gr.Accordion(
-                            label="画像回答",
+                            label="Vision 回答",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_openai_gpt4o_image_accordion:
@@ -7853,7 +8386,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         max_height=300
                     )
                     with gr.Accordion(
-                            label="画像回答",
+                            label="Vision 回答",
                             visible=False,
                             open=True
                     ) as tab_chat_document_llm_azure_openai_gpt4o_image_accordion:
@@ -8235,25 +8768,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ]
     )
 
-    # tab_split_document_embed_save_button.click(
-    #     split_document_by_unstructured,
-    #     inputs=[
-    #         tab_split_document_doc_id_radio,
-    #         tab_split_document_chunks_by_radio,
-    #         tab_split_document_chunks_max_slider,
-    #         tab_split_document_chunks_overlap_slider,
-    #         tab_split_document_chunks_split_by_radio,
-    #         tab_split_document_chunks_split_by_custom_text,
-    #         tab_split_document_chunks_language_radio,
-    #         tab_split_document_chunks_normalize_radio,
-    #         tab_split_document_chunks_normalize_options_checkbox_group
-    #     ],
-    #     outputs=[
-    #         tab_split_document_output_sql_text,
-    #         tab_split_document_chunks_count,
-    #         tab_split_document_chunks_result_dataframe
-    #     ],
-    # ).then(
     tab_split_document_embed_save_button.click(
         embed_save_document_by_unstructured,
         inputs=[
@@ -8343,16 +8857,16 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
     )
     tab_chat_document_llm_evaluation_checkbox.change(
         lambda x: (
-            gr.Textbox(visible=True, interactive=True),
-            gr.Textbox(visible=True, interactive=True, value="")
+            gr.Row(visible=True),
+            gr.Row(visible=True)
         ) if x else (
-            gr.Textbox(visible=False, interactive=False),
-            gr.Textbox(visible=False, interactive=False, value="")
+            gr.Row(visible=False),
+            gr.Row(visible=False)
         ),
         tab_chat_document_llm_evaluation_checkbox,
         [
-            tab_chat_document_system_message_text,
-            tab_chat_document_standard_answer_text
+            tab_chat_document_system_message_row,
+            tab_chat_document_standard_answer_row
         ]
     ).then(
         set_chat_llm_evaluation,
@@ -8389,10 +8903,12 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
 
     # 画像を使って回答チェックボックスの変更イベント
     tab_chat_document_use_image_checkbox.change(
-        lambda x: gr.Accordion(visible=True) if x else gr.Accordion(visible=False),  # 画像 Prompt 設定の表示/非表示のみ制御
+        lambda x: (gr.Accordion(visible=x), gr.Slider(visible=x), gr.Radio(visible=x)) if x else (gr.Accordion(visible=False), gr.Slider(visible=False), gr.Radio(visible=False)),
         inputs=[tab_chat_document_use_image_checkbox],
         outputs=[
-            tab_chat_document_image_prompt_accordion
+            tab_chat_document_image_prompt_accordion,
+            tab_chat_document_image_limit_k_slider,
+            tab_chat_document_single_image_processing_radio,
         ]
     ).then(
         set_image_answer_visibility,
@@ -8555,6 +9071,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_searched_result_dataframe,
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_include_citation_checkbox,
+            tab_chat_document_use_image_checkbox,
             tab_chat_document_query_text,
             tab_chat_document_doc_id_all_checkbox,
             tab_chat_document_doc_id_checkbox_group,
@@ -8586,7 +9103,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         inputs=[
             tab_chat_document_searched_result_dataframe,
             tab_chat_document_use_image_checkbox,
-            tab_chat_document_single_image_processing_checkbox,
+            tab_chat_document_single_image_processing_radio,
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_query_text,
             tab_chat_document_llama_4_maverick_image_answer_text,
@@ -8594,7 +9111,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llama_3_2_90b_vision_image_answer_text,
             tab_chat_document_openai_gpt4o_image_answer_text,
             tab_chat_document_azure_openai_gpt4o_image_answer_text,
-            tab_chat_document_image_prompt_text
+            tab_chat_document_image_limit_k_slider,
+            tab_chat_document_image_prompt_text,
         ],
         outputs=[
             tab_chat_document_llama_4_maverick_image_answer_text,
@@ -8612,6 +9130,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_searched_result_dataframe,
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_llm_evaluation_checkbox,
+            tab_chat_document_use_image_checkbox,
             tab_chat_document_system_message_text,
             tab_chat_document_standard_answer_text,
             tab_chat_document_xai_grok_3_answer_text,
@@ -8643,6 +9162,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_searched_result_dataframe,
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_include_citation_checkbox,
+            tab_chat_document_use_image_checkbox,
             tab_chat_document_llm_evaluation_checkbox,
             tab_chat_document_query_text,
             tab_chat_document_doc_id_all_checkbox,
@@ -8668,6 +9188,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_openai_gpt4_evaluation_text,
             tab_chat_document_azure_openai_gpt4o_evaluation_text,
             tab_chat_document_azure_openai_gpt4_evaluation_text,
+            tab_chat_document_llama_4_maverick_image_answer_text,
+            tab_chat_document_llama_4_scout_image_answer_text,
+            tab_chat_document_llama_3_2_90b_vision_image_answer_text,
+            tab_chat_document_openai_gpt4o_image_answer_text,
+            tab_chat_document_azure_openai_gpt4o_image_answer_text,
         ],
         outputs=[
             tab_chat_document_download_output_button
@@ -8710,6 +9235,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_openai_gpt4_evaluation_text,
             tab_chat_document_azure_openai_gpt4o_evaluation_text,
             tab_chat_document_azure_openai_gpt4_evaluation_text,
+            tab_chat_document_llama_4_maverick_image_answer_text,
+            tab_chat_document_llama_4_scout_image_answer_text,
+            tab_chat_document_llama_3_2_90b_vision_image_answer_text,
+            tab_chat_document_openai_gpt4o_image_answer_text,
+            tab_chat_document_azure_openai_gpt4o_image_answer_text,
         ],
         outputs=[]
     )
@@ -8741,7 +9271,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_command_a_answer_human_eval_feedback_text,
         ]
     )
-
 
     tab_chat_document_llama_4_maverick_answer_human_eval_feedback_send_button.click(
         eval_by_human,
@@ -8864,9 +9393,9 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
     )
 
 
-    # RAG Prompt 設定のイベントハンドラー
+    # RAGPrompt設定のイベントハンドラー
     def save_rag_prompt(prompt_text):
-        """RAG promptを保存する"""
+        """RAGPromptを保存する"""
         try:
             update_langgpt_rag_prompt(prompt_text)
             return gr.Info("Promptが保存されました。")
@@ -8875,7 +9404,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
 
 
     def reset_rag_prompt():
-        """RAG promptをデフォルトに戻す"""
+        """RAGPromptをデフォルトに戻す"""
         default_prompt = get_langgpt_rag_prompt("{{context}}", "{{query_text}}", False, False)
         update_langgpt_rag_prompt(default_prompt)
         return default_prompt
@@ -8894,18 +9423,18 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
     )
 
 
-    # 画像 Prompt 設定のイベントハンドラー
+    # VisionPrompt設定のイベントハンドラー
     def save_image_prompt(prompt_text):
-        """画像 promptを保存する"""
+        """VisionPromptを保存する"""
         try:
             update_image_qa_prompt(prompt_text)
-            return gr.Info("画像 Promptが保存されました。")
+            return gr.Info("VisionPromptが保存されました。")
         except Exception as e:
-            return gr.Warning(f"画像 Promptの保存に失敗しました: {str(e)}")
+            return gr.Warning(f"VisionPromptの保存に失敗しました: {str(e)}")
 
 
     def reset_image_prompt():
-        """画像 promptをデフォルトに戻す"""
+        """VisionPromptをデフォルトに戻す"""
         default_prompt = get_image_qa_prompt("{{query_text}}")
         update_image_qa_prompt(default_prompt)
         return default_prompt
