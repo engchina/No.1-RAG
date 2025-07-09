@@ -317,9 +317,14 @@ def _create_table(client: Connection, collection_name: str, embedding_dim: int) 
         **kwargs: Any,
     ) -> List[Tuple[Document, float]]:
         docs_and_scores = []
-        # embedding_arr =  array.array("f", embedding)
+        # embeddingが既にarray.array("f")形式の場合はそのまま使用、そうでなければ変換
+        if isinstance(embedding, array.array):
+            embedding_arr = embedding
+        else:
+            # FLOAT32形式に変換してOracle DBの向量列と一致させる
+            embedding_arr = array.array("f", embedding)
         inputsizes_parameters = {"query_embedding": oracledb.DB_TYPE_VECTOR}
-        keyword_parameters = {"query_embedding": embedding}
+        keyword_parameters = {"query_embedding": embedding_arr}
         similarity_threshold = kwargs.get("similarity_threshold", 0.95)
         query = f"""(
             SELECT embed_id,

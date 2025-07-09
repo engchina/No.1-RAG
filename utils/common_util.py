@@ -1,3 +1,6 @@
+from dotenv import find_dotenv, get_key
+
+
 def get_dict_value(dictionary, key, default_value=None):
     """
     Safely get a value from a dictionary.
@@ -14,3 +17,15 @@ def get_dict_value(dictionary, key, default_value=None):
         return dictionary[key]
     except KeyError:
         return default_value
+
+
+def get_region():
+    """
+    OCI設定ファイルからリージョン情報を取得する共通関数
+
+    Returns:
+        str: OCIリージョン名
+    """
+    oci_config_path = find_dotenv("/root/.oci/config")
+    region = get_key(oci_config_path, "region")
+    return region

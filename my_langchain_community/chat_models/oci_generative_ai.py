@@ -168,12 +168,21 @@ class CohereProvider(Provider):
         return response.data.chat_response.text
 
     def chat_stream_to_text(self, event_data: Dict) -> str:
-        if "text" in event_data:
-            if "finishReason" in event_data or "toolCalls" in event_data:
-                return ""
+        try:
+            if "text" in event_data:
+                if "finishReason" in event_data or "toolCalls" in event_data:
+                    return ""
+                else:
+                    text_content = event_data["text"]
+                    # Debug logging for empty text content
+                    if not text_content:
+                        print(f"DEBUG: Cohere provider received empty text content in event_data: {event_data}")
+                    return text_content
             else:
-                return event_data["text"]
-        else:
+                print(f"DEBUG: Cohere provider - no 'text' field in event_data: {event_data}")
+                return ""
+        except Exception as e:
+            print(f"ERROR: Cohere provider chat_stream_to_text failed: {e}, event_data: {event_data}")
             return ""
 
     def is_chat_stream_end(self, event_data: Dict) -> bool:
@@ -399,7 +408,33 @@ class MetaProvider(Provider):
         return response.data.chat_response.choices[0].message.content[0].text
 
     def chat_stream_to_text(self, event_data: Dict) -> str:
-        return event_data["message"]["content"][0]["text"]
+        try:
+            if "message" not in event_data:
+                print(f"DEBUG: XAI provider - no 'message' field in event_data: {event_data}")
+                return ""
+
+            message = event_data["message"]
+            if "content" not in message:
+                print(f"DEBUG: XAI provider - no 'content' field in message: {message}")
+                return ""
+
+            content = message["content"]
+            if not isinstance(content, list) or len(content) == 0:
+                print(f"DEBUG: XAI provider - invalid content format: {content}")
+                return ""
+
+            if "text" not in content[0]:
+                print(f"DEBUG: XAI provider - no 'text' field in content[0]: {content[0]}")
+                return ""
+
+            text_content = content[0]["text"]
+            # Debug logging for empty text content
+            if not text_content:
+                print(f"DEBUG: XAI provider received empty text content in event_data: {event_data}")
+            return text_content
+        except Exception as e:
+            print(f"ERROR: XAI provider chat_stream_to_text failed: {e}, event_data: {event_data}")
+            return ""
 
     def is_chat_stream_end(self, event_data: Dict) -> bool:
         return "message" not in event_data
@@ -828,39 +863,53 @@ class ChatOCIGenAI(BaseChatModel, OCIGenAIBase):
         request = self._prepare_request(messages, stop=stop, stream=True, **kwargs)
         response = self.client.chat(request)
 
+        chunk_count = 0
         for event in response.data.events():
-            event_data = json.loads(event.data)
-            if not self._provider.is_chat_stream_end(event_data):  # still streaming
-                delta = self._provider.chat_stream_to_text(event_data)
-                chunk = ChatGenerationChunk(message=AIMessageChunk(content=delta))
-                if run_manager:
-                    run_manager.on_llm_new_token(delta, chunk=chunk)
-                yield chunk
-            else:  # stream end
-                generation_info = self._provider.chat_stream_generation_info(event_data)
-                tool_call_chunks = []
-                if tool_calls := generation_info.get("tool_calls"):
-                    content = self._provider.chat_stream_to_text(event_data)
-                    try:
-                        tool_call_chunks = [
-                            ToolCallChunk(
-                                name=tool_call["function"].get("name"),
-                                args=tool_call["function"].get("arguments"),
-                                id=tool_call.get("id"),
-                                index=tool_call.get("index"),
-                            )
-                            for tool_call in tool_calls
-                        ]
-                    except KeyError:
-                        pass
-                else:
-                    content = ""
-                message = AIMessageChunk(
-                    content=content,
-                    additional_kwargs=generation_info,
-                    tool_call_chunks=tool_call_chunks,
-                )
-                yield ChatGenerationChunk(
-                    message=message,
-                    generation_info=generation_info,
-                )
+            try:
+                event_data = json.loads(event.data)
+                chunk_count += 1
+
+                if not self._provider.is_chat_stream_end(event_data):  # still streaming
+                    delta = self._provider.chat_stream_to_text(event_data)
+                    if delta is None:
+                        delta = ""
+                        print(f"DEBUG: Provider returned None for chunk {chunk_count}, event_data: {event_data}")
+
+                    chunk = ChatGenerationChunk(message=AIMessageChunk(content=delta))
+                    if run_manager:
+                        run_manager.on_llm_new_token(delta, chunk=chunk)
+                    yield chunk
+                else:  # stream end
+                    print(f"DEBUG: Stream ended after {chunk_count} chunks")
+                    # Handle tool calls and final generation info when stream ends
+                    generation_info = self._provider.chat_stream_generation_info(event_data)
+                    tool_call_chunks = []
+                    if tool_calls := generation_info.get("tool_calls"):
+                        content = self._provider.chat_stream_to_text(event_data)
+                        try:
+                            tool_call_chunks = [
+                                ToolCallChunk(
+                                    name=tool_call["function"].get("name"),
+                                    args=tool_call["function"].get("arguments"),
+                                    id=tool_call.get("id"),
+                                    index=tool_call.get("index"),
+                                )
+                                for tool_call in tool_calls
+                            ]
+                        except KeyError:
+                            pass
+                    else:
+                        content = ""
+                    message = AIMessageChunk(
+                        content=content,
+                        additional_kwargs=generation_info,
+                        tool_call_chunks=tool_call_chunks,
+                    )
+                    yield ChatGenerationChunk(
+                        message=message,
+                        generation_info=generation_info,
+                    )
+            except Exception as e:
+                print(f"ERROR: Failed to process streaming event {chunk_count}: {e}")
+                print(f"ERROR: Event data: {event.data if hasattr(event, 'data') else 'No data'}")
+                continue
