@@ -5,8 +5,8 @@
 Markdown形式とunstructured形式の両方のドキュメント処理をサポートしています。
 """
 
-import os
 import json
+import os
 import shutil
 from typing import Tuple
 
@@ -38,12 +38,12 @@ def load_document(file_path, server_directory, document_metadata,
     """
     print("in load_document() start...")
     has_error = False
-    
+
     # ファイルパスの検証
     if not file_path:
         has_error = True
         gr.Warning("ファイルを選択してください")
-    
+
     # メタデータの検証
     if document_metadata:
         document_metadata = document_metadata.strip()
@@ -58,21 +58,21 @@ def load_document(file_path, server_directory, document_metadata,
                     gr.Warning(
                         "メタデータの形式が正しくありません。key1=value1,key2=value2,... の形式で入力してください。")
                     break
-    
+
     if has_error:
         return gr.Textbox(value=""), gr.Textbox(value=""), gr.Textbox(value=""), gr.Textbox(value="")
 
     # サーバーディレクトリの作成
     if not os.path.exists(server_directory):
         os.makedirs(server_directory)
-    
+
     # ファイル情報の取得
     doc_id = generate_unique_id_func("doc_")
     file_name = os.path.basename(file_path.name)
     file_extension = os.path.splitext(file_name)
     if isinstance(file_extension, tuple):
         file_extension = file_extension[1]
-    
+
     # ファイルをサーバーディレクトリにコピー
     server_path = os.path.join(server_directory, f"{doc_id}_{file_name}")
     shutil.copy(file_path.name, server_path)
@@ -103,7 +103,7 @@ def load_document(file_path, server_directory, document_metadata,
     collection_cmeta['file_name'] = file_name
     collection_cmeta['source'] = server_path
     collection_cmeta['server_path'] = server_path
-    
+
     # カスタムメタデータの追加
     if document_metadata:
         metadatas = document_metadata.split(",")
@@ -119,12 +119,12 @@ def load_document(file_path, server_directory, document_metadata,
  -- (Only for Reference) Insert to table {default_collection_name}_collection
  INSERT INTO {default_collection_name}_collection(id, data, cmetadata)
  VALUES (:id, to_blob(:data), :cmetadata) """
-            
+
             # 出力用SQL文の生成（参照用）
             output_sql_text = load_document_sql.replace(":id", "'" + str(doc_id) + "'")
             output_sql_text = output_sql_text.replace(":data", "'...'")
             output_sql_text = output_sql_text.replace(":cmetadata", "'" + json.dumps(collection_cmeta) + "'") + ";"
-            
+
             # データベースに挿入
             cursor.execute(load_document_sql, {
                 'id': doc_id,
@@ -137,5 +137,5 @@ def load_document(file_path, server_directory, document_metadata,
         gr.Textbox(value=output_sql_text.strip()),
         gr.Textbox(value=doc_id),
         gr.Textbox(value=str(pages_count)),
-        gr.Textbox(value=original_contents)
+        gr.Textbox(value=original_contents[:1000] + " ..." if len(original_contents) > 1000 else original_contents)
     )

@@ -9,8 +9,9 @@ import os
 import time
 from typing import List
 
-import oci
 import gradio as gr
+import oci
+
 from utils.common_util import get_region
 
 
@@ -116,7 +117,8 @@ def generate_image_embedding_response(image_inputs: List[str], input_type: str =
         while retry_count < max_retries:
             try:
                 embed_text_response = generative_ai_inference_client.embed_text(embed_text_detail)
-                print(f"画像embeddingバッチ {i // batch_size + 1} / {(len(image_inputs) - 1) // batch_size + 1} を処理しました")
+                print(
+                    f"画像embeddingバッチ {i // batch_size + 1} / {(len(image_inputs) - 1) // batch_size + 1} を処理しました")
                 all_embeddings.extend(embed_text_response.data.embeddings)
                 break
             except Exception as e:

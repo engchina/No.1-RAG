@@ -1,7 +1,7 @@
-from PIL import Image
 import base64
 from io import BytesIO
 
+from PIL import Image
 
 # 支持的画像フォーマットの定義
 SUPPORTED_FORMATS = {
@@ -79,7 +79,7 @@ def image_to_base64_url(image_path: str) -> str:
 
 
 def image_to_base64(image_path: str, output_format: str = 'JPEG', quality: int = 20,
-                   include_data_url: bool = False) -> str:
+                    include_data_url: bool = False) -> str:
     """
     画像を指定フォーマットで圧縮してbase64エンコードする
 
@@ -105,7 +105,7 @@ def image_to_base64(image_path: str, output_format: str = 'JPEG', quality: int =
         mime_type = f"image/{output_format.lower()}"
         return f"data:{mime_type};base64,{base64_string}"
     else:
-        return base64_string    
+        return base64_string
 
 
 def combine_images(image1_path: str, image2_path: str, output_path: str, direction: str = 'vertical') -> None:
@@ -171,7 +171,8 @@ def compress_image_for_display(image_url: str, quality: int = 85, max_width: int
     return compressed_url
 
 
-def compress_image_for_display_with_info(image_url: str, quality: int = 85, max_width: int = 800, max_height: int = 1200) -> tuple[str, str]:
+def compress_image_for_display_with_info(image_url: str, quality: int = 85, max_width: int = 800,
+                                         max_height: int = 1200) -> tuple[str, str]:
     """
     画像URLを圧縮して表示用の新しいURLと圧縮情報を生成する
 

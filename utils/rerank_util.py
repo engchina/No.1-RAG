@@ -8,8 +8,9 @@ Cohere API を使用してドキュメントの再ランキングを行うため
 import os
 from typing import List
 
-import oci
 import cohere
+import oci
+
 from utils.common_util import get_region
 
 

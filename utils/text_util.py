@@ -5,9 +5,8 @@
 テキスト関連の操作を行うための関数を提供します。
 """
 
-import re
 import json
-import pandas as pd
+import re
 
 
 def remove_base64_images_from_text(text):

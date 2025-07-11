@@ -27,7 +27,7 @@ from utils.common_util import get_region
 from utils.css_gradio_util import custom_css
 from utils.database_util import create_table as create_table_util
 from utils.document_conversion_util import (
-    convert_excel_to_text_document, convert_to_markdown_document
+    convert_excel_to_text_document, convert_pdf_to_markdown, convert_to_markdown_document
 )
 from utils.document_embed_util import embed_save_document_by_unstructured as embed_save_document_util
 from utils.document_loader_util import load_document as load_document_util
@@ -36,7 +36,7 @@ from utils.document_split_util import (
     split_document_by_unstructured as split_document_util,
     update_document_chunks_result_detail_with_validation
 )
-from utils.document_util import (
+from utils.document_management_util import (
     search_document as search_document_util, delete_document as delete_document_util,
     get_doc_list as get_doc_list_util, get_server_path as get_server_path_util
 )
@@ -1255,6 +1255,22 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         tab_chat_with_llm_chat_button = gr.Button(value="送信", variant="primary")
         with gr.TabItem(label="RAG評価", elem_classes="inner_tab") as tab_rag_evaluation:
             with gr.TabItem(label="Step-0.前処理") as tab_convert_document:
+                with gr.TabItem(label="Pdf2Markdown") as tab_convert_pdf_to_markdown_document:
+                    with gr.Row():
+                        with gr.Column():
+                            tab_convert_document_convert_pdf_to_markdown_file_text = gr.File(
+                                label="変換前のファイル*",
+                                file_types=[
+                                    ".pdf"
+                                ],
+                                type="filepath",
+                                interactive=True,
+                            )
+                    with gr.Row():
+                        with gr.Column():
+                            tab_convert_document_convert_pdf_to_markdown_button = gr.Button(
+                                value="PdfをMarkdownへ変換",
+                                variant="primary")
                 with gr.TabItem(label="Excel2Text") as tab_convert_excel_to_text_document:
                     with gr.Row():
                         with gr.Column():
@@ -1334,7 +1350,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 with gr.Row():
                     with gr.Column():
                         tab_load_document_page_content_text = gr.Textbox(
-                            label="コンテンツ",
+                            label="コンテンツ（先頭部分）",
                             lines=15,
                             max_lines=15,
                             autoscroll=False,
@@ -2676,17 +2692,13 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ]
     )
 
-    tab_convert_document_convert_by_markitdown_button.click(
-        convert_to_markdown_document,
-        inputs=[
-            tab_convert_document_convert_by_markitdown_file_text,
-            tab_convert_document_convert_by_markitdown_use_llm_checkbox,
-            tab_convert_document_convert_by_markitdown_llm_prompt_text,
-        ],
+    tab_convert_document_convert_pdf_to_markdown_button.click(
+        fn=convert_pdf_to_markdown,
+        inputs=[tab_convert_document_convert_pdf_to_markdown_file_text],
         outputs=[
-            tab_convert_document_convert_by_markitdown_file_text,
-            tab_load_document_file_text,
-        ],
+            tab_convert_document_convert_pdf_to_markdown_file_text,
+            tab_load_document_file_text
+        ]
     )
 
     tab_convert_document_convert_button.click(
@@ -2696,6 +2708,19 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ],
         outputs=[
             tab_convert_document_convert_excel_to_text_file_text,
+            tab_load_document_file_text,
+        ],
+    )
+
+    tab_convert_document_convert_by_markitdown_button.click(
+        convert_to_markdown_document,
+        inputs=[
+            tab_convert_document_convert_by_markitdown_file_text,
+            tab_convert_document_convert_by_markitdown_use_llm_checkbox,
+            tab_convert_document_convert_by_markitdown_llm_prompt_text,
+        ],
+        outputs=[
+            tab_convert_document_convert_by_markitdown_file_text,
             tab_load_document_file_text,
         ],
     )
@@ -2819,6 +2844,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_doc_id_checkbox_group
         ]
     )
+
     tab_delete_document_delete_button.click(
         delete_document,
         inputs=[
@@ -2831,6 +2857,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_delete_document_doc_ids_checkbox_group
         ]
     )
+    
     tab_chat_document.select(
         refresh_doc_list,
         inputs=[],
@@ -2840,12 +2867,14 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_doc_id_checkbox_group
         ]
     )
+
     tab_chat_document_doc_id_all_checkbox.change(
         lambda x: gr.CheckboxGroup(interactive=False, value=[]) if x else
         gr.CheckboxGroup(interactive=True, value=[]),
         tab_chat_document_doc_id_all_checkbox,
         tab_chat_document_doc_id_checkbox_group
     )
+
     tab_chat_document_llm_answer_checkbox_group.change(
         set_chat_llm_answer,
         inputs=[
@@ -2877,6 +2906,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_azure_openai_gpt4o_image_accordion
         ]
     )
+    
     tab_chat_document_llm_evaluation_checkbox.change(
         lambda x: (
             gr.Row(visible=True),
@@ -3415,7 +3445,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ]
     )
 
-
     # RAGPrompt設定のイベントハンドラー
     def save_rag_prompt(prompt_text):
         """RAGPromptを保存する"""
@@ -3445,7 +3474,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[tab_chat_document_rag_prompt_text]
     )
 
-
     # VisionPrompt設定のイベントハンドラー
     def save_image_prompt(prompt_text):
         """VisionPromptを保存する"""
@@ -3474,6 +3502,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         inputs=[],
         outputs=[tab_chat_document_image_prompt_text]
     )
+
 
 app.queue()
 if __name__ == "__main__":

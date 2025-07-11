@@ -7,23 +7,21 @@
 - 複数画像ストリーミング処理 (process_multiple_images_streaming)
 """
 
+import asyncio
 import os
 import time
-import asyncio
-import pandas as pd
 
 import gradio as gr
-import oracledb
+from dotenv import load_dotenv, find_dotenv
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 
-from utils.common_util import get_region
-from utils.cleanup_util import lightweight_cleanup, cleanup_llm_client_async
-from utils.system_util import check_database_pool_health
-from utils.prompts_util import get_image_qa_prompt
-from utils.image_util import compress_image_for_display
 from my_langchain_community.chat_models import ChatOCIGenAI
-from dotenv import load_dotenv, find_dotenv
+from utils.cleanup_util import lightweight_cleanup, cleanup_llm_client_async
+from utils.common_util import get_region
+from utils.image_util import compress_image_for_display
+from utils.prompts_util import get_image_qa_prompt
+from utils.system_util import check_database_pool_health
 
 
 async def process_single_image_streaming(image_url, query_text, llm_answer_checkbox_group, target_models, image_index,
@@ -405,7 +403,8 @@ async def process_image_answers_streaming(
                             if order_idx not in img_results:
                                 img_results[order_idx] = []
                             img_results[order_idx].append((doc_id, img_id))
-                            print(f"見つかったペア: doc_id={doc_id}, embed_id={embed_id}, img_id={img_id}, order={order_idx}")
+                            print(
+                                f"見つかったペア: doc_id={doc_id}, embed_id={embed_id}, img_id={img_id}, order={order_idx}")
 
                     # search_resultの順序でdoc_img_pairsを構築
                     doc_img_pairs = []
@@ -577,7 +576,8 @@ async def process_image_answers_streaming(
                             print(f"複数画像一括処理開始: {len(base64_data_list)}枚の画像を一括処理中...")
 
                             # img_idによる昇順ソート
-                            sorted_base64_data_list = sorted(base64_data_list, key=lambda x: int(x[2]) if x[2] is not None else 0)
+                            sorted_base64_data_list = sorted(base64_data_list,
+                                                             key=lambda x: int(x[2]) if x[2] is not None else 0)
                             print(f"全画像をimg_idで昇順ソート完了: {len(sorted_base64_data_list)}枚")
 
                             # 各モデルの回答を保持
@@ -647,7 +647,8 @@ async def process_image_answers_streaming(
 
                             # 各ファイルグループを順次処理
                             for file_index, (doc_id, file_images) in enumerate(file_groups.items(), 1):
-                                print(f"ファイル {file_index}/{len(file_groups)} (doc_id: {doc_id}) を処理中: {len(file_images)}枚の画像")
+                                print(
+                                    f"ファイル {file_index}/{len(file_groups)} (doc_id: {doc_id}) を処理中: {len(file_images)}枚の画像")
 
                                 # 各モデルの現在のファイルに対する回答を保持
                                 current_file_llama_4_maverick = ""
@@ -772,7 +773,8 @@ async def process_image_answers_streaming(
                                 # img_idでソート
                                 all_images.sort(key=lambda x: x[2])
 
-                                print(f"処理対象画像数: {len(all_images)}枚 (検索: {len(file_images)}枚 + 追加: {len(additional_images)}枚)")
+                                print(
+                                    f"処理対象画像数: {len(all_images)}枚 (検索: {len(file_images)}枚 + 追加: {len(additional_images)}枚)")
 
                                 # 各モデルの現在のファイルに対する回答を保持
                                 current_file_llama_4_maverick = ""
@@ -831,7 +833,8 @@ async def process_image_answers_streaming(
 
                         else:
                             # ファイル単位で処理+最初・最後・前後画像モード
-                            print(f"ファイル単位+最初・最後・前後画像処理開始: {len(base64_data_list)}枚の画像を拡張処理中...")
+                            print(
+                                f"ファイル単位+最初・最後・前後画像処理開始: {len(base64_data_list)}枚の画像を拡張処理中...")
 
                             # doc_idでグループ化
                             file_groups = {}
@@ -878,7 +881,8 @@ async def process_image_answers_streaming(
                                             for row in first_last_results:
                                                 base64_data = row[0].read() if hasattr(row[0], 'read') else row[0]
                                                 # img_idはNUMBER型なので、直接使用するか安全に変換
-                                                img_id = row[2] if isinstance(row[2], (int, float)) and row[2] is not None else (int(row[2]) if row[2] is not None else None)
+                                                img_id = row[2] if isinstance(row[2], (int, float)) and row[
+                                                    2] is not None else (int(row[2]) if row[2] is not None else None)
                                                 if base64_data and img_id is not None and img_id not in searched_img_ids:
                                                     additional_images.append((base64_data, row[1], img_id))
                                                     print(f"最初/最後の画像を追加: img_id={img_id}")
@@ -887,7 +891,10 @@ async def process_image_answers_streaming(
                                             for searched_img_id in searched_img_ids:
                                                 # img_idを整数に変換（NUMBER型対応）
                                                 try:
-                                                    searched_img_id_int = searched_img_id if isinstance(searched_img_id, (int, float)) else int(searched_img_id)
+                                                    searched_img_id_int = searched_img_id if isinstance(searched_img_id,
+                                                                                                        (int,
+                                                                                                         float)) else int(
+                                                        searched_img_id)
                                                 except (ValueError, TypeError):
                                                     print(f"img_idの変換に失敗: {searched_img_id}")
                                                     continue
@@ -900,10 +907,13 @@ async def process_image_answers_streaming(
                                                 AND img_id = :prev_img_id
                                                 AND base64_data IS NOT NULL
                                                 """
-                                                cursor.execute(prev_sql, {'doc_id': doc_id, 'prev_img_id': searched_img_id_int - 1})
+                                                cursor.execute(prev_sql, {'doc_id': doc_id,
+                                                                          'prev_img_id': searched_img_id_int - 1})
                                                 prev_result = cursor.fetchone()
                                                 if prev_result:
-                                                    base64_data = prev_result[0].read() if hasattr(prev_result[0], 'read') else prev_result[0]
+                                                    base64_data = prev_result[0].read() if hasattr(prev_result[0],
+                                                                                                   'read') else \
+                                                    prev_result[0]
                                                     img_id = int(prev_result[2]) if prev_result[2] is not None else None
                                                     if base64_data and img_id is not None and img_id not in searched_img_ids:
                                                         additional_images.append((base64_data, prev_result[1], img_id))
@@ -917,12 +927,18 @@ async def process_image_answers_streaming(
                                                 AND img_id = :next_img_id
                                                 AND base64_data IS NOT NULL
                                                 """
-                                                cursor.execute(next_sql, {'doc_id': doc_id, 'next_img_id': searched_img_id_int + 1})
+                                                cursor.execute(next_sql, {'doc_id': doc_id,
+                                                                          'next_img_id': searched_img_id_int + 1})
                                                 next_result = cursor.fetchone()
                                                 if next_result:
-                                                    base64_data = next_result[0].read() if hasattr(next_result[0], 'read') else next_result[0]
+                                                    base64_data = next_result[0].read() if hasattr(next_result[0],
+                                                                                                   'read') else \
+                                                    next_result[0]
                                                     # img_idはNUMBER型なので、直接使用するか安全に変換
-                                                    img_id = next_result[2] if isinstance(next_result[2], (int, float)) and next_result[2] is not None else (int(next_result[2]) if next_result[2] is not None else None)
+                                                    img_id = next_result[2] if isinstance(next_result[2],
+                                                                                          (int, float)) and next_result[
+                                                                                   2] is not None else (
+                                                        int(next_result[2]) if next_result[2] is not None else None)
                                                     if base64_data and img_id is not None and img_id not in searched_img_ids:
                                                         additional_images.append((base64_data, next_result[1], img_id))
                                                         print(f"後の画像を追加: img_id={img_id}")
@@ -942,7 +958,8 @@ async def process_image_answers_streaming(
                                 # img_idでソート
                                 all_images.sort(key=lambda x: x[2])
 
-                                print(f"処理対象画像数: {len(all_images)}枚 (検索: {len(file_images)}枚 + 追加: {len(additional_images)}枚)")
+                                print(
+                                    f"処理対象画像数: {len(all_images)}枚 (検索: {len(file_images)}枚 + 追加: {len(additional_images)}枚)")
 
                                 # 各モデルの現在のファイルに対する回答を保持
                                 current_file_llama_4_maverick = ""

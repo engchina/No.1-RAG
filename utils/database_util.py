@@ -1,6 +1,8 @@
 import os
+
 from langchain_community.embeddings import OCIGenAIEmbeddings
 from oracledb import DatabaseError
+
 from utils.common_util import get_region
 
 
@@ -33,34 +35,81 @@ def create_table(pool, default_collection_name):
     # SQL statements for RAG QA tables
     drop_rag_qa_result_sql = "DROP TABLE IF EXISTS rag_qa_result"
 
-    create_rag_qa_result_sql = """CREATE TABLE IF NOT EXISTS rag_qa_result (
-        id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-        query_id VARCHAR2(100),
-        query VARCHAR2(4000),
-        standard_answer VARCHAR2(30000),
+    create_rag_qa_result_sql = """CREATE TABLE IF NOT EXISTS rag_qa_result
+    (
+        id
+        NUMBER
+        GENERATED
+        ALWAYS AS
+        IDENTITY
+        PRIMARY
+        KEY,
+        query_id
+        VARCHAR2
+                                  (
+        100
+                                  ),
+        query VARCHAR2
+                                  (
+                                      4000
+                                  ),
+        standard_answer VARCHAR2
+                                  (
+                                      30000
+                                  ),
         sql CLOB,
-        created_date TIMESTAMP DEFAULT TO_TIMESTAMP(
-            TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'),
-            'YYYY-MM-DD HH24:MI:SS'
+        created_date TIMESTAMP DEFAULT TO_TIMESTAMP
+                                  (
+                                      TO_CHAR
+                                  (
+                                      SYSTIMESTAMP,
+                                      'YYYY-MM-DD HH24:MI:SS'
+                                  ),
+        'YYYY-MM-DD HH24:MI:SS'
         )
-    )"""
+        )"""
 
     drop_rag_qa_feedback_sql = "DROP TABLE IF EXISTS rag_qa_feedback"
 
-    create_rag_qa_feedback_sql = """CREATE TABLE IF NOT EXISTS rag_qa_feedback (
-        id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-        query_id VARCHAR2(100),
-        llm_name VARCHAR2(100),
+    create_rag_qa_feedback_sql = """CREATE TABLE IF NOT EXISTS rag_qa_feedback
+    (
+        id
+        NUMBER
+        GENERATED
+        ALWAYS AS
+        IDENTITY
+        PRIMARY
+        KEY,
+        query_id
+        VARCHAR2
+                                    (
+        100
+                                    ),
+        llm_name VARCHAR2
+                                    (
+                                        100
+                                    ),
         llm_answer CLOB,
         vlm_answer CLOB,
         ragas_evaluation_result CLOB,
-        human_evaluation_result VARCHAR2(20),
-        user_comment VARCHAR2(30000),
-        created_date TIMESTAMP DEFAULT TO_TIMESTAMP(
-            TO_CHAR(SYSTIMESTAMP, 'YYYY-MM-DD HH24:MI:SS'),
-            'YYYY-MM-DD HH24:MI:SS'
+        human_evaluation_result VARCHAR2
+                                    (
+                                        20
+                                    ),
+        user_comment VARCHAR2
+                                    (
+                                        30000
+                                    ),
+        created_date TIMESTAMP DEFAULT TO_TIMESTAMP
+                                    (
+                                        TO_CHAR
+                                    (
+                                        SYSTIMESTAMP,
+                                        'YYYY-MM-DD HH24:MI:SS'
+                                    ),
+        'YYYY-MM-DD HH24:MI:SS'
         )
-    )"""
+        )"""
 
     # Index creation SQL statements
     create_index_sql = f"""CREATE INDEX {default_collection_name}_embed_data_idx
@@ -113,17 +162,19 @@ PARAMETERS ('LEXER world_lexer sync (every "freq=minutely; interval=1")')"""
 
     # Preference management SQL statements
     check_preference_sql = """SELECT PRE_NAME
-FROM CTX_PREFERENCES
-WHERE PRE_NAME = 'WORLD_LEXER'
-    AND PRE_OWNER = USER"""
+                              FROM CTX_PREFERENCES
+                              WHERE PRE_NAME = 'WORLD_LEXER'
+                                AND PRE_OWNER = USER"""
 
     drop_preference_plsql = """BEGIN
-    CTX_DDL.DROP_PREFERENCE('world_lexer');
-END;"""
+    CTX_DDL.DROP_PREFERENCE
+    ('world_lexer');
+    END;"""
 
     create_preference_plsql = """BEGIN
-    CTX_DDL.CREATE_PREFERENCE('world_lexer','WORLD_LEXER');
-END;"""
+    CTX_DDL.CREATE_PREFERENCE
+    ('world_lexer','WORLD_LEXER');
+    END;"""
 
     # Build SQL output text for reference
     output_sql_text = _build_sql_output_text(

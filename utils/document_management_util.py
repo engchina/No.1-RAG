@@ -280,16 +280,15 @@ def search_document(
     doc_ids_str = "'" + "','".join([str(doc_id) for doc_id in doc_id_checkbox_group_input if doc_id]) + "'"
     print(f"{doc_ids_str=}")
     with_sql = """
--- Select data
-WITH offsets AS 
-(
-    SELECT level - (:extend_around_chunk_size / 2 + 1) AS offset
-    FROM dual
-    CONNECT BY level <= (:extend_around_chunk_size + 1)
-), 
-selected_embed_ids AS 
-(
-"""
+               -- Select data
+               WITH offsets AS
+                        (SELECT level - (:extend_around_chunk_size / 2 + 1) AS offset
+                         FROM dual
+               CONNECT BY level <= (:extend_around_chunk_size + 1)
+                   )
+                        , selected_embed_ids AS
+                        ( \
+               """
 
     where_metadata_sql = ""
     if document_metadata_text_input:
@@ -462,16 +461,13 @@ aggregated_results AS
     # use_image が true の場合、相邻 embed_id のデータ合併を行わない
     if use_image:
         select_sql += """
-SELECT
-    ar.name,
-    ar.embed_id,
-    ar.embed_data AS combined_embed_data,
-    ar.doc_id,
-    ar.vector_distance
-FROM
-    aggregated_results ar
-ORDER BY
-    ar.vector_distance """
+                      SELECT ar.name,
+                             ar.embed_id,
+                             ar.embed_data AS combined_embed_data,
+                             ar.doc_id,
+                             ar.vector_distance
+                      FROM aggregated_results ar
+                      ORDER BY ar.vector_distance """
     else:
         # use_image が false の場合、従来の相邻 embed_id データ合併ロジックを使用
         select_sql += """

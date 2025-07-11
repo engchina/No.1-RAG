@@ -6,6 +6,7 @@
 """
 
 import gradio as gr
+
 from utils.llm_tasks_util import (
     xai_grok_3_task, command_a_task, llama_3_3_70b_task, llama_3_2_90b_vision_task,
     llama_4_maverick_task, llama_4_scout_task, openai_gpt4o_task, openai_gpt4_task,
@@ -72,8 +73,8 @@ async def chat(
     # 応答状態とジェネレーター名の初期化
     responses_status = ["", "", "", "", "", "", "", "", "", ""]
     generator_names = ["XAI Grok-3", "Command-A", "Llama-4-Maverick", "Llama-4-Scout",
-                      "Llama-3.3-70B", "Llama-3.2-90B-Vision", "OpenAI GPT-4o", "OpenAI GPT-4",
-                      "Azure OpenAI GPT-4o", "Azure OpenAI GPT-4"]
+                       "Llama-3.3-70B", "Llama-3.2-90B-Vision", "OpenAI GPT-4o", "OpenAI GPT-4",
+                       "Azure OpenAI GPT-4o", "Azure OpenAI GPT-4"]
     iteration_count = 0
 
     while True:
@@ -99,7 +100,8 @@ async def chat(
                             responses[i] = response
                             # 空の応答のデバッグログ
                             if not response.strip():
-                                print(f"DEBUG: {generator_names[i]} yielded empty response (iteration {iteration_count})")
+                                print(
+                                    f"DEBUG: {generator_names[i]} yielded empty response (iteration {iteration_count})")
                 except StopAsyncIteration:
                     responses_status[i] = "TASK_DONE"
                     print(f"DEBUG: {generator_names[i]} stopped iteration (iteration {iteration_count})")

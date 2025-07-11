@@ -7,15 +7,11 @@
 - クエリ結果挿入 (insert_query_result)
 """
 
-import asyncio
-import pandas as pd
-
 import gradio as gr
-import oracledb
 
-from utils.prompts_util import get_langgpt_rag_prompt
 from utils.chat_util import chat
-from utils.text_util import extract_and_format, remove_base64_images_from_text
+from utils.prompts_util import get_langgpt_rag_prompt
+from utils.text_util import extract_and_format
 
 
 async def chat_document(
@@ -140,7 +136,8 @@ async def chat_document(
 
         user_text = fixed_image_message
     else:
-        user_text = get_langgpt_rag_prompt(context, query_text, include_citation, include_current_time, rag_prompt_template)
+        user_text = get_langgpt_rag_prompt(context, query_text, include_citation, include_current_time,
+                                           rag_prompt_template)
 
     xai_grok_3_user_text = user_text
     command_a_user_text = user_text

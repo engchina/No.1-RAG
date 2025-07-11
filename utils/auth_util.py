@@ -5,12 +5,14 @@
 各種サービスの認証情報を設定するための関数を提供します。
 """
 
-import os
 import json
+import os
 import re
+
 import gradio as gr
 import oracledb
-from dotenv import find_dotenv, set_key, load_dotenv, get_key
+from dotenv import find_dotenv, set_key, load_dotenv
+
 from .common_util import get_region
 
 
@@ -29,6 +31,7 @@ def create_oci_cred(user_ocid, tenancy_ocid, fingerprint, private_key_file, regi
     Returns:
         tuple: (Accordion, Textbox) のタプル
     """
+
     def process_private_key(private_key_file_path):
         with open(private_key_file_path, 'r') as file:
             lines = file.readlines()

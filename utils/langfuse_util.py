@@ -5,10 +5,11 @@ Langfuseユーティリティモジュール
 ストリーミング設定の管理など、Langfuse関連の機能を提供します。
 """
 
-import os
 import logging
-import requests
+import os
 from urllib.parse import urljoin
+
+import requests
 from langfuse.callback import CallbackHandler
 
 # ログ設定
@@ -115,32 +116,32 @@ def validate_langfuse_config():
         # 必要な環境変数の確認
         required_vars = ["LANGFUSE_SECRET_KEY", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_HOST"]
         missing_vars = []
-        
+
         for var in required_vars:
             if not os.environ.get(var):
                 missing_vars.append(var)
-        
+
         if missing_vars:
             error_msg = f"必要な環境変数が設定されていません: {', '.join(missing_vars)}"
             return False, error_msg
-        
+
         # ホストURLの形式チェック
         host = os.environ["LANGFUSE_HOST"]
         if not (host.startswith("http://") or host.startswith("https://")):
             return False, "LANGFUSE_HOSTはhttp://またはhttps://で始まる必要があります"
-        
+
         # キーの長さチェック（基本的な妥当性）
         secret_key = os.environ["LANGFUSE_SECRET_KEY"]
         public_key = os.environ["LANGFUSE_PUBLIC_KEY"]
-        
+
         if len(secret_key) < 10:
             return False, "LANGFUSE_SECRET_KEYが短すぎます"
-        
+
         if len(public_key) < 10:
             return False, "LANGFUSE_PUBLIC_KEYが短すぎます"
-        
+
         return True, None
-        
+
     except Exception as e:
         return False, f"設定検証中にエラーが発生しました: {e}"
 
@@ -158,31 +159,31 @@ def get_langfuse_status():
         "handler_ready": False,
         "error_message": None
     }
-    
+
     try:
         # 設定の妥当性チェック
         config_valid, config_error = validate_langfuse_config()
         status["config_valid"] = config_valid
-        
+
         if not config_valid:
             status["error_message"] = config_error
             return status
-        
+
         # サービスの可用性チェック
         status["service_available"] = check_langfuse_availability()
-        
+
         # ハンドラーの作成テスト
         handler = create_safe_langfuse_handler()
         status["handler_ready"] = handler is not None
-        
+
         if status["config_valid"] and status["service_available"] and status["handler_ready"]:
             status["error_message"] = None
         elif not status["service_available"]:
             status["error_message"] = "Langfuseサービスに接続できません"
         elif not status["handler_ready"]:
             status["error_message"] = "Langfuseハンドラーの作成に失敗しました"
-        
+
     except Exception as e:
         status["error_message"] = f"状態取得中にエラーが発生しました: {e}"
-    
+
     return status

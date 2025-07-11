@@ -5,13 +5,14 @@ LLMタスク処理ユーティリティモジュール
 OCI GenAI、OpenAI、Azure OpenAIなどの様々なLLMプロバイダーに対応しています。
 """
 
+import logging
 import os
 import time
-import logging
+
 from dotenv import load_dotenv, find_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 from langchain_openai import AzureChatOpenAI
+from langchain_openai import ChatOpenAI
 
 # ロガーの設定
 logger = logging.getLogger(__name__)
@@ -189,9 +190,6 @@ async def llama_3_3_70b_task(system_text, query_text, llama_3_3_70b_checkbox):
     else:
         print("DEBUG: Llama-3.3-70B task skipped (checkbox not selected)")
         yield "TASK_DONE"
-
-
-
 
 
 async def llama_3_2_90b_vision_task(system_text, query_image, query_text, llama_3_2_90b_vision_checkbox):

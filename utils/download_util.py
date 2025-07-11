@@ -5,8 +5,9 @@
 ダウンロード可能な形式で提供するための関数を提供します。
 """
 
-import pandas as pd
 import gradio as gr
+import pandas as pd
+
 from utils.text_util import extract_citation, remove_base64_images_from_text
 
 
@@ -77,7 +78,7 @@ def generate_download_file(
         return gr.DownloadButton(value=None, visible=False)
     if search_result.empty or (len(search_result) > 0 and search_result.iloc[0]['CONTENT'] == ''):
         return gr.DownloadButton(value=None, visible=False)
-    
+
     # サンプルDataFrameを作成
     if llm_evaluation_checkbox:
         standard_answer_text = standard_answer_text
@@ -268,7 +269,7 @@ def generate_download_file(
                 remove_base64_images_from_text(openai_gpt4o_image_response),
                 "",  # openai/gpt-4 (Vision機能なし)
                 remove_base64_images_from_text(azure_openai_gpt4o_image_response),
-                ""   # azure_openai/gpt-4 (Vision機能なし)
+                ""  # azure_openai/gpt-4 (Vision機能なし)
             ],
             '引用 Contexts': [
                 xai_grok_3_referenced_contexts,

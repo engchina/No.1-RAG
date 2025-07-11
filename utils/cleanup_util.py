@@ -7,7 +7,6 @@
 
 import asyncio
 import gc
-import warnings
 import tracemalloc
 
 

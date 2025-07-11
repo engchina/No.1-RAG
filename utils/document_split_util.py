@@ -5,7 +5,6 @@
 unstructured形式のドキュメント処理とembedding生成に特化しています。
 """
 
-import json
 import re
 from typing import List, Dict, Any, Tuple
 
@@ -17,7 +16,6 @@ from unstructured.partition.auto import partition
 
 from utils.chunk_util import RecursiveCharacterTextSplitter
 from utils.common_util import get_dict_value
-from utils.embedding_util import generate_embedding_response
 
 
 def reset_document_chunks_result_dataframe():
@@ -243,8 +241,8 @@ def on_select_split_document_chunks_result(evt: gr.SelectData, chunks_result_dat
 
 
 def update_document_chunks_result_detail(doc_id, chunk_id, chunk_data,
-                                        pool, default_collection_name,
-                                        generate_embedding_response_func):
+                                         pool, default_collection_name,
+                                         generate_embedding_response_func):
     """
     ドキュメントチャンク結果詳細を更新する
 
@@ -286,8 +284,8 @@ WHERE doc_id = :doc_id and embed_id = :embed_id
 
 
 def update_document_chunks_result_detail_with_validation(doc_id, df: pd.DataFrame, chunk_id, chunk_data,
-                                                        pool, default_collection_name,
-                                                        generate_embedding_response_func):
+                                                         pool, default_collection_name,
+                                                         generate_embedding_response_func):
     """
     ドキュメントチャンク結果詳細を更新する（バリデーション付き）
 
@@ -325,7 +323,7 @@ def update_document_chunks_result_detail_with_validation(doc_id, df: pd.DataFram
 
     # 既存の関数を呼び出し
     result = update_document_chunks_result_detail(doc_id, chunk_id, chunk_data,
-                                                 pool, default_collection_name, generate_embedding_response_func)
+                                                  pool, default_collection_name, generate_embedding_response_func)
 
     # データフレームを更新
     updated_df = df.copy()

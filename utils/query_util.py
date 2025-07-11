@@ -6,6 +6,7 @@
 """
 
 import oracledb
+
 from utils.text_util import remove_base64_images_from_text
 
 
@@ -70,7 +71,7 @@ def insert_query_result(
         return
     if search_result.empty or (len(search_result) > 0 and search_result.iloc[0]['CONTENT'] == ''):
         return
-    
+
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
             # レコードが存在しない場合、挿入操作を実行

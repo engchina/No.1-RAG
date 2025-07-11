@@ -167,7 +167,6 @@ IMAGE_QA_PROMPT_TEMPLATE_V3 = """## 厳格なコンテキストQAシステムの
 ### 現在の質問
 {query_text}"""
 
-
 IMAGE_QA_PROMPT_TEMPLATE = """## 厳格なコンテキストQAシステムの実行規則
 
 ### 基本原則
@@ -191,7 +190,6 @@ IMAGE_QA_PROMPT_TEMPLATE = """## 厳格なコンテキストQAシステムの実
 ### 現在の質問  
 {query_text}"""
 
-
 # Query generation prompts
 QUERY_GENERATION_PROMPTS = {
     "Sub-Query": {
@@ -208,23 +206,29 @@ QUERY_GENERATION_PROMPTS = {
     }
 }
 
+
 def get_sub_query_prompt():
     """Get sub-query prompt template"""
     return SUB_QUERY_PROMPT_TEMPLATE
+
 
 def get_rag_fusion_prompt():
     """Get RAG-Fusion prompt template"""
     return RAG_FUSION_PROMPT_TEMPLATE
 
+
 def get_hyde_prompt():
     """Get HyDE prompt template"""
     return HYDE_PROMPT_TEMPLATE
+
 
 def get_step_back_prompt():
     """Get Step-Back-Prompting template"""
     return STEP_BACK_PROMPT_TEMPLATE
 
-def get_langgpt_rag_prompt(context, query_text, include_citation=False, include_current_time=False, use_image=False, custom_template=None):
+
+def get_langgpt_rag_prompt(context, query_text, include_citation=False, include_current_time=False, use_image=False,
+                           custom_template=None):
     """Get LangGPT RAG prompt with context and query"""
     # Use custom template if provided, otherwise use default template
     template = custom_template if custom_template else LANGGPT_RAG_PROMPT_TEMPLATE
@@ -259,17 +263,21 @@ The current date is {current_time}.
 
     return prompt.strip()
 
+
 def get_llm_evaluation_system_message():
     """Get LLM evaluation system message"""
     return LLM_EVALUATION_SYSTEM_MESSAGE
+
 
 def get_chat_system_message():
     """Get chat system message"""
     return CHAT_SYSTEM_MESSAGE
 
+
 def get_markitdown_llm_prompt():
     """Get MarkItDown LLM prompt"""
     return MARKITDOWN_LLM_PROMPT
+
 
 def get_image_qa_prompt(query_text, custom_template=None):
     """Get Image QA prompt with query text"""
@@ -282,21 +290,25 @@ def get_image_qa_prompt(query_text, custom_template=None):
 
     return template.format(query_text=query_text)
 
+
 def get_query_generation_prompt(query_type, original_query):
     """Get query generation prompt for specific type"""
     if query_type in QUERY_GENERATION_PROMPTS:
         return QUERY_GENERATION_PROMPTS[query_type]["user_template"].format(original_query=original_query)
     return ""
 
+
 def update_langgpt_rag_prompt(new_prompt):
     """Update LangGPT RAG prompt template"""
     global LANGGPT_RAG_PROMPT_TEMPLATE
     LANGGPT_RAG_PROMPT_TEMPLATE = new_prompt
 
+
 def update_llm_evaluation_system_message(new_message):
     """Update LLM evaluation system message"""
     global LLM_EVALUATION_SYSTEM_MESSAGE
     LLM_EVALUATION_SYSTEM_MESSAGE = new_message
+
 
 def update_image_qa_prompt(new_prompt):
     """Update Image QA prompt template"""

@@ -1,9 +1,6 @@
-import base64
 import os
-from io import BytesIO
 
 import anthropic
-from PIL import Image
 import fitz  # PyMuPDF
 from dotenv import load_dotenv, find_dotenv
 from langchain.docstore.document import Document

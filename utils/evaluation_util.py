@@ -5,6 +5,7 @@
 """
 
 import gradio as gr
+
 from utils.chat_util import chat
 
 
@@ -138,7 +139,7 @@ async def eval_by_ragas(
             gr.Markdown(value=""),  # openai_gpt4o_evaluation
             gr.Markdown(value=""),  # openai_gpt4_evaluation
             gr.Markdown(value=""),  # azure_openai_gpt4o_evaluation
-            gr.Markdown(value="")   # azure_openai_gpt4_evaluation
+            gr.Markdown(value="")  # azure_openai_gpt4_evaluation
         )
         return
 
@@ -159,7 +160,7 @@ async def eval_by_ragas(
     if llm_evaluation_checkbox and not standard_answer_text:
         has_error = True
         gr.Warning("LLM 評価をオンにする場合、LLM 評価の標準回答を入力してください")
-    
+
     if has_error:
         yield (
             gr.Markdown(value=""),
@@ -193,7 +194,7 @@ async def eval_by_ragas(
         standard_answer_text = standard_answer_text.strip()
     else:
         standard_answer_text = "入力されていません。"
-    
+
     print(f"{llm_evaluation_checkbox=}")
     if not llm_evaluation_checkbox:
         yield (

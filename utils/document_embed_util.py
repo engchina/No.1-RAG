@@ -5,14 +5,14 @@
 unstructured形式のドキュメント処理に特化しています。
 """
 
-import re
 import json
+import re
 from typing import Tuple
 
 import gradio as gr
 import oracledb
-from langchain_community.document_loaders import TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import TextLoader
 
 from utils.embedding_util import generate_embedding_response, generate_image_embedding_response
 
@@ -71,9 +71,9 @@ def embed_save_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
         # 画像ブロックが含まれている場合は処理する
         if re.search(r'<!-- image_begin -->.*?<!-- image_end -->', doc_data, re.DOTALL):
             process_image_blocks(doc_id, doc_data, pool, default_collection_name,
-                                     generate_embedding_response,
-                                     chunk_size=chunks_max_size - chunks_overlap,
-                                     chunk_overlap=chunks_overlap)
+                                 generate_embedding_response,
+                                 chunk_size=chunks_max_size - chunks_overlap,
+                                 chunk_overlap=chunks_overlap)
 
     output_sql = ""
     with pool.acquire() as conn:
@@ -85,10 +85,10 @@ SELECT doc_id, embed_id, embed_data FROM {default_collection_name}_embedding  WH
             cursor.execute(select_sql, doc_id=doc_id)
             records = cursor.fetchall()
             embed_datas = [record[2] for record in records]
-            
+
             # 埋め込みベクトルを生成
             embed_vectors = generate_embedding_response(embed_datas)
-            
+
             # 埋め込みベクトルを更新するSQL
             update_sql = f"""
 UPDATE {default_collection_name}_embedding
@@ -98,19 +98,19 @@ WHERE doc_id = :doc_id and embed_id = :embed_id
 
             # SQLサイズ設定
             cursor.setinputsizes(embed_vector=oracledb.DB_TYPE_VECTOR)
-            
+
             # 出力用SQL文を生成（参照用）
             output_sql += update_sql.replace(':doc_id', "'" + str(doc_id) + "'"
                                              ).replace(':embed_id', "'" + str('...') + "'"
                                                        ).replace(':embed_vector', "'" + str('...') + "'").strip() + ";"
             print(f"{output_sql=}")
-            
+
             # バッチで埋め込みベクトルを更新
             cursor.executemany(update_sql,
                                [{'doc_id': record[0], 'embed_id': record[1], 'embed_vector': embed_vector}
                                 for record, embed_vector in zip(records, embed_vectors)])
             conn.commit()
-            
+
     return (
         gr.Textbox(output_sql),
         gr.Textbox(),
@@ -119,7 +119,7 @@ WHERE doc_id = :doc_id and embed_id = :embed_id
 
 
 def process_image_blocks(doc_id: str, doc_data: str, pool, default_collection_name: str,
-                        generate_embedding_response_func, chunk_size: int = None, chunk_overlap: int = None):
+                         generate_embedding_response_func, chunk_size: int = None, chunk_overlap: int = None):
     """
     画像ブロックを処理してデータベースに保存し、text_splitterを使用してデータを分割する
     
@@ -205,12 +205,12 @@ INSERT INTO {default_collection_name}_image (
 
             # 画像データのsplit処理を実行
             _process_image_data_splitting(doc_id, cursor, default_collection_name,
-                                        generate_embedding_response_func, chunk_size, chunk_overlap)
+                                          generate_embedding_response_func, chunk_size, chunk_overlap)
             conn.commit()
 
 
 def _process_image_data_splitting(doc_id: str, cursor, default_collection_name: str,
-                                 generate_embedding_response_func, chunk_size: int = None, chunk_overlap: int = None):
+                                  generate_embedding_response_func, chunk_size: int = None, chunk_overlap: int = None):
     """
     画像テーブルのtext_dataとvlm_dataを個別にtext_splitterで分割し、image_embeddingテーブルに保存する
     
@@ -400,7 +400,8 @@ INSERT INTO {default_collection_name}_image_embedding (
         if base64_data:
             base64_data_check = base64_data.read() if hasattr(base64_data, 'read') else str(base64_data)
 
-        if (not text_data_str or not text_data_str.strip()) and (not vlm_data_str or not vlm_data_str.strip()) and (not base64_data_check or not base64_data_check.strip()):
+        if (not text_data_str or not text_data_str.strip()) and (not vlm_data_str or not vlm_data_str.strip()) and (
+                not base64_data_check or not base64_data_check.strip()):
             print(f"画像 {img_id} にtext_data、vlm_data、base64_dataの全てが空です")
 
     print(f"画像データの分割処理が完了しました: 合計 {total_chunks} 個のchunkを生成")
