@@ -2978,16 +2978,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ]
     )
 
-    # tab_chat_document_chat_document_button.click(
-    #     check_chat_document_input,
-    #     inputs=[
-    #         tab_chat_document_llm_answer_checkbox_group,
-    #         tab_chat_document_llm_evaluation_checkbox,
-    #         tab_chat_document_system_message_text,
-    #         tab_chat_document_standard_answer_text,
-    #     ],
-    #     outputs=[]
-    # ).then(
     tab_chat_document_chat_document_button.click(
         lambda: gr.DownloadButton(visible=False),
         outputs=[tab_chat_document_download_output_button]

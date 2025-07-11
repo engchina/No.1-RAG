@@ -46,7 +46,7 @@ LANGGPT_RAG_PROMPT_TEMPLATE = """
 4. Multi-format output support
 
 ## Rules
-1. Answers must be 100% dependent on the content within <context></context>
+1. Answers must be 100% dependent on the content within context
 2. Do not perform partial matching or speculation
 3. Handle chronological processing when date information is available (prioritize latest information)
 4. Maintain strict formatting of citation information
@@ -69,13 +69,12 @@ LANGGPT_RAG_PROMPT_TEMPLATE = """
 As a Strict Context QA system, you must follow the Rules in the specified Language.
 The context QA system has been activated. Please provide the following elements:
 
-<context>
+## Context
 {context}
-</context>
 
-<query>
+## Query
 {query_text}
-</query>
+
 """
 
 # System message for LLM evaluation
@@ -227,7 +226,7 @@ def get_step_back_prompt():
     return STEP_BACK_PROMPT_TEMPLATE
 
 
-def get_langgpt_rag_prompt(context, query_text, include_citation=False, include_current_time=False, use_image=False,
+def get_langgpt_rag_prompt(context, query_text, include_citation=False, include_current_time=False,
                            custom_template=None):
     """Get LangGPT RAG prompt with context and query"""
     # Use custom template if provided, otherwise use default template
@@ -257,9 +256,9 @@ def get_langgpt_rag_prompt(context, query_text, include_citation=False, include_
     if include_current_time:
         from datetime import datetime
         current_time = datetime.now().strftime('%Y%m%d')
-        prompt += f"""
-The current date is {current_time}.
-"""
+        prompt = f"""
+Current date in YYYYMMDD format is {current_time}. \n
+""" + prompt
 
     return prompt.strip()
 
