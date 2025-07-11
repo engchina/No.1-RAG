@@ -15,6 +15,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from my_langchain_community.chat_models import ChatOCIGenAI
 from utils.auth_util import (
+    do_auth,
     create_oci_cred as create_oci_cred_util, create_cohere_cred, create_openai_cred,
     create_azure_openai_cred, create_langfuse_cred, test_oci_cred as test_oci_cred_util
 )
@@ -31,14 +32,14 @@ from utils.document_conversion_util import (
 )
 from utils.document_embed_util import embed_save_document_by_unstructured as embed_save_document_util
 from utils.document_loader_util import load_document as load_document_util
+from utils.document_management_util import (
+    search_document as search_document_util, delete_document as delete_document_util,
+    get_doc_list as get_doc_list_util, get_server_path as get_server_path_util
+)
 from utils.document_split_util import (
     reset_document_chunks_result_dataframe,
     split_document_by_unstructured as split_document_util,
     update_document_chunks_result_detail_with_validation
-)
-from utils.document_management_util import (
-    search_document as search_document_util, delete_document as delete_document_util,
-    get_doc_list as get_doc_list_util, get_server_path as get_server_path_util
 )
 from utils.download_util import generate_download_file
 from utils.embedding_util import (
@@ -690,7 +691,6 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
             doc_id, img_id, custom_image_prompt
     ):
         yield result
-
 
 
 async def process_image_answers_streaming(
@@ -2857,7 +2857,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_delete_document_doc_ids_checkbox_group
         ]
     )
-    
+
     tab_chat_document.select(
         refresh_doc_list,
         inputs=[],
@@ -2906,7 +2906,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_azure_openai_gpt4o_image_accordion
         ]
     )
-    
+
     tab_chat_document_llm_evaluation_checkbox.change(
         lambda x: (
             gr.Row(visible=True),
@@ -3445,6 +3445,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ]
     )
 
+
     # RAGPrompt設定のイベントハンドラー
     def save_rag_prompt(prompt_text):
         """RAGPromptを保存する"""
@@ -3473,6 +3474,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         inputs=[],
         outputs=[tab_chat_document_rag_prompt_text]
     )
+
 
     # VisionPrompt設定のイベントハンドラー
     def save_image_prompt(prompt_text):
@@ -3503,7 +3505,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[tab_chat_document_image_prompt_text]
     )
 
-
 app.queue()
 if __name__ == "__main__":
     # リソース警告追跡を有効化
@@ -3518,5 +3519,5 @@ if __name__ == "__main__":
         server_port=args.port,
         max_threads=200,
         show_api=False,
-        # auth=do_auth,
+        auth=do_auth,
     )

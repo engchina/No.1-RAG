@@ -8,10 +8,12 @@
 import json
 import os
 import re
+import shutil
 
 import gradio as gr
 import oracledb
 from dotenv import find_dotenv, set_key, load_dotenv
+from oracledb import DatabaseError
 
 from .common_util import get_region
 
@@ -64,81 +66,89 @@ def create_oci_cred(user_ocid, tenancy_ocid, fingerprint, private_key_file, regi
     fingerprint = fingerprint.strip()
     region = region.strip()
 
-    env_path = find_dotenv()
-    os.environ["OCI_USER_OCID"] = user_ocid
-    os.environ["OCI_TENANCY_OCID"] = tenancy_ocid
-    os.environ["OCI_FINGERPRINT"] = fingerprint
-    os.environ["OCI_REGION"] = region
+    # set up OCI config
+    if not os.path.exists("/root/.oci"):
+        os.makedirs("/root/.oci")
+    if not os.path.exists("/root/.oci/config"):
+        shutil.copy("./.oci/config", "/root/.oci/config")
+    oci_config_path = find_dotenv("/root/.oci/config")
+    key_file_path = '/root/.oci/oci_api_key.pem'
+    set_key(oci_config_path, "user", user_ocid, quote_mode="never")
+    set_key(oci_config_path, "tenancy", tenancy_ocid, quote_mode="never")
+    set_key(oci_config_path, "region", region, quote_mode="never")
+    set_key(oci_config_path, "fingerprint", fingerprint, quote_mode="never")
+    set_key(oci_config_path, "key_file", key_file_path, quote_mode="never")
+    shutil.copy(private_key_file.name, key_file_path)
+    load_dotenv(oci_config_path)
 
-    set_key(env_path, "OCI_USER_OCID", user_ocid, quote_mode="never")
-    set_key(env_path, "OCI_TENANCY_OCID", tenancy_ocid, quote_mode="never")
-    set_key(env_path, "OCI_FINGERPRINT", fingerprint, quote_mode="never")
-    set_key(env_path, "OCI_REGION", region, quote_mode="never")
+    # set up OCI Credential on database
+    private_key = process_private_key(private_key_file.name)
 
-    private_key = process_private_key(private_key_file)
-    set_key(env_path, "OCI_PRIVATE_KEY", private_key, quote_mode="never")
-    os.environ["OCI_PRIVATE_KEY"] = private_key
+    with pool.acquire() as conn:
+        with conn.cursor() as cursor:
+            try:
+                # Define the PL/SQL statement
+                append_acl_sql = """
+    BEGIN
+      DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE(
+        host => '*',
+        ace => xs$ace_type(privilege_list => xs$name_list('connect'),
+                           principal_name => 'admin',
+                           principal_type => xs_acl.ptype_db));
+    END;
+                    """
 
-    load_dotenv(env_path)
+                # Execute the PL/SQL statement
+                cursor.execute(append_acl_sql)
+            except DatabaseError as de:
+                print(f"DatabaseError={de}")
 
-    # データベース接続プールを使用してOCI認証情報を作成
-    if pool is not None:
-        with pool.acquire() as conn:
-            with conn.cursor() as cursor:
-                try:
-                    cursor.execute("BEGIN dbms_vector.drop_credential('OCI_CRED'); END;")
-                except Exception:
-                    pass
+            try:
+                drop_oci_cred_sql = "BEGIN dbms_vector.drop_credential('OCI_CRED'); END;"
+                cursor.execute(drop_oci_cred_sql)
+            except DatabaseError as de:
+                print(f"DatabaseError={de}")
 
-                oci_cred = {
-                    'user_ocid': user_ocid,
-                    'tenancy_ocid': tenancy_ocid,
-                    'compartment_ocid': os.environ["OCI_COMPARTMENT_OCID"],
-                    'private_key': private_key.strip(),
-                    'fingerprint': fingerprint
-                }
+            oci_cred = {
+                'user_ocid': user_ocid,
+                'tenancy_ocid': tenancy_ocid,
+                'compartment_ocid': os.environ["OCI_COMPARTMENT_OCID"],
+                'private_key': private_key.strip(),
+                'fingerprint': fingerprint
+            }
 
-                create_oci_cred_sql = """
-BEGIN
-   dbms_vector.create_credential(
-       credential_name => 'OCI_CRED',
-       params => json(:json_params)
-   );
-END; """
+            create_oci_cred_sql = """
+    BEGIN
+       dbms_vector.create_credential(
+           credential_name => 'OCI_CRED',
+           params => json(:json_params)
+       );
+    END; """
 
-                cursor.execute(create_oci_cred_sql, json_params=json.dumps(oci_cred))
-                conn.commit()
-    else:
-        # poolが提供されていない場合のダミー処理
-        oci_cred = {
-            'user_ocid': user_ocid,
-            'tenancy_ocid': tenancy_ocid,
-            'compartment_ocid': os.environ.get("OCI_COMPARTMENT_OCID", ""),
-            'private_key': private_key.strip(),
-            'fingerprint': fingerprint
-        }
+            cursor.execute(create_oci_cred_sql, json_params=json.dumps(oci_cred))
+            conn.commit()
 
     create_oci_cred_sql = f"""
--- Append Host ACE
-BEGIN
-  DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE(
-    host => '*',
-    ace => xs$ace_type(privilege_list => xs$name_list('connect'),
-                       principal_name => 'admin',
-                       principal_type => xs_acl.ptype_db));
-END;
+    -- Append Host ACE
+    BEGIN
+      DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE(
+        host => '*',
+        ace => xs$ace_type(privilege_list => xs$name_list('connect'),
+                           principal_name => 'admin',
+                           principal_type => xs_acl.ptype_db));
+    END;
 
--- Drop Existing OCI Credential
-BEGIN dbms_vector.drop_credential('OCI_CRED'); END;
+    -- Drop Existing OCI Credential
+    BEGIN dbms_vector.drop_credential('OCI_CRED'); END;
 
--- Create New OCI Credential
-BEGIN
-    dbms_vector.create_credential(
-        credential_name => 'OCI_CRED',
-        params => json('{json.dumps(oci_cred)}')
-    );
-END;
-"""
+    -- Create New OCI Credential
+    BEGIN
+        dbms_vector.create_credential(
+            credential_name => 'OCI_CRED',
+            params => json('{json.dumps(oci_cred)}')
+        );
+    END;
+    """
     gr.Info("OCI API Keyの設定が完了しました")
     return gr.Accordion(), gr.Textbox(value=create_oci_cred_sql.strip())
 
