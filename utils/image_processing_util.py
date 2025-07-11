@@ -1194,16 +1194,7 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
         except Exception as e:
             print(f"エラーが発生しました ({model}): {e}")
             # 表示用に画像を圧縮してエラーメッセージを作成
-            try:
-                compressed_images_text = ""
-                for i, (image_url, (_, doc_id, img_id)) in enumerate(zip(image_urls, image_data_list), 1):
-                    compressed_image_url = compress_image_for_display(image_url)
-                    compressed_images_text += f"\n\n![画像{i}]({compressed_image_url})\n"
-
-                error_text = f"\n\n---\n**{len(image_urls)}枚の画像による回答：**\n\n{compressed_images_text}\n\nエラーが発生しました: {e}\n\n"
-            except Exception as inner_e:
-                print(f"エラーメッセージ作成中にエラー: {inner_e}")
-                error_text = f"\n\nエラーが発生しました: {e}\n\n"
+            error_text = f"\n\nエラーが発生しました: {e}\n\n"
             yield error_text
             yield "TASK_DONE"
         finally:
