@@ -51,6 +51,10 @@ sed -i "s|localhost:3000|$EXTERNAL_IP:3000|g" ./langfuse/docker-compose.yml
 chmod +x ./langfuse/main.sh
 nohup ./langfuse/main.sh &
 
+# Accept conda pkgs
+conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
+conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+
 # Run ginza-api
 conda create -n ginza-api python=3.11 -y
 conda activate ginza-api
