@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+from pathlib import Path
 
 import gradio as gr
 import oracledb
@@ -67,10 +68,12 @@ def create_oci_cred(user_ocid, tenancy_ocid, fingerprint, private_key_file, regi
     region = region.strip()
 
     # set up OCI config
+    BASE_DIR = Path(__file__).resolve().parent.parent
     if not os.path.exists("/root/.oci"):
         os.makedirs("/root/.oci")
     if not os.path.exists("/root/.oci/config"):
-        shutil.copy("./.oci/config", "/root/.oci/config")
+        config_src = BASE_DIR / ".oci" / "config"
+        shutil.copy(str(config_src), "/root/.oci/config")
     oci_config_path = find_dotenv("/root/.oci/config")
     key_file_path = '/root/.oci/oci_api_key.pem'
     set_key(oci_config_path, "user", user_ocid, quote_mode="never")
