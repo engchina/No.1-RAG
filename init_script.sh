@@ -10,18 +10,18 @@ eval "$(/u01/aipoc/miniconda/bin/conda shell.bash hook)"
 /u01/aipoc/miniconda/bin/conda init bash
 
 # Download and configure instantclient
-wget https://download.oracle.com/otn_software/linux/instantclient/2350000/instantclient-basic-linux.x64-23.5.0.24.07.zip -O /u01/aipoc/instantclient-basic-linux.x64-23.5.0.24.07.zip
-unzip /u01/aipoc/instantclient-basic-linux.x64-23.5.0.24.07.zip -d ./
+wget https://download.oracle.com/otn_software/linux/instantclient/2380000/instantclient-basic-linux.x64-23.8.0.25.04.zip -O /u01/aipoc/instantclient-basic-linux.x64-23.8.0.25.04.zip
+unzip /u01/aipoc/instantclient-basic-linux.x64-23.8.0.25.04.zip -d ./
 wget http://ftp.de.debian.org/debian/pool/main/liba/libaio/libaio1_0.3.113-4_amd64.deb
 dpkg -i libaio1_0.3.113-4_amd64.deb
-sh -c "echo /u01/aipoc/instantclient_23_5 > /etc/ld.so.conf.d/oracle-instantclient.conf"
+sh -c "echo /u01/aipoc/instantclient_23_8 > /etc/ld.so.conf.d/oracle-instantclient.conf"
 ldconfig
-echo 'export LD_LIBRARY_PATH=/u01/aipoc/instantclient_23_5:$LD_LIBRARY_PATH' >> /etc/profile
+echo 'export LD_LIBRARY_PATH=/u01/aipoc/instantclient_23_8:$LD_LIBRARY_PATH' >> /etc/profile
 source /etc/profile
 
 # Unzip wallet and copy essential file to instantclient
 unzip /u01/aipoc/wallet.zip -d ./wallet
-cp ./wallet/*  /u01/aipoc/instantclient_23_5/network/admin/
+cp ./wallet/*  /u01/aipoc/instantclient_23_8/network/admin/
 
 # Move to source directory
 cd /u01/aipoc/No.1-RAG
