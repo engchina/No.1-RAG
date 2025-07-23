@@ -2,13 +2,8 @@
 
 ## Deploy
 
-- v1.1.1: 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
+- v1.1.2(Pre-Release): 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
   - update: oracle instance client 
-  
-  
-  Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.1.1/v1.1.1.zip)
-
-- v1.1.0(Pre-Release): 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
   - add model: xai.grok-3
   - add model: cohere.embed-v4.0
   - remove model: cohere.embed-multilingual-v3.0
@@ -18,19 +13,18 @@
   - remove feature: Markitdown 
   
   
-  Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.1.0/v1.1.0.zip)
+  Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.1.2/v1.1.2.zip)
 
 
-- v1.0.9: 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
-  - support meta.llama-4-maverick-17b-128e-instruct-fp8
-  - support meta.llama-4-scout-17b-16e-instruct
+- v1.1.1: 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
+  - update: oracle instance client 
+  - support meta.llama-4-maverick-17b-128e-instruct-fp8 (only for chicago region)
+  - support meta.llama-4-scout-17b-16e-instruct (only for chicago region)
   - support modify rag prompt through ui
   
-  Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.0.9/v1.0.9.zip)
+  
+  Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.1.1/v1.1.1.zip)
 
-- v1.0.8: 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
-
-  Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.0.8/v1.0.8.zip)
 
 ## Local Development Setup (No need for deploy to OCI)
 
