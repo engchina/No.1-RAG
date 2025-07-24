@@ -43,6 +43,7 @@ def insert_query_result(
         openai_gpt4_evaluation,
         azure_openai_gpt4o_evaluation,
         azure_openai_gpt4_evaluation,
+        xai_grok_4_image_response,
         llama_4_maverick_image_response,
         llama_4_scout_image_response,
         llama_3_2_90b_vision_image_response,
@@ -66,7 +67,7 @@ def insert_query_result(
         各LLMの回答と評価結果
         各LLMの画像回答
     """
-    print("in insert_query_result() start...")
+    print("in insert_query_result() 開始...")  # クエリ結果挿入処理開始
     if not query:
         return
     if not doc_id_all_checkbox_input and (not doc_id_checkbox_group_input or doc_id_checkbox_group_input == [""]):
@@ -124,7 +125,7 @@ def insert_query_result(
                         query_id,
                         "xai/grok-4",
                         xai_grok_4_response,
-                        "",  # Vision機能なし
+                        remove_base64_images_from_text(xai_grok_4_image_response),  # Vision機能対応
                         xai_grok_4_evaluation
                     ]
                 )

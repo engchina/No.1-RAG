@@ -43,6 +43,7 @@ def generate_download_file(
         openai_gpt4_evaluation,
         azure_openai_gpt4o_evaluation,
         azure_openai_gpt4_evaluation,
+        xai_grok_4_image_response,
         llama_4_maverick_image_response,
         llama_4_scout_image_response,
         llama_3_2_90b_vision_image_response,
@@ -278,7 +279,7 @@ def generate_download_file(
                 azure_openai_gpt4_response
             ],
             'Vision 回答': [
-                "",  # xai/grok-4 (Vision機能なし)
+                remove_base64_images_from_text(xai_grok_4_image_response),  # xai/grok-4 (Vision機能対応)
                 "",  # xai/grok-3 (Vision機能なし)
                 "",  # cohere/command-a (Vision機能なし)
                 remove_base64_images_from_text(llama_4_maverick_image_response),

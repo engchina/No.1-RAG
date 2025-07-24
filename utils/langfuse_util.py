@@ -179,11 +179,11 @@ def get_langfuse_status():
         if status["config_valid"] and status["service_available"] and status["handler_ready"]:
             status["error_message"] = None
         elif not status["service_available"]:
-            status["error_message"] = "Langfuseサービスに接続できません"
+            status["error_message"] = "Langfuseサービスに接続できません"  # Langfuseサービス接続エラーメッセージ
         elif not status["handler_ready"]:
-            status["error_message"] = "Langfuseハンドラーの作成に失敗しました"
+            status["error_message"] = "Langfuseハンドラーの作成に失敗しました"  # Langfuseハンドラー作成エラーメッセージ
 
     except Exception as e:
-        status["error_message"] = f"状態取得中にエラーが発生しました: {e}"
+        status["error_message"] = f"状態取得中にエラーが発生しました: {e}"  # 状態取得エラーメッセージ
 
     return status

@@ -46,7 +46,7 @@ async def chat_document(
     if use_image:
         include_citation = False
         include_current_time = False
-        print("Vision 回答がオンのため、include_citation=False, include_current_time=Falseに設定されました")
+        print("Vision 回答がオンのため、include_citation=False, include_current_time=Falseに設定されました")  # Vision回答設定ログ
 
     has_error = False
     if not query_text:
@@ -200,6 +200,7 @@ async def chat_document(
         # 通常のLLM処理
         async for xai_grok_4, xai_grok_3, command_a, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
                 system_text,
+                None,  # xai_grok_4_user_image - 通常のRAGでは画像なし
                 xai_grok_4_user_text,
                 xai_grok_3_user_text,
                 command_a_user_text,

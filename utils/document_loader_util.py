@@ -20,7 +20,7 @@ def load_document(file_path, server_directory, document_metadata,
                   pool, default_collection_name, generate_unique_id_func):
     """
     ドキュメントファイルを読み込み、処理してデータベースに保存する
-    
+
     Args:
         file_path: アップロードされたファイルのパス
         server_directory (str): サーバー上の保存ディレクトリ
@@ -28,9 +28,9 @@ def load_document(file_path, server_directory, document_metadata,
         pool: データベース接続プール
         default_collection_name (str): デフォルトコレクション名
         generate_unique_id_func: ユニークID生成関数
-        
+
     Returns:
-        Tuple[gr.Textbox, gr.Textbox, gr.Textbox, gr.Textbox]: 
+        Tuple[gr.Textbox, gr.Textbox, gr.Textbox, gr.Textbox]:
             - 実行されたSQL文
             - 生成されたドキュメントID
             - ページ数
@@ -95,9 +95,9 @@ def load_document(file_path, server_directory, document_metadata,
                              extract_image_block_to_payload=False,
                              skip_infer_table_types=["pdf", "jpg", "png", "heic", "doc", "docx"])
         for el in elements:
-            print(f"{el=}")
+            print(f"{el=}")  # 要素情報ログ
         original_contents = " \n".join(el.text.replace('\x0b', '\n') for el in elements)
-        print(f"{original_contents=}")
+        print(f"{original_contents=}")  # 元コンテンツログ
 
     # メタデータの設定
     collection_cmeta['file_name'] = file_name

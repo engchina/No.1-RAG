@@ -50,7 +50,7 @@ def extract_citation(input_str):
         tuple: (回答部分, 引用部分) のタプル。見つからない場合は (None, None)
     """
     # 2つの部分の内容をマッチング
-    pattern = '^(.*?)\n\n---回答内で参照されているコンテキスト---\n\n(.*?)$'
+    pattern = '^(.*?)\n\n---回答内で参照されているコンテキスト---\n\n(.*?)$'  # 回答とコンテキスト分離パターン
     match = re.search(pattern, input_str, re.DOTALL)
     if match:
         part1 = match.group(1).strip()
@@ -78,7 +78,7 @@ def extract_and_format(input_str, search_result_df):
                 f"\n\n"
                 f"---回答内で参照されているコンテキスト---"
                 f"\n\n"
-                f"回答にコンテキストが存在しないか、コンテキストの形式が正しくありません。"
+                f"回答にコンテキストが存在しないか、コンテキストの形式が正しくありません。"  # コンテキスト不存在エラーメッセージ
         )
 
     extracted = []
@@ -88,7 +88,6 @@ def extract_and_format(input_str, search_result_df):
         data = json.loads(json_str)
 
         for item in data:
-            print(f"{item=}")
             if isinstance(item, dict):
                 if "EMBED_ID" in item and "SOURCE" in item:
                     extracted.append({

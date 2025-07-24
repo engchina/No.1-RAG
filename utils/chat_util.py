@@ -16,6 +16,7 @@ from utils.llm_tasks_util import (
 
 async def chat(
         system_text,
+        xai_grok_4_user_image,
         xai_grok_4_user_text,
         xai_grok_3_user_text,
         command_a_user_text,
@@ -55,7 +56,7 @@ async def chat(
         tuple: 各モデルからの応答のタプル
     """
     # 各LLMタスクのジェネレーターを初期化
-    xai_grok_4_gen = xai_grok_4_task(system_text, xai_grok_4_user_text, xai_grok_4_checkbox)
+    xai_grok_4_gen = xai_grok_4_task(system_text, xai_grok_4_user_image, xai_grok_4_user_text, xai_grok_4_checkbox)
     xai_grok_3_gen = xai_grok_3_task(system_text, xai_grok_3_user_text, xai_grok_3_checkbox)
     command_a_gen = command_a_task(system_text, command_a_user_text, command_a_checkbox)
     llama_4_maverick_gen = llama_4_maverick_task(system_text, llama_4_maverick_user_image,
@@ -73,15 +74,10 @@ async def chat(
     azure_openai_gpt4_gen = azure_openai_gpt4_task(system_text, azure_openai_gpt4_user_text,
                                                    azure_openai_gpt4_gen_checkbox)
 
-    # 応答状態とジェネレーター名の初期化
+    # 応答状態の初期化
     responses_status = ["", "", "", "", "", "", "", "", "", "", ""]
-    generator_names = ["XAI Grok-4", "XAI Grok-3", "Command-A", "Llama-4-Maverick", "Llama-4-Scout",
-                       "Llama-3.3-70B", "Llama-3.2-90B-Vision", "OpenAI GPT-4o", "OpenAI GPT-4",
-                       "Azure OpenAI GPT-4o", "Azure OpenAI GPT-4"]
-    iteration_count = 0
 
     while True:
-        iteration_count += 1
         responses = ["", "", "", "", "", "", "", "", "", "", ""]
         generators = [xai_grok_4_gen, xai_grok_3_gen, command_a_gen,
                       llama_4_maverick_gen, llama_4_scout_gen,
@@ -98,26 +94,17 @@ async def chat(
                     if response:
                         if response == "TASK_DONE":
                             responses_status[i] = response
-                            print(f"DEBUG: {generator_names[i]} completed (iteration {iteration_count})")
                         else:
                             responses[i] = response
-                            # 空の応答のデバッグログ
-                            if not response.strip():
-                                print(
-                                    f"DEBUG: {generator_names[i]} yielded empty response (iteration {iteration_count})")
                 except StopAsyncIteration:
                     responses_status[i] = "TASK_DONE"
-                    print(f"DEBUG: {generator_names[i]} stopped iteration (iteration {iteration_count})")
                 except Exception as e:
-                    print(f"ERROR: {generator_names[i]} generator failed: {e}")
                     responses_status[i] = "TASK_DONE"
 
-        print(f"DEBUG: Iteration {iteration_count}, active generators: {active_generators}")
         yield tuple(responses)
 
         # すべてのタスクが完了したかチェック
         if all(response_status == "TASK_DONE" for response_status in responses_status):
-            print(f"DEBUG: All tasks completed after {iteration_count} iterations")
             break
 
 
@@ -162,6 +149,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
         return
 
     # 各モデル用のパラメータを設定
+    xai_grok_4_user_image = query_image  # Grok-4多模態対応
     xai_grok_4_user_text = query_text
     xai_grok_3_user_text = query_text
     command_a_user_text = query_text
@@ -230,6 +218,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     # chat関数を呼び出してストリーミング処理
     async for xai_grok_4, xai_grok_3, command_a, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
             system_text,
+            xai_grok_4_user_image,
             xai_grok_4_user_text,
             xai_grok_3_user_text,
             command_a_user_text,
