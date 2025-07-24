@@ -8,7 +8,7 @@
 import gradio as gr
 
 from utils.llm_tasks_util import (
-    xai_grok_3_task, command_a_task, llama_3_3_70b_task, llama_3_2_90b_vision_task,
+    xai_grok_4_task, xai_grok_3_task, command_a_task, llama_3_3_70b_task, llama_3_2_90b_vision_task,
     llama_4_maverick_task, llama_4_scout_task, openai_gpt4o_task, openai_gpt4_task,
     azure_openai_gpt4o_task, azure_openai_gpt4_task
 )
@@ -16,6 +16,7 @@ from utils.llm_tasks_util import (
 
 async def chat(
         system_text,
+        xai_grok_4_user_text,
         xai_grok_3_user_text,
         command_a_user_text,
         llama_4_maverick_user_image,
@@ -29,6 +30,7 @@ async def chat(
         openai_gpt4_user_text,
         azure_openai_gpt4o_user_text,
         azure_openai_gpt4_user_text,
+        xai_grok_4_checkbox,
         xai_grok_3_checkbox,
         command_a_checkbox,
         llama_4_maverick_checkbox,
@@ -42,17 +44,18 @@ async def chat(
 ):
     """
     複数のLLMモデルを並行実行し、ストリーミング形式で結果を返すチャット処理関数
-    
+
     Args:
         system_text: システムメッセージ
         *_user_text: 各モデル用のユーザーテキスト
         *_user_image: 各モデル用のユーザー画像
         *_checkbox: 各モデルの有効/無効フラグ
-        
+
     Yields:
         tuple: 各モデルからの応答のタプル
     """
     # 各LLMタスクのジェネレーターを初期化
+    xai_grok_4_gen = xai_grok_4_task(system_text, xai_grok_4_user_text, xai_grok_4_checkbox)
     xai_grok_3_gen = xai_grok_3_task(system_text, xai_grok_3_user_text, xai_grok_3_checkbox)
     command_a_gen = command_a_task(system_text, command_a_user_text, command_a_checkbox)
     llama_4_maverick_gen = llama_4_maverick_task(system_text, llama_4_maverick_user_image,
@@ -71,16 +74,16 @@ async def chat(
                                                    azure_openai_gpt4_gen_checkbox)
 
     # 応答状態とジェネレーター名の初期化
-    responses_status = ["", "", "", "", "", "", "", "", "", ""]
-    generator_names = ["XAI Grok-3", "Command-A", "Llama-4-Maverick", "Llama-4-Scout",
+    responses_status = ["", "", "", "", "", "", "", "", "", "", ""]
+    generator_names = ["XAI Grok-4", "XAI Grok-3", "Command-A", "Llama-4-Maverick", "Llama-4-Scout",
                        "Llama-3.3-70B", "Llama-3.2-90B-Vision", "OpenAI GPT-4o", "OpenAI GPT-4",
                        "Azure OpenAI GPT-4o", "Azure OpenAI GPT-4"]
     iteration_count = 0
 
     while True:
         iteration_count += 1
-        responses = ["", "", "", "", "", "", "", "", "", ""]
-        generators = [xai_grok_3_gen, command_a_gen,
+        responses = ["", "", "", "", "", "", "", "", "", "", ""]
+        generators = [xai_grok_4_gen, xai_grok_3_gen, command_a_gen,
                       llama_4_maverick_gen, llama_4_scout_gen,
                       llama_3_3_70b_gen, llama_3_2_90b_vision_gen,
                       openai_gpt4o_gen, openai_gpt4_gen,
@@ -153,11 +156,13 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             "",
             "",
             "",
+            "",
             ""
         )
         return
 
     # 各モデル用のパラメータを設定
+    xai_grok_4_user_text = query_text
     xai_grok_3_user_text = query_text
     command_a_user_text = query_text
     llama_4_maverick_user_image = query_image
@@ -173,6 +178,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     azure_openai_gpt4_user_text = query_text
 
     # 各モデルのチェックボックス状態を初期化
+    xai_grok_4_checkbox = False
     xai_grok_3_checkbox = False
     command_a_checkbox = False
     llama_4_maverick_checkbox = False
@@ -185,6 +191,8 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     azure_openai_gpt4_checkbox = False
 
     # 選択されたモデルに基づいてチェックボックス状態を設定
+    if "xai/grok-4" in llm_answer_checkbox:
+        xai_grok_4_checkbox = True
     if "xai/grok-3" in llm_answer_checkbox:
         xai_grok_3_checkbox = True
     if "cohere/command-a" in llm_answer_checkbox:
@@ -207,6 +215,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
         azure_openai_gpt4_checkbox = True
 
     # 各モデルの応答を初期化
+    xai_grok_4_response = ""
     xai_grok_3_response = ""
     command_a_response = ""
     llama_4_maverick_response = ""
@@ -219,8 +228,9 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
     azure_openai_gpt4_response = ""
 
     # chat関数を呼び出してストリーミング処理
-    async for xai_grok_3, command_a, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
+    async for xai_grok_4, xai_grok_3, command_a, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
             system_text,
+            xai_grok_4_user_text,
             xai_grok_3_user_text,
             command_a_user_text,
             llama_4_maverick_user_image,
@@ -234,6 +244,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             openai_gpt4_user_text,
             azure_openai_gpt4o_user_text,
             azure_openai_gpt4_user_text,
+            xai_grok_4_checkbox,
             xai_grok_3_checkbox,
             command_a_checkbox,
             llama_4_maverick_checkbox,
@@ -246,6 +257,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             azure_openai_gpt4_checkbox
     ):
         # 各モデルからの応答を累積
+        xai_grok_4_response += xai_grok_4
         xai_grok_3_response += xai_grok_3
         command_a_response += command_a
         llama_4_maverick_response += llama_4_maverick
@@ -259,6 +271,7 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
 
         # Gradio Markdownコンポーネントとして結果を返す
         yield (
+            gr.Markdown(value=xai_grok_4_response),
             gr.Markdown(value=xai_grok_3_response),
             gr.Markdown(value=command_a_response),
             gr.Markdown(value=llama_4_maverick_response),

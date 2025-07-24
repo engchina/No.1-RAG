@@ -21,6 +21,7 @@ def insert_query_result(
         llm_answer_checkbox_group,
         llm_evaluation_checkbox,
         standard_answer_text,
+        xai_grok_4_response,
         xai_grok_3_response,
         command_a_response,
         llama_4_maverick_response,
@@ -31,6 +32,7 @@ def insert_query_result(
         openai_gpt4_response,
         azure_openai_gpt4o_response,
         azure_openai_gpt4_response,
+        xai_grok_4_evaluation,
         xai_grok_3_evaluation,
         command_a_evaluation,
         llama_4_maverick_evaluation,
@@ -49,7 +51,7 @@ def insert_query_result(
 ):
     """
     クエリ結果をデータベースに挿入する
-    
+
     Args:
         pool: データベース接続プール
         search_result: 検索結果のDataFrame
@@ -95,6 +97,37 @@ def insert_query_result(
                     sql
                 ]
             )
+
+            if "xai/grok-4" in llm_answer_checkbox_group:
+                xai_grok_4_response = xai_grok_4_response
+                if llm_evaluation_checkbox:
+                    xai_grok_4_evaluation = xai_grok_4_evaluation
+                else:
+                    xai_grok_4_evaluation = ""
+
+                insert_sql = """
+                             INSERT INTO RAG_QA_FEEDBACK (query_id,
+                                                          llm_name,
+                                                          llm_answer,
+                                                          vlm_answer,
+                                                          ragas_evaluation_result)
+                             VALUES (:1,
+                                     :2,
+                                     :3,
+                                     :4,
+                                     :5) \
+                             """
+                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB, oracledb.CLOB)
+                cursor.execute(
+                    insert_sql,
+                    [
+                        query_id,
+                        "xai/grok-4",
+                        xai_grok_4_response,
+                        "",  # Vision機能なし
+                        xai_grok_4_evaluation
+                    ]
+                )
 
             if "xai/grok-3" in llm_answer_checkbox_group:
                 xai_grok_3_response = xai_grok_3_response

@@ -24,6 +24,47 @@ from utils.langfuse_util import get_safe_stream_config
 from utils.image_util import encode_image
 
 
+async def xai_grok_4_task(system_text, query_text, xai_grok_4_checkbox):
+    """XAI Grok-4モデルでのタスク処理"""
+    region = get_region()
+    if xai_grok_4_checkbox:
+        print(f"DEBUG: Starting XAI Grok-4 task with query: {query_text[:100]}...")
+        xai_grok_4 = ChatOCIGenAI(
+            model_id="xai.grok-4",
+            provider="xai",
+            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+        )
+
+        messages = [
+            SystemMessage(content=system_text),
+            HumanMessage(content=query_text)
+        ]
+
+        stream_config = get_safe_stream_config()
+
+        chunk_count = 0
+        total_content = ""
+        try:
+            async for chunk in xai_grok_4.astream(messages, config=stream_config):
+                chunk_count += 1
+                content = chunk.content if chunk.content else ""
+                total_content += content
+                print(f"DEBUG: XAI Grok-4 chunk {chunk_count}: '{content}' (length: {len(content)})")
+                yield content
+        except Exception as e:
+            logger.error(f"XAI Grok-4 ストリーム処理中にエラーが発生しました: {e}")
+            print(f"ERROR: XAI Grok-4 streaming failed after {chunk_count} chunks: {e}")
+            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
+
+        print(f"DEBUG: XAI Grok-4 task completed. Total chunks: {chunk_count}, Total content length: {len(total_content)}")
+    else:
+        print("DEBUG: XAI Grok-4 task skipped (checkbox not selected)")
+        yield ""
+
+
 async def xai_grok_3_task(system_text, query_text, xai_grok_3_checkbox):
     """XAI Grok-3モデルでのタスク処理"""
     region = get_region()

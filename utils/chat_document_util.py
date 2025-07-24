@@ -27,7 +27,7 @@ async def chat_document(
 ):
     """
     検索結果を使用してLLMとチャットする
-    
+
     Args:
         search_result: 検索結果のDataFrame
         llm_answer_checkbox: 選択されたLLMモデルのリスト
@@ -38,7 +38,7 @@ async def chat_document(
         doc_id_all_checkbox_input: 全ドキュメント選択フラグ
         doc_id_checkbox_group_input: 選択されたドキュメントIDのリスト
         rag_prompt_template: RAGプロンプトテンプレート
-        
+
     Yields:
         tuple: 各LLMの回答を含むGradio Markdownコンポーネントのタプル
     """
@@ -79,6 +79,7 @@ async def chat_document(
 
     query_text = query_text.strip()
 
+    xai_grok_4_response = ""
     xai_grok_3_response = ""
     command_a_response = ""
     llama_4_maverick_response = ""
@@ -90,6 +91,7 @@ async def chat_document(
     azure_openai_gpt4o_response = ""
     azure_openai_gpt4_response = ""
 
+    xai_grok_4_checkbox = False
     xai_grok_3_checkbox = False
     command_a_checkbox = False
     llama_4_maverick_checkbox = False
@@ -100,6 +102,8 @@ async def chat_document(
     openai_gpt4_checkbox = False
     azure_openai_gpt4o_checkbox = False
     azure_openai_gpt4_checkbox = False
+    if "xai/grok-4" in llm_answer_checkbox:
+        xai_grok_4_checkbox = True
     if "xai/grok-3" in llm_answer_checkbox:
         xai_grok_3_checkbox = True
     if "cohere/command-a" in llm_answer_checkbox:
@@ -139,6 +143,7 @@ async def chat_document(
         user_text = get_langgpt_rag_prompt(context, query_text, include_citation, include_current_time,
                                            rag_prompt_template)
 
+    xai_grok_4_user_text = user_text
     xai_grok_3_user_text = user_text
     command_a_user_text = user_text
 
@@ -154,6 +159,8 @@ async def chat_document(
     # Vision 回答がオンの場合、固定メッセージを即座に返す
     if use_image:
         # 選択されたLLMに対してのみ固定メッセージを設定
+        if xai_grok_4_checkbox:
+            xai_grok_4_response = fixed_image_message
         if xai_grok_3_checkbox:
             xai_grok_3_response = fixed_image_message
         if command_a_checkbox:
@@ -177,6 +184,7 @@ async def chat_document(
 
         # 固定メッセージを一度だけ返す
         yield (
+            gr.Markdown(value=xai_grok_4_response),
             gr.Markdown(value=xai_grok_3_response),
             gr.Markdown(value=command_a_response),
             gr.Markdown(value=llama_4_maverick_response),
@@ -190,8 +198,9 @@ async def chat_document(
         )
     else:
         # 通常のLLM処理
-        async for xai_grok_3, command_a, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
+        async for xai_grok_4, xai_grok_3, command_a, llama_4_maverick, llama_4_scout, llama_3_3_70b, llama_3_2_90b_vision, gpt4o, gpt4, azure_gpt4o, azure_gpt4 in chat(
                 system_text,
+                xai_grok_4_user_text,
                 xai_grok_3_user_text,
                 command_a_user_text,
                 None,
@@ -205,6 +214,7 @@ async def chat_document(
                 openai_gpt4_user_text,
                 azure_openai_gpt4o_user_text,
                 azure_openai_gpt4_user_text,
+                xai_grok_4_checkbox,
                 xai_grok_3_checkbox,
                 command_a_checkbox,
                 llama_4_maverick_checkbox,
@@ -216,6 +226,7 @@ async def chat_document(
                 azure_openai_gpt4o_checkbox,
                 azure_openai_gpt4_checkbox
         ):
+            xai_grok_4_response += xai_grok_4
             xai_grok_3_response += xai_grok_3
             command_a_response += command_a
             llama_4_maverick_response += llama_4_maverick
@@ -227,6 +238,7 @@ async def chat_document(
             azure_openai_gpt4o_response += azure_gpt4o
             azure_openai_gpt4_response += azure_gpt4
             yield (
+                gr.Markdown(value=xai_grok_4_response),
                 gr.Markdown(value=xai_grok_3_response),
                 gr.Markdown(value=command_a_response),
                 gr.Markdown(value=llama_4_maverick_response),
@@ -248,6 +260,7 @@ async def append_citation(
         query_text,
         doc_id_all_checkbox_input,
         doc_id_checkbox_group_input,
+        xai_grok_4_answer_text,
         xai_grok_3_answer_text,
         command_a_answer_text,
         llama_4_maverick_answer_text,
@@ -292,6 +305,7 @@ async def append_citation(
         # gr.Warning("検索結果が見つかりませんでした。設定もしくはクエリを変更して再度ご確認ください。")
     if has_error:
         yield (
+            gr.Markdown(value=xai_grok_4_answer_text),
             gr.Markdown(value=xai_grok_3_answer_text),
             gr.Markdown(value=command_a_answer_text),
             gr.Markdown(value=llama_4_maverick_answer_text),
@@ -307,6 +321,7 @@ async def append_citation(
 
     if not include_citation:
         yield (
+            gr.Markdown(value=xai_grok_4_answer_text),
             gr.Markdown(value=xai_grok_3_answer_text),
             gr.Markdown(value=command_a_answer_text),
             gr.Markdown(value=llama_4_maverick_answer_text),
@@ -320,6 +335,8 @@ async def append_citation(
         )
         return
 
+    if "xai/grok-4" in llm_answer_checkbox:
+        xai_grok_4_answer_text = extract_and_format(xai_grok_4_answer_text, search_result)
     if "xai/grok-3" in llm_answer_checkbox:
         xai_grok_3_answer_text = extract_and_format(xai_grok_3_answer_text, search_result)
     if "cohere/command-a" in llm_answer_checkbox:
@@ -341,6 +358,7 @@ async def append_citation(
     if "azure_openai/gpt-4" in llm_answer_checkbox:
         azure_openai_gpt4_answer_text = extract_and_format(azure_openai_gpt4_answer_text, search_result)
     yield (
+        gr.Markdown(value=xai_grok_4_answer_text),
         gr.Markdown(value=xai_grok_3_answer_text),
         gr.Markdown(value=command_a_answer_text),
         gr.Markdown(value=llama_4_maverick_answer_text),

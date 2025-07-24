@@ -21,6 +21,7 @@ def generate_download_file(
         doc_id_all_checkbox_input,
         doc_id_checkbox_group_input,
         standard_answer_text,
+        xai_grok_4_response,
         xai_grok_3_response,
         command_a_response,
         llama_4_maverick_response,
@@ -31,6 +32,7 @@ def generate_download_file(
         openai_gpt4_response,
         azure_openai_gpt4o_response,
         azure_openai_gpt4_response,
+        xai_grok_4_evaluation,
         xai_grok_3_evaluation,
         command_a_evaluation,
         llama_4_maverick_evaluation,
@@ -87,6 +89,20 @@ def generate_download_file(
     df1 = pd.DataFrame({'クエリ': [query_text], '標準回答': [standard_answer_text]})
 
     df2 = search_result
+
+    if "xai/grok-4" in llm_answer_checkbox_group:
+        xai_grok_4_response = xai_grok_4_response
+        xai_grok_4_referenced_contexts = ""
+        if include_citation:
+            xai_grok_4_response, xai_grok_4_referenced_contexts = extract_citation(xai_grok_4_response)
+        if llm_evaluation_checkbox:
+            xai_grok_4_evaluation = xai_grok_4_evaluation
+        else:
+            xai_grok_4_evaluation = ""
+    else:
+        xai_grok_4_response = ""
+        xai_grok_4_evaluation = ""
+        xai_grok_4_referenced_contexts = ""
 
     if "xai/grok-3" in llm_answer_checkbox_group:
         xai_grok_3_response = xai_grok_3_response
@@ -236,6 +252,7 @@ def generate_download_file(
         {
             'LLM モデル':
                 [
+                    "xai/grok-4",
                     "xai/grok-3",
                     "cohere/command-a",
                     "meta/llama-4-maverick-17b-128e-instruct-fp8",
@@ -248,6 +265,7 @@ def generate_download_file(
                     "azure_openai/gpt-4"
                 ],
             'LLM メッセージ': [
+                xai_grok_4_response,
                 xai_grok_3_response,
                 command_a_response,
                 llama_4_maverick_response,
@@ -260,6 +278,7 @@ def generate_download_file(
                 azure_openai_gpt4_response
             ],
             'Vision 回答': [
+                "",  # xai/grok-4 (Vision機能なし)
                 "",  # xai/grok-3 (Vision機能なし)
                 "",  # cohere/command-a (Vision機能なし)
                 remove_base64_images_from_text(llama_4_maverick_image_response),
@@ -272,6 +291,7 @@ def generate_download_file(
                 ""  # azure_openai/gpt-4 (Vision機能なし)
             ],
             '引用 Contexts': [
+                xai_grok_4_referenced_contexts,
                 xai_grok_3_referenced_contexts,
                 command_a_referenced_contexts,
                 llama_4_maverick_referenced_contexts,
@@ -284,6 +304,7 @@ def generate_download_file(
                 azure_openai_gpt4_referenced_contexts
             ],
             'LLM 評価結果': [
+                xai_grok_4_evaluation,
                 xai_grok_3_evaluation,
                 command_a_evaluation,
                 llama_4_maverick_evaluation,
