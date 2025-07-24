@@ -694,7 +694,8 @@ def generate_eval_result_file():
                                   JOIN
                               RAG_QA_FEEDBACK f
                               ON
-                                  r.query_id = f.query_id \
+                                  r.query_id = f.query_id
+                         ORDER BY r.created_date ASC, r.query_id, f.llm_name \
                          """
 
             cursor.execute(select_sql)
@@ -1625,6 +1626,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             with gr.Column():
                                 tab_chat_document_image_prompt_text = gr.Textbox(
                                     label="VisionPromptテンプレート",
+                                    show_label=False,
                                     lines=15,
                                     max_lines=25,
                                     interactive=True,
@@ -2757,7 +2759,19 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[]
     )
 
-
+    tab_chat_document_xai_grok_4_answer_human_eval_feedback_send_button.click(
+        eval_by_human,
+        inputs=[
+            query_id_state,
+            gr.State(value="xai/grok-4"),
+            tab_chat_document_xai_grok_4_answer_human_eval_feedback_radio,
+            tab_chat_document_xai_grok_4_answer_human_eval_feedback_text,
+        ],
+        outputs=[
+            tab_chat_document_xai_grok_4_answer_human_eval_feedback_radio,
+            tab_chat_document_xai_grok_4_answer_human_eval_feedback_text,
+        ]
+    )
 
     tab_chat_document_command_a_answer_human_eval_feedback_send_button.click(
         eval_by_human,
@@ -2773,8 +2787,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ]
     )
 
-
-
     tab_chat_document_llama_4_scout_answer_human_eval_feedback_send_button.click(
         eval_by_human,
         inputs=[
@@ -2788,10 +2800,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llama_4_scout_answer_human_eval_feedback_text,
         ]
     )
-
-
-
-
 
     tab_chat_document_openai_gpt4o_answer_human_eval_feedback_send_button.click(
         eval_by_human,
@@ -2807,8 +2815,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ]
     )
 
-
-
     tab_chat_document_azure_openai_gpt4o_answer_human_eval_feedback_send_button.click(
         eval_by_human,
         inputs=[
@@ -2823,8 +2829,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ]
     )
 
-
-
     tab_download_eval_result_generate_button.click(
         generate_eval_result_file,
         inputs=[],
@@ -2832,7 +2836,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_download_eval_result_download_button,
         ]
     )
-
 
     # RAGPrompt設定のイベントハンドラー
     def save_rag_prompt(prompt_text):
@@ -2843,13 +2846,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         except Exception as e:
             return gr.Warning(f"Promptの保存に失敗しました: {str(e)}")
 
-
     def reset_rag_prompt():
         """RAGPromptをデフォルトに戻す"""
         default_prompt = get_langgpt_rag_prompt("{{context}}", "{{query_text}}", False, False)
         update_langgpt_rag_prompt(default_prompt)
         return default_prompt
-
 
     tab_chat_document_rag_prompt_save_button.click(
         save_rag_prompt,
@@ -2863,7 +2864,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[tab_chat_document_rag_prompt_text]
     )
 
-
     # VisionPrompt設定のイベントハンドラー
     def save_image_prompt(prompt_text):
         """VisionPromptを保存する"""
@@ -2873,13 +2873,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         except Exception as e:
             return gr.Warning(f"VisionPromptの保存に失敗しました: {str(e)}")
 
-
     def reset_image_prompt():
         """VisionPromptをデフォルトに戻す"""
         default_prompt = get_image_qa_prompt("{{query_text}}")
         update_image_qa_prompt(default_prompt)
         return default_prompt
-
 
     # tab_chat_document_image_prompt_save_button.click(
     #     save_image_prompt,

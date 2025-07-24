@@ -166,7 +166,7 @@ IMAGE_QA_PROMPT_TEMPLATE_V3 = """## 厳格なコンテキストQAシステムの
 ### 現在の質問
 {query_text}"""
 
-IMAGE_QA_PROMPT_TEMPLATE = """## 厳格なコンテキストQAシステムの実行規則
+IMAGE_QA_PROMPT_TEMPLATE_V4 = """## 厳格なコンテキストQAシステムの実行規則
 
 ### 基本原則
 1. 提供された画像を唯一の情報源として利用すること  
@@ -187,6 +187,13 @@ IMAGE_QA_PROMPT_TEMPLATE = """## 厳格なコンテキストQAシステムの実
   「情報不足のため、回答できません」  
 
 ### 現在の質問  
+{query_text}"""
+
+IMAGE_QA_PROMPT_TEMPLATE = """
+提供された画像を唯一の情報源として以下の質問を回答してください。
+
+--質問--
+
 {query_text}"""
 
 # Query generation prompts
