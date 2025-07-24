@@ -28,6 +28,8 @@ async def xai_grok_4_task(system_text, query_image, query_text, xai_grok_4_check
     """XAI Grok-4モデルでのタスク処理（多模態対応）"""
     region = get_region()
     if xai_grok_4_checkbox:
+        start_time = time.time()  # 推論時間計測開始
+
         xai_grok_4 = ChatOCIGenAI(
             model_id="xai.grok-4",
             provider="xai",
@@ -60,7 +62,7 @@ async def xai_grok_4_task(system_text, query_image, query_text, xai_grok_4_check
                 HumanMessage(content=query_text)
             ]
 
-        stream_config = get_safe_stream_config()
+        stream_config = get_safe_stream_config("xai.grok-4")
 
         try:
             async for chunk in xai_grok_4.astream(messages, config=stream_config):
@@ -71,48 +73,20 @@ async def xai_grok_4_task(system_text, query_image, query_text, xai_grok_4_check
             # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
 
+        # 推論時間を計算して出力
+        end_time = time.time()
+        inference_time = end_time - start_time
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        print(f"=== XAI Grok-4 での処理完了 ===\n")
+
+        # 推論時間を追加
+        yield f"\n\n推論時間: {inference_time:.2f}秒\n\n"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
 
 
-async def xai_grok_3_task(system_text, query_text, xai_grok_3_checkbox):
-    """XAI Grok-3モデルでのタスク処理"""
-    region = get_region()
-    if xai_grok_3_checkbox:
-        xai_grok_3 = ChatOCIGenAI(
-            model_id="xai.grok-3",
-            provider="xai",
-            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
-            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
-        )
 
-        if system_text:
-            messages = [
-                SystemMessage(content=system_text),
-                HumanMessage(content=query_text),
-            ]
-        else:
-            messages = [
-                HumanMessage(content=query_text),
-            ]
-
-        # 安全なlangfuse設定を取得
-        stream_config = get_safe_stream_config("xai.grok-3")
-
-        try:
-            async for chunk in xai_grok_3.astream(messages, config=stream_config):
-                content = chunk.content if chunk.content else ""
-                yield content
-        except Exception as e:
-            logger.error(f"XAI Grok-3 ストリーム処理中にエラーが発生しました: {e}")
-            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
-            yield f"\n\nエラーが発生しました: {e}\n\n"
-
-        yield "TASK_DONE"
-    else:
-        yield "TASK_DONE"
 
 
 async def command_a_task(system_text, query_text, command_a_checkbox):
@@ -155,67 +129,28 @@ async def command_a_task(system_text, query_text, command_a_checkbox):
             # エラーが発生してもstream処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
 
+        # 推論時間を計算して出力
+        end_time = time.time()
+        inference_time = end_time - start_time
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        print(f"=== Command-A での処理完了 ===\n")
+
+        # 推論時間を追加
+        yield f"\n\n推論時間: {inference_time:.2f}秒\n\n"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
 
 
-async def llama_4_maverick_task(system_text, query_image, query_text, llama_4_maverick_checkbox):
-    """Llama-4-Maverickモデルでのタスク処理"""
-    region = get_region()
-    if llama_4_maverick_checkbox:
-        llama_4_maverick = ChatOCIGenAI(
-            model_id="meta.llama-4-maverick-17b-128e-instruct-fp8",
-            provider="meta",
-            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
-            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
-        )
 
-        # 画像がある場合とない場合でメッセージを分ける
-        if query_image is not None:
-            # 画像がある場合
-            base64_image = encode_image(query_image)
-            messages = [
-                SystemMessage(content=system_text),
-                HumanMessage(content=[
-                    {
-                        "type": "text",
-                        "text": query_text
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
-                    },
-                ])
-            ]
-        else:
-            # 画像がない場合
-            messages = [
-                SystemMessage(content=system_text),
-                HumanMessage(content=query_text)
-            ]
-
-        stream_config = get_safe_stream_config()
-
-        try:
-            async for chunk in llama_4_maverick.astream(messages, config=stream_config):
-                content = chunk.content if chunk.content else ""
-                yield content
-        except Exception as e:
-            logger.error(f"Llama-4-Maverick ストリーム処理中にエラーが発生しました: {e}")
-            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
-            yield f"\n\nエラーが発生しました: {e}\n\n"
-
-        yield "TASK_DONE"
-    else:
-        yield "TASK_DONE"
 
 
 async def llama_4_scout_task(system_text, query_image, query_text, llama_4_scout_checkbox):
     """Llama-4-Scoutモデルでのタスク処理"""
     region = get_region()
     if llama_4_scout_checkbox:
+        start_time = time.time()  # 推論時間計測開始
+
         llama_4_scout = ChatOCIGenAI(
             model_id="meta.llama-4-scout-17b-16e-instruct",
             provider="meta",
@@ -248,7 +183,7 @@ async def llama_4_scout_task(system_text, query_image, query_text, llama_4_scout
                 HumanMessage(content=query_text)
             ]
 
-        stream_config = get_safe_stream_config()
+        stream_config = get_safe_stream_config("meta.llama-4-scout-17b-16e-instruct")
 
         try:
             async for chunk in llama_4_scout.astream(messages, config=stream_config):
@@ -259,97 +194,14 @@ async def llama_4_scout_task(system_text, query_image, query_text, llama_4_scout
             # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
 
-        yield "TASK_DONE"
-    else:
-        yield "TASK_DONE"
+        # 推論時間を計算して出力
+        end_time = time.time()
+        inference_time = end_time - start_time
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        print(f"=== Llama-4-Scout での処理完了 ===\n")
 
-
-async def llama_3_3_70b_task(system_text, query_text, llama_3_3_70b_checkbox):
-    """Llama-3.3-70Bモデルでのタスク処理"""
-    region = get_region()
-    if llama_3_3_70b_checkbox:
-        llama_3_3_70b = ChatOCIGenAI(
-            model_id="meta.llama-3.3-70b-instruct",
-            provider="meta",
-            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
-            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
-        )
-
-        if system_text:
-            messages = [
-                SystemMessage(content=system_text),
-                HumanMessage(content=query_text),
-            ]
-        else:
-            messages = [
-                HumanMessage(content=query_text),
-            ]
-        # 安全なlangfuse設定を取得
-        stream_config = get_safe_stream_config("meta.llama-3.3-70b-instruct")
-
-        try:
-            async for chunk in llama_3_3_70b.astream(messages, config=stream_config):
-                content = chunk.content if chunk.content else ""
-                yield content
-        except Exception as e:
-            logger.error(f"Llama-3.3-70B ストリーム処理中にエラーが発生しました: {e}")
-            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
-            yield f"\n\nエラーが発生しました: {e}\n\n"
-
-        yield "TASK_DONE"
-    else:
-        yield "TASK_DONE"
-
-
-async def llama_3_2_90b_vision_task(system_text, query_image, query_text, llama_3_2_90b_vision_checkbox):
-    """Llama-3.2-90B-Visionモデルでのタスク処理"""
-    region = get_region()
-    if llama_3_2_90b_vision_checkbox:
-        llama_3_2_90b_vision = ChatOCIGenAI(
-            model_id="meta.llama-3.2-90b-vision-instruct",
-            provider="meta",
-            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
-            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600, "presence_penalty": 2,
-                          "frequency_penalty": 2},
-        )
-
-        # 画像がある場合とない場合でメッセージを分ける
-        if query_image is not None:
-            # 画像がある場合
-            base64_image = encode_image(query_image)
-            messages = [
-                SystemMessage(content=system_text),
-                HumanMessage(content=[
-                    {
-                        "type": "text",
-                        "text": query_text
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
-                    },
-                ])
-            ]
-        else:
-            # 画像がない場合
-            messages = [
-                SystemMessage(content=system_text),
-                HumanMessage(content=query_text)
-            ]
-
-        stream_config = get_safe_stream_config()
-
-        try:
-            async for chunk in llama_3_2_90b_vision.astream(messages, config=stream_config):
-                content = chunk.content if chunk.content else ""
-                yield content
-        except Exception as e:
-            logger.error(f"Llama-3.2-90B-Vision ストリーム処理中にエラーが発生しました: {e}")
-            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
-            yield f"\n\nエラーが発生しました: {e}\n\n"
-
+        # 推論時間を追加
+        yield f"\n\n推論時間: {inference_time:.2f}秒\n\n"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
@@ -358,6 +210,8 @@ async def llama_3_2_90b_vision_task(system_text, query_image, query_text, llama_
 async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
     """OpenAI GPT-4oモデルでのタスク処理"""
     if openai_gpt4o_checkbox:
+        start_time = time.time()  # 推論時間計測開始
+
         load_dotenv(find_dotenv())
         openai_gpt4o = ChatOpenAI(
             model="gpt-4o",
@@ -376,7 +230,7 @@ async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
             HumanMessage(content=query_text)
         ]
 
-        stream_config = get_safe_stream_config()
+        stream_config = get_safe_stream_config("gpt-4o")
 
         try:
             async for chunk in openai_gpt4o.astream(messages, config=stream_config):
@@ -387,43 +241,14 @@ async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
             # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
 
-        yield "TASK_DONE"
-    else:
-        yield "TASK_DONE"
+        # 推論時間を計算して出力
+        end_time = time.time()
+        inference_time = end_time - start_time
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        print(f"=== OpenAI GPT-4o での処理完了 ===\n")
 
-
-async def openai_gpt4_task(system_text, query_text, openai_gpt4_checkbox):
-    """OpenAI GPT-4モデルでのタスク処理"""
-    if openai_gpt4_checkbox:
-        load_dotenv(find_dotenv())
-        openai_gpt4 = ChatOpenAI(
-            model="gpt-4",
-            temperature=0,
-            top_p=0.75,
-            seed=42,
-            max_tokens=None,
-            timeout=None,
-            max_retries=2,
-            api_key=os.environ["OPENAI_API_KEY"],
-            base_url=os.environ["OPENAI_BASE_URL"],
-        )
-
-        messages = [
-            SystemMessage(content=system_text),
-            HumanMessage(content=query_text)
-        ]
-
-        stream_config = get_safe_stream_config()
-
-        try:
-            async for chunk in openai_gpt4.astream(messages, config=stream_config):
-                content = chunk.content if chunk.content else ""
-                yield content
-        except Exception as e:
-            logger.error(f"OpenAI GPT-4 ストリーム処理中にエラーが発生しました: {e}")
-            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
-            yield f"\n\nエラーが発生しました: {e}\n\n"
-
+        # 推論時間を追加
+        yield f"\n\n推論時間: {inference_time:.2f}秒\n\n"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
@@ -432,6 +257,8 @@ async def openai_gpt4_task(system_text, query_text, openai_gpt4_checkbox):
 async def azure_openai_gpt4o_task(system_text, query_text, azure_openai_gpt4o_checkbox):
     """Azure OpenAI GPT-4oモデルでのタスク処理"""
     if azure_openai_gpt4o_checkbox:
+        start_time = time.time()  # 推論時間計測開始
+
         load_dotenv(find_dotenv())
         azure_openai_gpt4o = AzureChatOpenAI(
             deployment_name="gpt-4o",
@@ -451,7 +278,7 @@ async def azure_openai_gpt4o_task(system_text, query_text, azure_openai_gpt4o_ch
             HumanMessage(content=query_text)
         ]
 
-        stream_config = get_safe_stream_config()
+        stream_config = get_safe_stream_config("azure-gpt-4o")
 
         try:
             async for chunk in azure_openai_gpt4o.astream(messages, config=stream_config):
@@ -462,44 +289,14 @@ async def azure_openai_gpt4o_task(system_text, query_text, azure_openai_gpt4o_ch
             # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
 
-        yield "TASK_DONE"
-    else:
-        yield "TASK_DONE"
+        # 推論時間を計算して出力
+        end_time = time.time()
+        inference_time = end_time - start_time
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        print(f"=== Azure OpenAI GPT-4o での処理完了 ===\n")
 
-
-async def azure_openai_gpt4_task(system_text, query_text, azure_openai_gpt4_checkbox):
-    """Azure OpenAI GPT-4モデルでのタスク処理"""
-    if azure_openai_gpt4_checkbox:
-        load_dotenv(find_dotenv())
-        azure_openai_gpt4 = AzureChatOpenAI(
-            deployment_name="gpt-4",
-            temperature=0,
-            top_p=0.75,
-            seed=42,
-            max_tokens=None,
-            timeout=None,
-            max_retries=2,
-            azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT_GPT_4"],
-            openai_api_key=os.environ["AZURE_OPENAI_API_KEY"],
-            openai_api_version=os.environ["AZURE_OPENAI_API_VERSION_GPT_4"],
-        )
-
-        messages = [
-            SystemMessage(content=system_text),
-            HumanMessage(content=query_text)
-        ]
-
-        stream_config = get_safe_stream_config()
-
-        try:
-            async for chunk in azure_openai_gpt4.astream(messages, config=stream_config):
-                content = chunk.content if chunk.content else ""
-                yield content
-        except Exception as e:
-            logger.error(f"Azure OpenAI GPT-4 ストリーム処理中にエラーが発生しました: {e}")
-            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
-            yield f"\n\nエラーが発生しました: {e}\n\n"
-
+        # 推論時間を追加
+        yield f"\n\n推論時間: {inference_time:.2f}秒\n\n"
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
