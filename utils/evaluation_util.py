@@ -73,7 +73,7 @@ def reset_eval_by_human_result():
         gr.Radio(value="good"),
         gr.Textbox(value=""),
         gr.Radio(value="good"),
-        gr.Textbox(value=""),
+        gr.Textbox(value="")
     )
 
 

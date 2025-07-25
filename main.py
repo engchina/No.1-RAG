@@ -2556,6 +2556,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         reset_eval_by_human_result,
         inputs=[],
         outputs=[
+            tab_chat_document_xai_grok_4_answer_human_eval_feedback_radio,
+            tab_chat_document_xai_grok_4_answer_human_eval_feedback_text,
             tab_chat_document_command_a_answer_human_eval_feedback_radio,
             tab_chat_document_command_a_answer_human_eval_feedback_text,
             tab_chat_document_llama_4_scout_answer_human_eval_feedback_radio,

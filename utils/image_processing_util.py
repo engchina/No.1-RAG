@@ -110,7 +110,9 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
                 return
 
             # プロンプトを作成
+            print(f"{custom_image_prompt=}")
             if custom_image_prompt:
+                custom_image_prompt = custom_image_prompt.replace('{{query_text}}', '{query_text}')
                 prompt_text = custom_image_prompt.format(query_text=query_text)
             else:
                 prompt_text = get_image_qa_prompt(query_text)
@@ -1077,6 +1079,7 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
                 return
 
             # メッセージを作成（複数画像対応）
+            print(f"{custom_image_prompt=}")
             if custom_image_prompt:
                 prompt_text = custom_image_prompt.format(query_text=query_text)
             else:
