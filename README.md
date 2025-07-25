@@ -2,6 +2,18 @@
 
 ## Deploy
 
+- v1.1.4(Pre-Release): 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
+  - add model: xai.grok-4
+  - remove model: xai.grok-3
+  - remove model: meta.llama-4-maverick-17b-128e-instruct-fp8
+  - remove model: meta.llama-3-3-70b
+  - remove model: meta.llama-3-2-90b-vision
+  - remove model: openai/gpt-4o
+  - remove model: azure_openai/gpt-4o
+
+  Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.1.4/v1.1.4.zip)
+  
+
 - v1.1.1: 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
   - update: oracle instance client 
   
@@ -17,20 +29,11 @@
   - add feature: Pdf2Markdown (only for VQA)
   - remove feature: Markitdown 
   
-  
-  Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.1.0/v1.1.0.zip)
-
-
+ 
 - v1.0.9: 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
   - support meta.llama-4-maverick-17b-128e-instruct-fp8
   - support meta.llama-4-scout-17b-16e-instruct
   - support modify rag prompt through ui
-  
-  Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.0.9/v1.0.9.zip)
-
-- v1.0.8: 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
-
-  Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.0.8/v1.0.8.zip)
 
 ## Local Development Setup (No need for deploy to OCI)
 
