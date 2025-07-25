@@ -11,7 +11,6 @@ from PIL import Image
 from langchain_community.chat_models import ChatOCIGenAI
 from pdf2image import convert_from_path
 
-from markitdown import MarkItDown
 from utils.common_util import get_region
 
 logger = logging.getLogger(__name__)
