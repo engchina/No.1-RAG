@@ -304,9 +304,9 @@ def _drop_indexes(cursor, default_collection_name):
             )
             if cursor.fetchone()[0] > 0:
                 cursor.execute(f"DROP INDEX {index_name}")
-                print(f"インデックス {index_name} を削除しました")
+                print(f"インデックス {index_name} を削除しました")  # インデックス削除成功ログ
         except DatabaseError as e:
-            print(f"インデックス {index_name} の削除エラー: {e}")
+            print(f"インデックス {index_name} の削除エラー: {e}")  # インデックス削除エラーログ
 
 
 def _drop_tables(cursor, default_collection_name, *drop_sqls):
@@ -327,16 +327,16 @@ def _drop_tables(cursor, default_collection_name, *drop_sqls):
         try:
             if table_name.startswith("RAG_QA"):
                 cursor.execute(drop_sql)
-                print(f"テーブル {table_name} を削除しました")
+                print(f"テーブル {table_name} を削除しました")  # テーブル削除成功ログ
             else:
                 cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
                 cursor.execute(drop_sql)
-                print(f"テーブル {table_name} を削除しました")
+                print(f"テーブル {table_name} を削除しました")  # テーブル削除成功ログ
         except DatabaseError as e:
             if e.args[0].code == 942:  # Table or view does not exist
-                print(f"テーブル {table_name} は存在しません")
+                print(f"テーブル {table_name} は存在しません")  # テーブル不存在ログ
             else:
-                print(f"テーブル {table_name} の削除エラー: {e}")
+                print(f"テーブル {table_name} の削除エラー: {e}")  # テーブル削除エラーログ
 
 
 def _create_tables(cursor, default_collection_name, *create_sqls):
@@ -356,9 +356,9 @@ def _create_tables(cursor, default_collection_name, *create_sqls):
     for table_name, create_sql in tables:
         try:
             cursor.execute(create_sql)
-            print(f"テーブル {table_name} を作成しました")
+            print(f"テーブル {table_name} を作成しました")  # テーブル作成成功ログ
         except DatabaseError as e:
-            print(f"テーブル {table_name} の作成エラー: {e}")
+            print(f"テーブル {table_name} の作成エラー: {e}")  # テーブル作成エラーログ
 
 
 def _create_indexes(cursor, default_collection_name, create_index_sql, create_image_index_sql):
@@ -371,9 +371,9 @@ def _create_indexes(cursor, default_collection_name, create_index_sql, create_im
     for index_name, create_sql in indexes:
         try:
             cursor.execute(create_sql)
-            print(f"インデックス {index_name} を作成しました")
+            print(f"インデックス {index_name} を作成しました")  # インデックス作成成功ログ
         except DatabaseError as e:
-            print(f"インデックス {index_name} の作成エラー: {e}")
+            print(f"インデックス {index_name} の作成エラー: {e}")  # インデックス作成エラーログ
 
 
 def _handle_preferences(cursor, check_preference_sql, drop_preference_plsql, create_preference_plsql):
@@ -382,14 +382,14 @@ def _handle_preferences(cursor, check_preference_sql, drop_preference_plsql, cre
         cursor.execute(check_preference_sql)
         if cursor.fetchone():
             cursor.execute(drop_preference_plsql)
-            print("Preference 'WORLD_LEXER' を削除しました")
+            print("Preference 'WORLD_LEXER' を削除しました")  # プリファレンス削除成功ログ
         else:
-            print("Preference 'WORLD_LEXER' は存在しません")
+            print("Preference 'WORLD_LEXER' は存在しません")  # プリファレンス不存在ログ
     except DatabaseError as e:
-        print(f"Preference 'WORLD_LEXER' の削除エラー: {e}")
+        print(f"Preference 'WORLD_LEXER' の削除エラー: {e}")  # プリファレンス削除エラーログ
 
     try:
         cursor.execute(create_preference_plsql)
-        print("Preference 'WORLD_LEXER' を作成しました")
+        print("Preference 'WORLD_LEXER' を作成しました")  # プリファレンス作成成功ログ
     except DatabaseError as e:
-        print(f"Preference 'WORLD_LEXER' の作成エラー: {e}")
+        print(f"Preference 'WORLD_LEXER' の作成エラー: {e}")  # プリファレンス作成エラーログ

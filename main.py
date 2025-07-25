@@ -117,83 +117,50 @@ def get_server_path(doc_id: str) -> str:
 
 
 def set_chat_llm_answer(llm_answer_checkbox):
-    xai_grok_3_answer_visible = False
+    xai_grok_4_answer_visible = False
     command_a_answer_visible = False
-    llama_4_maverick_answer_visible = False
     llama_4_scout_answer_visible = False
-    llama_3_3_70b_answer_visible = False
-    llama_3_2_90b_vision_answer_visible = False
     openai_gpt4o_answer_visible = False
-    openai_gpt4_answer_visible = False
     azure_openai_gpt4o_answer_visible = False
-    azure_openai_gpt4_answer_visible = False
-    if "xai/grok-3" in llm_answer_checkbox:
-        xai_grok_3_answer_visible = True
+
+    if "xai/grok-4" in llm_answer_checkbox:
+        xai_grok_4_answer_visible = True
     if "cohere/command-a" in llm_answer_checkbox:
         command_a_answer_visible = True
-    if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox:
-        llama_4_maverick_answer_visible = True
     if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
         llama_4_scout_answer_visible = True
-    if "meta/llama-3-3-70b" in llm_answer_checkbox:
-        llama_3_3_70b_answer_visible = True
-    if "meta/llama-3-2-90b-vision" in llm_answer_checkbox:
-        llama_3_2_90b_vision_answer_visible = True
     if "openai/gpt-4o" in llm_answer_checkbox:
         openai_gpt4o_answer_visible = True
-    if "openai/gpt-4" in llm_answer_checkbox:
-        openai_gpt4_answer_visible = True
     if "azure_openai/gpt-4o" in llm_answer_checkbox:
         azure_openai_gpt4o_answer_visible = True
-    if "azure_openai/gpt-4" in llm_answer_checkbox:
-        azure_openai_gpt4_answer_visible = True
+
     return (
-        gr.Accordion(visible=xai_grok_3_answer_visible),
+        gr.Accordion(visible=xai_grok_4_answer_visible),
         gr.Accordion(visible=command_a_answer_visible),
-        gr.Accordion(visible=llama_4_maverick_answer_visible),
         gr.Accordion(visible=llama_4_scout_answer_visible),
-        gr.Accordion(visible=llama_3_3_70b_answer_visible),
-        gr.Accordion(visible=llama_3_2_90b_vision_answer_visible),
         gr.Accordion(visible=openai_gpt4o_answer_visible),
-        gr.Accordion(visible=openai_gpt4_answer_visible),
         gr.Accordion(visible=azure_openai_gpt4o_answer_visible),
-        gr.Accordion(visible=azure_openai_gpt4_answer_visible)
     )
 
 
 def set_chat_llm_evaluation(llm_evaluation_checkbox):
-    xai_grok_3_evaluation_visible = False
+    xai_grok_4_evaluation_visible = False
     command_a_evaluation_visible = False
-    llama_4_maverick_evaluation_visible = False
     llama_4_scout_evaluation_visible = False
-    llama_3_3_70b_evaluation_visible = False
-    llama_3_2_90b_vision_evaluation_visible = False
     openai_gpt4o_evaluation_visible = False
-    openai_gpt4_evaluation_visible = False
     azure_openai_gpt4o_evaluation_visible = False
-    azure_openai_gpt4_evaluation_visible = False
     if llm_evaluation_checkbox:
-        xai_grok_3_evaluation_visible = True
+        xai_grok_4_evaluation_visible = True
         command_a_evaluation_visible = True
-        llama_4_maverick_evaluation_visible = True
         llama_4_scout_evaluation_visible = True
-        llama_3_3_70b_evaluation_visible = True
-        llama_3_2_90b_vision_evaluation_visible = True
         openai_gpt4o_evaluation_visible = True
-        openai_gpt4_evaluation_visible = True
         azure_openai_gpt4o_evaluation_visible = True
-        azure_openai_gpt4_evaluation_visible = True
     return (
-        gr.Accordion(visible=xai_grok_3_evaluation_visible),
+        gr.Accordion(visible=xai_grok_4_evaluation_visible),
         gr.Accordion(visible=command_a_evaluation_visible),
-        gr.Accordion(visible=llama_4_maverick_evaluation_visible),
         gr.Accordion(visible=llama_4_scout_evaluation_visible),
-        gr.Accordion(visible=llama_3_3_70b_evaluation_visible),
-        gr.Accordion(visible=llama_3_2_90b_vision_evaluation_visible),
         gr.Accordion(visible=openai_gpt4o_evaluation_visible),
-        gr.Accordion(visible=openai_gpt4_evaluation_visible),
-        gr.Accordion(visible=azure_openai_gpt4o_evaluation_visible),
-        gr.Accordion(visible=azure_openai_gpt4_evaluation_visible)
+        gr.Accordion(visible=azure_openai_gpt4o_evaluation_visible)
     )
 
 
@@ -203,29 +170,25 @@ def set_image_answer_visibility(llm_answer_checkbox, use_image):
     選択されたLLMモデルと「画像を使って回答」の状態に基づいて、
     対象のモデルのVision 回答Accordionの可視性を決定する
     """
-    llama_4_maverick_image_visible = False
+    xai_grok_4_image_visible = False
     llama_4_scout_image_visible = False
-    llama_3_2_90b_vision_image_visible = False
     openai_gpt4o_image_visible = False
     azure_openai_gpt4o_image_visible = False
 
     # 画像を使って回答がオンで、かつ対応するモデルが選択されている場合のみ表示
     if use_image:
-        if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox:
-            llama_4_maverick_image_visible = True
+        if "xai/grok-4" in llm_answer_checkbox:
+            xai_grok_4_image_visible = True
         if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
             llama_4_scout_image_visible = True
-        if "meta/llama-3-2-90b-vision" in llm_answer_checkbox:
-            llama_3_2_90b_vision_image_visible = True
         if "openai/gpt-4o" in llm_answer_checkbox:
             openai_gpt4o_image_visible = True
         if "azure_openai/gpt-4o" in llm_answer_checkbox:
             azure_openai_gpt4o_image_visible = True
 
     return (
-        gr.Accordion(visible=llama_4_maverick_image_visible),
+        gr.Accordion(visible=xai_grok_4_image_visible),
         gr.Accordion(visible=llama_4_scout_image_visible),
-        gr.Accordion(visible=llama_3_2_90b_vision_image_visible),
         gr.Accordion(visible=openai_gpt4o_image_visible),
         gr.Accordion(visible=azure_openai_gpt4o_image_visible)
     )
@@ -236,16 +199,11 @@ def reset_all_llm_messages():
     すべてのLLMメッセージをリセットする
     """
     return (
-        gr.Markdown(value=""),  # tab_chat_document_xai_grok_3_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_xai_grok_4_answer_text
         gr.Markdown(value=""),  # tab_chat_document_command_a_answer_text
-        gr.Markdown(value=""),  # tab_chat_document_llama_4_maverick_answer_text
         gr.Markdown(value=""),  # tab_chat_document_llama_4_scout_answer_text
-        gr.Markdown(value=""),  # tab_chat_document_llama_3_3_70b_answer_text
-        gr.Markdown(value=""),  # tab_chat_document_llama_3_2_90b_vision_answer_text
         gr.Markdown(value=""),  # tab_chat_document_openai_gpt4o_answer_text
-        gr.Markdown(value=""),  # tab_chat_document_openai_gpt4_answer_text
         gr.Markdown(value=""),  # tab_chat_document_azure_openai_gpt4o_answer_text
-        gr.Markdown(value=""),  # tab_chat_document_azure_openai_gpt4_answer_text
     )
 
 
@@ -254,9 +212,8 @@ def reset_image_answers():
     Vision 回答をリセットする
     """
     return (
-        gr.Markdown(value=""),  # tab_chat_document_llama_4_maverick_image_answer_text
+        gr.Markdown(value=""),  # tab_chat_document_xai_grok_4_image_answer_text
         gr.Markdown(value=""),  # tab_chat_document_llama_4_scout_image_answer_text
-        gr.Markdown(value=""),  # tab_chat_document_llama_3_2_90b_vision_image_answer_text
         gr.Markdown(value=""),  # tab_chat_document_openai_gpt4o_image_answer_text
         gr.Markdown(value=""),  # tab_chat_document_azure_openai_gpt4o_image_answer_text
     )
@@ -267,16 +224,11 @@ def reset_llm_evaluations():
     LLM評価をリセットする
     """
     return (
-        gr.Markdown(value=""),  # tab_chat_document_xai_grok_3_evaluation_text
+        gr.Markdown(value=""),  # tab_chat_document_xai_grok_4_evaluation_text
         gr.Markdown(value=""),  # tab_chat_document_command_a_evaluation_text
-        gr.Markdown(value=""),  # tab_chat_document_llama_4_maverick_evaluation_text
         gr.Markdown(value=""),  # tab_chat_document_llama_4_scout_evaluation_text
-        gr.Markdown(value=""),  # tab_chat_document_llama_3_3_70b_evaluation_text
-        gr.Markdown(value=""),  # tab_chat_document_llama_3_2_90b_vision_evaluation_text
         gr.Markdown(value=""),  # tab_chat_document_openai_gpt4o_evaluation_text
-        gr.Markdown(value=""),  # tab_chat_document_openai_gpt4_evaluation_text
         gr.Markdown(value=""),  # tab_chat_document_azure_openai_gpt4o_evaluation_text
-        gr.Markdown(value=""),  # tab_chat_document_azure_openai_gpt4_evaluation_text
     )
 
 
@@ -299,7 +251,7 @@ def create_table():
     Wrapper function for creating database tables using the utility function
     """
     output_sql_text = create_table_util(pool, DEFAULT_COLLECTION_NAME)
-    gr.Info("テーブルの作成が完了しました")
+    gr.Info("テーブルの作成が完了しました")  # テーブル作成完了メッセージ
     return gr.Accordion(), gr.Textbox(value=output_sql_text.strip())
 
 
@@ -346,7 +298,7 @@ def on_select_split_document_chunks_result(evt: gr.SelectData, df: pd.DataFrame)
 
     この関数は utils.document_split_util モジュールの関数を呼び出すラッパー関数です。
     """
-    print("on_select_split_document_chunks_result() start...")
+    print("on_select_split_document_chunks_result() 開始...")  # 分割ドキュメントチャンク結果選択処理開始
     selected_index = evt.index[0]  # 選択された行のインデックスを取得
     selected_row = df.iloc[selected_index]  # 選択された行のすべてのデータを取得
     return selected_row['CHUNK_ID'], \
@@ -387,7 +339,7 @@ def generate_query(query_text, generate_query_radio):
     has_error = False
     if not query_text:
         has_error = True
-        gr.Warning("クエリを入力してください")
+        gr.Warning("クエリを入力してください")  # クエリ入力要求メッセージ
     if has_error:
         return gr.Textbox(value=""), gr.Textbox(value=""), gr.Textbox(value="")
 
@@ -399,22 +351,13 @@ def generate_query(query_text, generate_query_radio):
         return gr.Textbox(value=generate_query1), gr.Textbox(value=generate_query2), gr.Textbox(value=generate_query3)
 
     region = get_region()
-    if region == "us-chicago-1":
-        chat_llm = ChatOCIGenAI(
-            model_id="xai.grok-3",
-            provider="xai",
-            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
-            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 600},
-        )
-    else:
-        chat_llm = ChatOCIGenAI(
-            model_id="cohere.command-a-03-2025",
-            provider="cohere",
-            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
-            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 600},
-        )
+    chat_llm = ChatOCIGenAI(
+        model_id="cohere.command-a-03-2025",
+        provider="cohere",
+        service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+        compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+        model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 600},
+    )
 
     # RAG-Fusion
     if generate_query_radio == "Sub-Query":
@@ -440,7 +383,7 @@ def generate_query(query_text, generate_query_radio):
                 sub_query_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         sub_queries = generate_sub_queries_chain.invoke({"original_query": query_text})
-        print(f"{sub_queries=}")
+        print(f"{sub_queries=}")  # サブクエリ生成結果ログ
 
         if isinstance(sub_queries, list):
             generate_query1 = re.sub(r'^1\. ', '', sub_queries[0])
@@ -463,7 +406,7 @@ def generate_query(query_text, generate_query_radio):
                 rag_fusion_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         rag_fusion_queries = generate_rag_fusion_queries_chain.invoke({"original_query": query_text})
-        print(f"{rag_fusion_queries=}")
+        print(f"{rag_fusion_queries=}")  # RAG-Fusionクエリ生成結果ログ
 
         if isinstance(rag_fusion_queries, list):
             generate_query1 = re.sub(r'^1\. ', '', rag_fusion_queries[0])
@@ -479,7 +422,7 @@ def generate_query(query_text, generate_query_radio):
                 hyde_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         hyde_answers = generate_hyde_answers_chain.invoke({"original_query": query_text})
-        print(f"{hyde_answers=}")
+        print(f"{hyde_answers=}")  # HyDE回答生成結果ログ
 
         if isinstance(hyde_answers, list):
             generate_query1 = re.sub(r'^1\. ', '', hyde_answers[0])
@@ -495,7 +438,7 @@ def generate_query(query_text, generate_query_radio):
                 step_back_prompt | chat_llm | StrOutputParser() | (lambda x: x.split("\n"))
         )
         step_back_queries = generate_step_back_queries_chain.invoke({"original_query": query_text})
-        print(f"{step_back_queries=}")
+        print(f"{step_back_queries=}")  # ステップバッククエリ生成結果ログ
 
         if isinstance(step_back_queries, list):
             generate_query1 = re.sub(r'^1\. ', '', step_back_queries[0])
@@ -538,15 +481,15 @@ def generate_query(query_text, generate_query_radio):
             query_sql_output = query_sql_output.replace(placeholder, display_value)
 
         # Now query_sql_output contains the SQL command with parameter values inserted
-        print(f"\nQUERY_SQL_OUTPUT:\n{query_sql_output}")
+        print(f"\nQUERY_SQL_OUTPUT:\n{query_sql_output}")  # クエリSQL出力ログ
         with pool.acquire() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(select_multi_step_query_sql, multi_step_query_params)
                 multi_step_queries = []
                 for row in cursor:
-                    # print(f"row: {row}")
+                    # print(f"row: {row}")  # 行データログ（コメントアウト）
                     multi_step_queries.append(row[2])
-                print(f"{multi_step_queries=}")
+                print(f"{multi_step_queries=}")  # マルチステップクエリ結果ログ
 
         if isinstance(multi_step_queries, list):
             generate_query1 = multi_step_queries[0]
@@ -645,16 +588,11 @@ async def append_citation(
         query_text,
         doc_id_all_checkbox_input,
         doc_id_checkbox_group_input,
-        xai_grok_3_answer_text,
+        xai_grok_4_answer_text,
         command_a_answer_text,
-        llama_4_maverick_answer_text,
         llama_4_scout_answer_text,
-        llama_3_3_70b_answer_text,
-        llama_3_2_90b_vision_answer_text,
         openai_gpt4o_answer_text,
-        openai_gpt4_answer_text,
         azure_openai_gpt4o_answer_text,
-        azure_openai_gpt4_answer_text
 ):
     """
     LLMの回答に引用情報を追加するためのラッパー関数
@@ -667,16 +605,11 @@ async def append_citation(
             query_text,
             doc_id_all_checkbox_input,
             doc_id_checkbox_group_input,
-            xai_grok_3_answer_text,
+            xai_grok_4_answer_text,
             command_a_answer_text,
-            llama_4_maverick_answer_text,
             llama_4_scout_answer_text,
-            llama_3_3_70b_answer_text,
-            llama_3_2_90b_vision_answer_text,
             openai_gpt4o_answer_text,
-            openai_gpt4_answer_text,
             azure_openai_gpt4o_answer_text,
-            azure_openai_gpt4_answer_text
     ):
         yield result
 
@@ -699,9 +632,8 @@ async def process_image_answers_streaming(
         single_image_processing,
         llm_answer_checkbox_group,
         query_text,
-        llama_4_maverick_image_answer_text,
+        xai_grok_4_image_answer_text,
         llama_4_scout_image_answer_text,
-        llama_3_2_90b_vision_image_answer_text,
         openai_gpt4o_image_answer_text,
         azure_openai_gpt4o_image_answer_text,
         image_limit_k=5,
@@ -719,9 +651,8 @@ async def process_image_answers_streaming(
             single_image_processing,
             llm_answer_checkbox_group,
             query_text,
-            llama_4_maverick_image_answer_text,
+            xai_grok_4_image_answer_text,
             llama_4_scout_image_answer_text,
-            llama_3_2_90b_vision_image_answer_text,
             openai_gpt4o_image_answer_text,
             azure_openai_gpt4o_image_answer_text,
             image_limit_k,
@@ -731,7 +662,7 @@ async def process_image_answers_streaming(
 
 
 def set_query_id_state():
-    print("in set_query_id_state() start...")
+    print("in set_query_id_state() 開始...")  # クエリID状態設定処理開始
     return generate_unique_id("query_")
 
 
@@ -743,7 +674,7 @@ def eval_by_human(query_id, llm_name, human_evaluation_result, user_comment):
 
 
 def generate_eval_result_file():
-    print("in generate_eval_result_file() start...")
+    print("in generate_eval_result_file() 開始...")  # 評価結果ファイル生成処理開始
 
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
@@ -763,7 +694,8 @@ def generate_eval_result_file():
                                   JOIN
                               RAG_QA_FEEDBACK f
                               ON
-                                  r.query_id = f.query_id \
+                                  r.query_id = f.query_id
+                         ORDER BY r.created_date ASC, r.query_id, f.llm_name \
                          """
 
             cursor.execute(select_sql)
@@ -774,14 +706,14 @@ def generate_eval_result_file():
             # データを取得
             data = cursor.fetchall()
 
-            print(f"{columns=}")
+            print(f"{columns=}")  # データベース列名ログ
 
             # データをDataFrameに変換
             result_df = pd.DataFrame(data, columns=columns)
 
-            print(f"{result_df=}")
+            print(f"{result_df=}")  # 結果データフレームログ（変換前）
 
-            # 列名を日文に変更
+            # 列名を日本語に変更
             result_df.rename(columns={
                 'QUERY_ID': 'クエリID',
                 'QUERY': 'クエリ',
@@ -796,7 +728,7 @@ def generate_eval_result_file():
                 'CREATED_DATE': '作成日時'
             }, inplace=True)
 
-            print(f"{result_df=}")
+            print(f"{result_df=}")  # 結果データフレームログ（変換後）
 
             # 必要に応じてcreated_date列をdatetime型に変換
             result_df['作成日時'] = pd.to_datetime(result_df['作成日時'], format='%Y-%m-%d %H:%M:%S')
@@ -814,8 +746,8 @@ def generate_eval_result_file():
             with pd.ExcelWriter(filepath) as writer:
                 result_df.to_excel(writer, sheet_name='Sheet1', index=False)
 
-            print(f"Excelファイルが {filepath} に保存されました")
-            gr.Info("評価レポートの生成が完了しました")
+            print(f"Excelファイルが {filepath} に保存されました")  # ファイル保存完了ログ
+            gr.Info("評価レポートの生成が完了しました")  # レポート生成完了メッセージ
             return gr.DownloadButton(value=filepath, visible=True)
 
 
@@ -829,29 +761,18 @@ def insert_query_result(
         llm_answer_checkbox_group,
         llm_evaluation_checkbox,
         standard_answer_text,
-        xai_grok_3_response,
+        xai_grok_4_response,
         command_a_response,
-        llama_4_maverick_response,
         llama_4_scout_response,
-        llama_3_3_70b_response,
-        llama_3_2_90b_vision_response,
         openai_gpt4o_response,
-        openai_gpt4_response,
         azure_openai_gpt4o_response,
-        azure_openai_gpt4_response,
-        xai_grok_3_evaluation,
+        xai_grok_4_evaluation,
         command_a_evaluation,
-        llama_4_maverick_evaluation,
         llama_4_scout_evaluation,
-        llama_3_3_70b_evaluation,
-        llama_3_2_90b_vision_evaluation,
         openai_gpt4o_evaluation,
-        openai_gpt4_evaluation,
         azure_openai_gpt4o_evaluation,
-        azure_openai_gpt4_evaluation,
-        llama_4_maverick_image_response,
+        xai_grok_4_image_response,
         llama_4_scout_image_response,
-        llama_3_2_90b_vision_image_response,
         openai_gpt4o_image_response,
         azure_openai_gpt4o_image_response
 ):
@@ -869,29 +790,18 @@ def insert_query_result(
         llm_answer_checkbox_group,
         llm_evaluation_checkbox,
         standard_answer_text,
-        xai_grok_3_response,
+        xai_grok_4_response,
         command_a_response,
-        llama_4_maverick_response,
         llama_4_scout_response,
-        llama_3_3_70b_response,
-        llama_3_2_90b_vision_response,
         openai_gpt4o_response,
-        openai_gpt4_response,
         azure_openai_gpt4o_response,
-        azure_openai_gpt4_response,
-        xai_grok_3_evaluation,
+        xai_grok_4_evaluation,
         command_a_evaluation,
-        llama_4_maverick_evaluation,
         llama_4_scout_evaluation,
-        llama_3_3_70b_evaluation,
-        llama_3_2_90b_vision_evaluation,
         openai_gpt4o_evaluation,
-        openai_gpt4_evaluation,
         azure_openai_gpt4o_evaluation,
-        azure_openai_gpt4_evaluation,
-        llama_4_maverick_image_response,
+        xai_grok_4_image_response,
         llama_4_scout_image_response,
-        llama_3_2_90b_vision_image_response,
         openai_gpt4o_image_response,
         azure_openai_gpt4o_image_response
     )
@@ -1094,30 +1004,26 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     with gr.Column():
                         tab_chat_with_llm_answer_checkbox_group = gr.CheckboxGroup(
                             [
-                                "xai/grok-3",
+                                "xai/grok-4",
                                 "cohere/command-a",
-                                "meta/llama-4-maverick-17b-128e-instruct-fp8",
                                 "meta/llama-4-scout-17b-16e-instruct",
-                                "meta/llama-3-3-70b",
-                                "meta/llama-3-2-90b-vision",
                                 "openai/gpt-4o",
-                                "openai/gpt-4",
-                                "azure_openai/gpt-4o",
-                                "azure_openai/gpt-4"],
+                                "azure_openai/gpt-4o"],
                             label="LLM モデル*",
                             value=[]
                         )
                 with gr.Accordion(
-                        label="XAI Grok-3 メッセージ",
+                        label="XAI Grok-4 メッセージ",
                         visible=False,
                         open=True
-                ) as tab_chat_with_llm_xai_grok_3_accordion:
-                    tab_chat_with_xai_grok_3_answer_text = gr.Markdown(
+                ) as tab_chat_with_llm_xai_grok_4_accordion:
+                    tab_chat_with_xai_grok_4_answer_text = gr.Markdown(
                         show_copy_button=True,
                         height=200,
                         min_height=200,
                         max_height=300
                     )
+
                 with gr.Accordion(
                         label="Command-A メッセージ",
                         visible=False,
@@ -1131,17 +1037,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     )
 
                 with gr.Accordion(
-                        label="Llama 4 Maverick 17b メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_with_llm_llama_4_maverick_accordion:
-                    tab_chat_with_llama_4_maverick_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=200,
-                        min_height=200,
-                        max_height=300
-                    )
-                with gr.Accordion(
                         label="Llama 4 Scout 17b メッセージ",
                         visible=False,
                         open=True
@@ -1152,28 +1047,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         min_height=200,
                         max_height=300
                     )
-                with gr.Accordion(
-                        label="Llama 3.3 70b メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_with_llm_llama_3_3_70b_accordion:
-                    tab_chat_with_llama_3_3_70b_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=200,
-                        min_height=200,
-                        max_height=300
-                    )
-                with gr.Accordion(
-                        label="Llama 3.2 90b Vision メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_with_llm_llama_3_2_90b_vision_accordion:
-                    tab_chat_with_llama_3_2_90b_vision_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=200,
-                        min_height=200,
-                        max_height=300
-                    )
+
                 with gr.Accordion(
                         label="OpenAI gpt-4o メッセージ",
                         visible=False,
@@ -1185,34 +1059,13 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         min_height=200,
                         max_height=300
                     )
-                with gr.Accordion(
-                        label="OpenAI gpt-4 メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_with_llm_openai_gpt4_accordion:
-                    tab_chat_with_openai_gpt4_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=200,
-                        min_height=200,
-                        max_height=300
-                    )
+
                 with gr.Accordion(
                         label="Azure OpenAI gpt-4o メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_azure_openai_gpt4o_accordion:
                     tab_chat_with_azure_openai_gpt4o_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=200,
-                        min_height=200,
-                        max_height=300
-                    )
-                with gr.Accordion(
-                        label="Azure OpenAI gpt-4 メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_with_llm_azure_openai_gpt4_accordion:
-                    tab_chat_with_azure_openai_gpt4_answer_text = gr.Markdown(
                         show_copy_button=True,
                         height=200,
                         min_height=200,
@@ -1233,7 +1086,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         value=get_chat_system_message()
                     )
                 with gr.Accordion(open=False,
-                                  label="画像ファイル(オプション) - Llama-4-Maverick、Llama-4-Scout、Llama-3.2-90B-Visionモデルを利用する場合に限り、この画像入力が適用されます。"):
+                                  label="画像ファイル(オプション) - Grok-4、Llama-4-Scoutモデルを利用する場合に限り、この画像入力が適用されます。"):
                     tab_chat_with_llm_query_image = gr.Image(
                         label="",
                         interactive=True,
@@ -1576,16 +1429,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     with gr.Column():
                         tab_chat_document_llm_answer_checkbox_group = gr.CheckboxGroup(
                             [
-                                "xai/grok-3",
+                                "xai/grok-4",
                                 "cohere/command-a",
-                                "meta/llama-4-maverick-17b-128e-instruct-fp8",
                                 "meta/llama-4-scout-17b-16e-instruct",
-                                "meta/llama-3-3-70b",
-                                "meta/llama-3-2-90b-vision",
                                 "openai/gpt-4o",
-                                "openai/gpt-4",
-                                "azure_openai/gpt-4o",
-                                "azure_openai/gpt-4"
+                                "azure_openai/gpt-4o"
                             ],
                             label="LLM モデル",
                             value=[]
@@ -1778,6 +1626,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             with gr.Column():
                                 tab_chat_document_image_prompt_text = gr.Textbox(
                                     label="VisionPromptテンプレート",
+                                    show_label=False,
                                     lines=15,
                                     max_lines=25,
                                     interactive=True,
@@ -1938,11 +1787,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             interactive=False,
                         )
                 with gr.Accordion(
-                        label="XAI Grok-3 メッセージ",
+                        label="XAI Grok-4 メッセージ",
                         visible=False,
                         open=True
-                ) as tab_chat_document_llm_xai_grok_3_accordion:
-                    tab_chat_document_xai_grok_3_answer_text = gr.Markdown(
+                ) as tab_chat_document_llm_xai_grok_4_accordion:
+                    tab_chat_document_xai_grok_4_answer_text = gr.Markdown(
                         show_copy_button=True,
                         height=300,
                         min_height=300,
@@ -1952,9 +1801,9 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             label="Human 評価",
                             visible=True,
                             open=True
-                    ) as tab_chat_document_llm_xai_grok_3_human_evaluation_accordion:
+                    ) as tab_chat_document_llm_xai_grok_4_human_evaluation_accordion:
                         with gr.Row():
-                            tab_chat_document_xai_grok_3_answer_human_eval_feedback_radio = gr.Radio(
+                            tab_chat_document_xai_grok_4_answer_human_eval_feedback_radio = gr.Radio(
                                 show_label=False,
                                 choices=[
                                     ("Good response", "good"),
@@ -1967,16 +1816,16 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             )
                         with gr.Row():
                             with gr.Column(scale=11):
-                                tab_chat_document_xai_grok_3_answer_human_eval_feedback_text = gr.Textbox(
+                                tab_chat_document_xai_grok_4_answer_human_eval_feedback_text = gr.Textbox(
                                     show_label=False,
                                     container=False,
                                     lines=2,
                                     interactive=True,
                                     autoscroll=True,
-                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                    placeholder="具体的なご意見やご感想を自由にお書きください。",  # 人間評価フィードバック入力欄
                                 )
                             with gr.Column(scale=1):
-                                tab_chat_document_xai_grok_3_answer_human_eval_feedback_send_button = gr.Button(
+                                tab_chat_document_xai_grok_4_answer_human_eval_feedback_send_button = gr.Button(
                                     value="送信",
                                     variant="primary",
                                 )
@@ -1984,13 +1833,25 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             label="LLM 評価結果",
                             visible=False,
                             open=True
-                    ) as tab_chat_document_llm_xai_grok_3_evaluation_accordion:
-                        tab_chat_document_xai_grok_3_evaluation_text = gr.Markdown(
+                    ) as tab_chat_document_llm_xai_grok_4_evaluation_accordion:
+                        tab_chat_document_xai_grok_4_evaluation_text = gr.Markdown(
                             show_copy_button=True,
                             height=200,
                             min_height=200,
                             max_height=300
                         )
+                    with gr.Accordion(
+                            label="Vision 回答",
+                            visible=False,
+                            open=True
+                    ) as tab_chat_document_llm_xai_grok_4_image_accordion:
+                        tab_chat_document_xai_grok_4_image_answer_text = gr.Markdown(
+                            show_copy_button=True,
+                            height=600,
+                            min_height=600,
+                            max_height=600
+                        )
+
                 with gr.Accordion(
                         label="Command-A メッセージ",
                         visible=False,
@@ -2027,7 +1888,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                     lines=2,
                                     interactive=True,
                                     autoscroll=True,
-                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                    placeholder="具体的なご意見やご感想を自由にお書きください。",  # 人間評価フィードバック入力欄
                                 )
                             with gr.Column(scale=1):
                                 tab_chat_document_command_a_answer_human_eval_feedback_send_button = gr.Button(
@@ -2046,71 +1907,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             max_height=300
                         )
 
-                with gr.Accordion(
-                        label="Llama 4 Maverick 17b メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_document_llm_llama_4_maverick_accordion:
-                    tab_chat_document_llama_4_maverick_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=300,
-                        min_height=300,
-                        max_height=300
-                    )
-                    with gr.Accordion(
-                            label="Vision 回答",
-                            visible=False,
-                            open=True
-                    ) as tab_chat_document_llm_llama_4_maverick_image_accordion:
-                        tab_chat_document_llama_4_maverick_image_answer_text = gr.Markdown(
-                            show_copy_button=True,
-                            height=600,
-                            min_height=600,
-                            max_height=600
-                        )
-                    with gr.Accordion(
-                            label="Human 評価",
-                            visible=True,
-                            open=True
-                    ) as tab_chat_document_llm_llama_4_maverick_human_evaluation_accordion:
-                        with gr.Row():
-                            tab_chat_document_llama_4_maverick_answer_human_eval_feedback_radio = gr.Radio(
-                                show_label=False,
-                                choices=[
-                                    ("Good response", "good"),
-                                    ("Neutral response", "neutral"),
-                                    ("Bad response", "bad"),
-                                ],
-                                value="good",
-                                container=False,
-                                interactive=True,
-                            )
-                        with gr.Row():
-                            with gr.Column(scale=11):
-                                tab_chat_document_llama_4_maverick_answer_human_eval_feedback_text = gr.Textbox(
-                                    show_label=False,
-                                    container=False,
-                                    lines=2,
-                                    interactive=True,
-                                    autoscroll=True,
-                                    placeholder="具体的な意見や感想を自由に書いてください。",
-                                )
-                            with gr.Column(scale=1):
-                                tab_chat_document_llama_4_maverick_answer_human_eval_feedback_send_button = gr.Button(
-                                    value="送信",
-                                    variant="primary",
-                                )
-                    with gr.Accordion(
-                            label="LLM 評価結果",
-                            visible=False,
-                            open=True
-                    ) as tab_chat_document_llm_llama_4_maverick_evaluation_accordion:
-                        tab_chat_document_llama_4_maverick_evaluation_text = gr.Markdown(
-                            show_copy_button=True,
-                            height=200,
-                            min_height=200,
-                            max_height=300
-                        )
+
                 with gr.Accordion(
                         label="Llama 4 Scout 17b メッセージ",
                         visible=False,
@@ -2158,7 +1955,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                     lines=2,
                                     interactive=True,
                                     autoscroll=True,
-                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                    placeholder="具体的なご意見やご感想を自由にお書きください。",  # 人間評価フィードバック入力欄
                                 )
                             with gr.Column(scale=1):
                                 tab_chat_document_llama_4_scout_answer_human_eval_feedback_send_button = gr.Button(
@@ -2171,125 +1968,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             open=True
                     ) as tab_chat_document_llm_llama_4_scout_evaluation_accordion:
                         tab_chat_document_llama_4_scout_evaluation_text = gr.Markdown(
-                            show_copy_button=True,
-                            height=200,
-                            min_height=200,
-                            max_height=300
-                        )
-                with gr.Accordion(
-                        label="Llama 3.3 70b メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_document_llm_llama_3_3_70b_accordion:
-                    tab_chat_document_llama_3_3_70b_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=300,
-                        min_height=300,
-                        max_height=300
-                    )
-                    with gr.Accordion(
-                            label="Human 評価",
-                            visible=True,
-                            open=True
-                    ) as tab_chat_document_llm_llama_3_3_70b_human_evaluation_accordion:
-                        with gr.Row():
-                            tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_radio = gr.Radio(
-                                show_label=False,
-                                choices=[
-                                    ("Good response", "good"),
-                                    ("Neutral response", "neutral"),
-                                    ("Bad response", "bad"),
-                                ],
-                                value="good",
-                                container=False,
-                                interactive=True,
-                            )
-                        with gr.Row():
-                            with gr.Column(scale=11):
-                                tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_text = gr.Textbox(
-                                    show_label=False,
-                                    container=False,
-                                    lines=2,
-                                    interactive=True,
-                                    autoscroll=True,
-                                    placeholder="具体的な意見や感想を自由に書いてください。",
-                                )
-                            with gr.Column(scale=1):
-                                tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_send_button = gr.Button(
-                                    value="送信",
-                                    variant="primary",
-                                )
-                    with gr.Accordion(
-                            label="LLM 評価結果",
-                            visible=False,
-                            open=True
-                    ) as tab_chat_document_llm_llama_3_3_70b_evaluation_accordion:
-                        tab_chat_document_llama_3_3_70b_evaluation_text = gr.Markdown(
-                            show_copy_button=True,
-                            height=200,
-                            min_height=200,
-                            max_height=300
-                        )
-                with gr.Accordion(
-                        label="Llama 3.2 90b Vision メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_document_llm_llama_3_2_90b_vision_accordion:
-                    tab_chat_document_llama_3_2_90b_vision_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=300,
-                        min_height=300,
-                        max_height=300
-                    )
-                    with gr.Accordion(
-                            label="Vision 回答",
-                            visible=False,
-                            open=True
-                    ) as tab_chat_document_llm_llama_3_2_90b_vision_image_accordion:
-                        tab_chat_document_llama_3_2_90b_vision_image_answer_text = gr.Markdown(
-                            show_copy_button=True,
-                            height=600,
-                            min_height=600,
-                            max_height=600
-                        )
-                    with gr.Accordion(
-                            label="Human 評価",
-                            visible=True,
-                            open=True
-                    ) as tab_chat_document_llm_llama_3_2_90b_vision_human_evaluation_accordion:
-                        with gr.Row():
-                            tab_chat_document_llama_3_2_90b_vision_answer_human_eval_feedback_radio = gr.Radio(
-                                show_label=False,
-                                choices=[
-                                    ("Good response", "good"),
-                                    ("Neutral response", "neutral"),
-                                    ("Bad response", "bad"),
-                                ],
-                                value="good",
-                                container=False,
-                                interactive=True,
-                            )
-                        with gr.Row():
-                            with gr.Column(scale=11):
-                                tab_chat_document_llama_3_2_90b_vision_answer_human_eval_feedback_text = gr.Textbox(
-                                    show_label=False,
-                                    container=False,
-                                    lines=2,
-                                    interactive=True,
-                                    autoscroll=True,
-                                    placeholder="具体的な意見や感想を自由に書いてください。",
-                                )
-                            with gr.Column(scale=1):
-                                tab_chat_document_llama_3_2_90b_vision_answer_human_eval_feedback_send_button = gr.Button(
-                                    value="送信",
-                                    variant="primary",
-                                )
-                    with gr.Accordion(
-                            label="LLM 評価結果",
-                            visible=False,
-                            open=True
-                    ) as tab_chat_document_llm_llama_3_2_90b_vision_evaluation_accordion:
-                        tab_chat_document_llama_3_2_90b_vision_evaluation_text = gr.Markdown(
                             show_copy_button=True,
                             height=200,
                             min_height=200,
@@ -2340,7 +2018,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                     lines=2,
                                     interactive=True,
                                     autoscroll=True,
-                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                    placeholder="具体的なご意見やご感想を自由にお書きください。",  # 人間評価フィードバック入力欄
                                 )
                             with gr.Column(scale=1):
                                 tab_chat_document_openai_gpt4o_answer_human_eval_feedback_send_button = gr.Button(
@@ -2353,60 +2031,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             open=True
                     ) as tab_chat_document_llm_openai_gpt4o_evaluation_accordion:
                         tab_chat_document_openai_gpt4o_evaluation_text = gr.Markdown(
-                            show_copy_button=True,
-                            height=200,
-                            min_height=200,
-                            max_height=300
-                        )
-                with gr.Accordion(
-                        label="OpenAI gpt-4 メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_document_llm_openai_gpt4_accordion:
-                    tab_chat_document_openai_gpt4_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=300,
-                        min_height=300,
-                        max_height=300
-                    )
-                    with gr.Accordion(
-                            label="Human 評価",
-                            visible=True,
-                            open=True
-                    ) as tab_chat_document_llm_openai_gpt4_human_evaluation_accordion:
-                        with gr.Row():
-                            tab_chat_document_openai_gpt4_answer_human_eval_feedback_radio = gr.Radio(
-                                show_label=False,
-                                choices=[
-                                    ("Good response", "good"),
-                                    ("Neutral response", "neutral"),
-                                    ("Bad response", "bad"),
-                                ],
-                                value="good",
-                                container=False,
-                                interactive=True,
-                            )
-                        with gr.Row():
-                            with gr.Column(scale=11):
-                                tab_chat_document_openai_gpt4_answer_human_eval_feedback_text = gr.Textbox(
-                                    show_label=False,
-                                    container=False,
-                                    lines=2,
-                                    interactive=True,
-                                    autoscroll=True,
-                                    placeholder="具体的な意見や感想を自由に書いてください。",
-                                )
-                            with gr.Column(scale=1):
-                                tab_chat_document_openai_gpt4_answer_human_eval_feedback_send_button = gr.Button(
-                                    value="送信",
-                                    variant="primary",
-                                )
-                    with gr.Accordion(
-                            label="LLM 評価結果",
-                            visible=False,
-                            open=True
-                    ) as tab_chat_document_llm_openai_gpt4_evaluation_accordion:
-                        tab_chat_document_openai_gpt4_evaluation_text = gr.Markdown(
                             show_copy_button=True,
                             height=200,
                             min_height=200,
@@ -2459,7 +2083,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                     lines=2,
                                     interactive=True,
                                     autoscroll=True,
-                                    placeholder="具体的な意見や感想を自由に書いてください。",
+                                    placeholder="具体的なご意見やご感想を自由にお書きください。",  # 人間評価フィードバック入力欄
                                 )
                             with gr.Column(scale=1):
                                 tab_chat_document_azure_openai_gpt4o_answer_human_eval_feedback_send_button = gr.Button(
@@ -2477,61 +2101,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             min_height=200,
                             max_height=300
                         )
-                with gr.Accordion(
-                        label="Azure OpenAI gpt-4 メッセージ",
-                        visible=False,
-                        open=True
-                ) as tab_chat_document_llm_azure_openai_gpt4_accordion:
-                    tab_chat_document_azure_openai_gpt4_answer_text = gr.Markdown(
-                        show_copy_button=True,
-                        height=300,
-                        min_height=300,
-                        max_height=300
-                    )
-                    with gr.Accordion(
-                            label="Human 評価",
-                            visible=True,
-                            open=True
-                    ) as tab_chat_document_llm_azure_openai_gpt4_human_evaluation_accordion:
-                        with gr.Row():
-                            tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_radio = gr.Radio(
-                                show_label=False,
-                                choices=[
-                                    ("Good response", "good"),
-                                    ("Neutral response", "neutral"),
-                                    ("Bad response", "bad"),
-                                ],
-                                value="good",
-                                container=False,
-                                interactive=True,
-                            )
-                        with gr.Row():
-                            with gr.Column(scale=11):
-                                tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_text = gr.Textbox(
-                                    show_label=False,
-                                    container=False,
-                                    lines=2,
-                                    interactive=True,
-                                    autoscroll=True,
-                                    placeholder="具体的な意見や感想を自由に書いてください。",
-                                )
-                            with gr.Column(scale=1):
-                                tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_send_button = gr.Button(
-                                    value="送信",
-                                    variant="primary",
-                                )
-                    with gr.Accordion(
-                            label="LLM 評価結果",
-                            visible=False,
-                            open=True
-                    ) as tab_chat_document_llm_azure_openai_gpt4_evaluation_accordion:
-                        tab_chat_document_azure_openai_gpt4_evaluation_text = gr.Markdown(
-                            show_copy_button=True,
-                            height=200,
-                            min_height=200,
-                            max_height=300
-                        )
-
             with gr.TabItem(label="Step-5.評価レポートの取得") as tab_download_eval_result:
                 with gr.Row():
                     tab_download_eval_result_generate_button = gr.Button(
@@ -2632,16 +2201,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_llm_answer_checkbox_group
         ],
         outputs=[
-            tab_chat_with_llm_xai_grok_3_accordion,
+            tab_chat_with_llm_xai_grok_4_accordion,
             tab_chat_with_llm_command_a_accordion,
-            tab_chat_with_llm_llama_4_maverick_accordion,
             tab_chat_with_llm_llama_4_scout_accordion,
-            tab_chat_with_llm_llama_3_3_70b_accordion,
-            tab_chat_with_llm_llama_3_2_90b_vision_accordion,
             tab_chat_with_llm_openai_gpt4o_accordion,
-            tab_chat_with_llm_openai_gpt4_accordion,
-            tab_chat_with_llm_azure_openai_gpt4o_accordion,
-            tab_chat_with_llm_azure_openai_gpt4_accordion
+            tab_chat_with_llm_azure_openai_gpt4o_accordion
         ]
     )
     tab_chat_with_llm_clear_button.add(
@@ -2649,16 +2213,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_llm_query_image,
             tab_chat_with_llm_query_text,
             tab_chat_with_llm_answer_checkbox_group,
-            tab_chat_with_xai_grok_3_answer_text,
+            tab_chat_with_xai_grok_4_answer_text,
             tab_chat_with_command_a_answer_text,
-            tab_chat_with_llama_4_maverick_answer_text,
             tab_chat_with_llama_4_scout_answer_text,
-            tab_chat_with_llama_3_3_70b_answer_text,
-            tab_chat_with_llama_3_2_90b_vision_answer_text,
             tab_chat_with_openai_gpt4o_answer_text,
-            tab_chat_with_openai_gpt4_answer_text,
-            tab_chat_with_azure_openai_gpt4o_answer_text,
-            tab_chat_with_azure_openai_gpt4_answer_text
+            tab_chat_with_azure_openai_gpt4o_answer_text
         ]
     )
     tab_chat_with_llm_chat_button.click(
@@ -2670,16 +2229,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_llm_answer_checkbox_group
         ],
         outputs=[
-            tab_chat_with_xai_grok_3_answer_text,
+            tab_chat_with_xai_grok_4_answer_text,
             tab_chat_with_command_a_answer_text,
-            tab_chat_with_llama_4_maverick_answer_text,
             tab_chat_with_llama_4_scout_answer_text,
-            tab_chat_with_llama_3_3_70b_answer_text,
-            tab_chat_with_llama_3_2_90b_vision_answer_text,
             tab_chat_with_openai_gpt4o_answer_text,
-            tab_chat_with_openai_gpt4_answer_text,
-            tab_chat_with_azure_openai_gpt4o_answer_text,
-            tab_chat_with_azure_openai_gpt4_answer_text
+            tab_chat_with_azure_openai_gpt4o_answer_text
         ]
     )
 
@@ -2881,16 +2435,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_answer_checkbox_group
         ],
         outputs=[
-            tab_chat_document_llm_xai_grok_3_accordion,
+            tab_chat_document_llm_xai_grok_4_accordion,
             tab_chat_document_llm_command_a_accordion,
-            tab_chat_document_llm_llama_4_maverick_accordion,
             tab_chat_document_llm_llama_4_scout_accordion,
-            tab_chat_document_llm_llama_3_3_70b_accordion,
-            tab_chat_document_llm_llama_3_2_90b_vision_accordion,
             tab_chat_document_llm_openai_gpt4o_accordion,
-            tab_chat_document_llm_openai_gpt4_accordion,
-            tab_chat_document_llm_azure_openai_gpt4o_accordion,
-            tab_chat_document_llm_azure_openai_gpt4_accordion
+            tab_chat_document_llm_azure_openai_gpt4o_accordion
         ]
     ).then(
         set_image_answer_visibility,
@@ -2899,9 +2448,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_use_image_checkbox
         ],
         outputs=[
-            tab_chat_document_llm_llama_4_maverick_image_accordion,
+            tab_chat_document_llm_xai_grok_4_image_accordion,
             tab_chat_document_llm_llama_4_scout_image_accordion,
-            tab_chat_document_llm_llama_3_2_90b_vision_image_accordion,
             tab_chat_document_llm_openai_gpt4o_image_accordion,
             tab_chat_document_llm_azure_openai_gpt4o_image_accordion
         ]
@@ -2926,16 +2474,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_evaluation_checkbox
         ],
         outputs=[
-            tab_chat_document_llm_xai_grok_3_evaluation_accordion,
+            tab_chat_document_llm_xai_grok_4_evaluation_accordion,
             tab_chat_document_llm_command_a_evaluation_accordion,
-            tab_chat_document_llm_llama_4_maverick_evaluation_accordion,
             tab_chat_document_llm_llama_4_scout_evaluation_accordion,
-            tab_chat_document_llm_llama_3_3_70b_evaluation_accordion,
-            tab_chat_document_llm_llama_3_2_90b_vision_evaluation_accordion,
             tab_chat_document_llm_openai_gpt4o_evaluation_accordion,
-            tab_chat_document_llm_openai_gpt4_evaluation_accordion,
             tab_chat_document_llm_azure_openai_gpt4o_evaluation_accordion,
-            tab_chat_document_llm_azure_openai_gpt4_evaluation_accordion
         ]
     )
 
@@ -2970,9 +2513,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_use_image_checkbox
         ],
         outputs=[
-            tab_chat_document_llm_llama_4_maverick_image_accordion,
+            tab_chat_document_llm_xai_grok_4_image_accordion,
             tab_chat_document_llm_llama_4_scout_image_accordion,
-            tab_chat_document_llm_llama_3_2_90b_vision_image_accordion,
             tab_chat_document_llm_openai_gpt4o_image_accordion,
             tab_chat_document_llm_azure_openai_gpt4o_image_accordion
         ]
@@ -2985,24 +2527,18 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         reset_all_llm_messages,
         inputs=[],
         outputs=[
-            tab_chat_document_xai_grok_3_answer_text,
+            tab_chat_document_xai_grok_4_answer_text,
             tab_chat_document_command_a_answer_text,
-            tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
-            tab_chat_document_llama_3_3_70b_answer_text,
-            tab_chat_document_llama_3_2_90b_vision_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
-            tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
-            tab_chat_document_azure_openai_gpt4_answer_text,
         ]
     ).then(
         reset_image_answers,
         inputs=[],
         outputs=[
-            tab_chat_document_llama_4_maverick_image_answer_text,
+            tab_chat_document_xai_grok_4_image_answer_text,
             tab_chat_document_llama_4_scout_image_answer_text,
-            tab_chat_document_llama_3_2_90b_vision_image_answer_text,
             tab_chat_document_openai_gpt4o_image_answer_text,
             tab_chat_document_azure_openai_gpt4o_image_answer_text
         ]
@@ -3010,16 +2546,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         reset_llm_evaluations,
         inputs=[],
         outputs=[
-            tab_chat_document_xai_grok_3_evaluation_text,
+            tab_chat_document_xai_grok_4_evaluation_text,
             tab_chat_document_command_a_evaluation_text,
-            tab_chat_document_llama_4_maverick_evaluation_text,
             tab_chat_document_llama_4_scout_evaluation_text,
-            tab_chat_document_llama_3_3_70b_evaluation_text,
-            tab_chat_document_llama_3_2_90b_vision_evaluation_text,
             tab_chat_document_openai_gpt4o_evaluation_text,
-            tab_chat_document_openai_gpt4_evaluation_text,
             tab_chat_document_azure_openai_gpt4o_evaluation_text,
-            tab_chat_document_azure_openai_gpt4_evaluation_text
         ]
     ).then(
         reset_eval_by_human_result,
@@ -3027,22 +2558,12 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_chat_document_command_a_answer_human_eval_feedback_radio,
             tab_chat_document_command_a_answer_human_eval_feedback_text,
-            tab_chat_document_llama_4_maverick_answer_human_eval_feedback_radio,
-            tab_chat_document_llama_4_maverick_answer_human_eval_feedback_text,
             tab_chat_document_llama_4_scout_answer_human_eval_feedback_radio,
             tab_chat_document_llama_4_scout_answer_human_eval_feedback_text,
-            tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_radio,
-            tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_text,
-            tab_chat_document_llama_3_2_90b_vision_answer_human_eval_feedback_radio,
-            tab_chat_document_llama_3_2_90b_vision_answer_human_eval_feedback_text,
             tab_chat_document_openai_gpt4o_answer_human_eval_feedback_radio,
             tab_chat_document_openai_gpt4o_answer_human_eval_feedback_text,
-            tab_chat_document_openai_gpt4_answer_human_eval_feedback_radio,
-            tab_chat_document_openai_gpt4_answer_human_eval_feedback_text,
             tab_chat_document_azure_openai_gpt4o_answer_human_eval_feedback_radio,
             tab_chat_document_azure_openai_gpt4o_answer_human_eval_feedback_text,
-            tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_radio,
-            tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_text,
         ]
     ).then(
         generate_query,
@@ -3097,16 +2618,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_rag_prompt_text,
         ],
         outputs=[
-            tab_chat_document_xai_grok_3_answer_text,
+            tab_chat_document_xai_grok_4_answer_text,
             tab_chat_document_command_a_answer_text,
-            tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
-            tab_chat_document_llama_3_3_70b_answer_text,
-            tab_chat_document_llama_3_2_90b_vision_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
-            tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
-            tab_chat_document_azure_openai_gpt4_answer_text,
         ]
     ).then(
         append_citation,
@@ -3118,28 +2634,18 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_query_text,
             tab_chat_document_doc_id_all_checkbox,
             tab_chat_document_doc_id_checkbox_group,
-            tab_chat_document_xai_grok_3_answer_text,
+            tab_chat_document_xai_grok_4_answer_text,
             tab_chat_document_command_a_answer_text,
-            tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
-            tab_chat_document_llama_3_3_70b_answer_text,
-            tab_chat_document_llama_3_2_90b_vision_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
-            tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
-            tab_chat_document_azure_openai_gpt4_answer_text,
         ],
         outputs=[
-            tab_chat_document_xai_grok_3_answer_text,
+            tab_chat_document_xai_grok_4_answer_text,
             tab_chat_document_command_a_answer_text,
-            tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
-            tab_chat_document_llama_3_3_70b_answer_text,
-            tab_chat_document_llama_3_2_90b_vision_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
-            tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
-            tab_chat_document_azure_openai_gpt4_answer_text,
         ]
     ).then(
         process_image_answers_streaming,
@@ -3149,18 +2655,16 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_single_image_processing_radio,
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_query_text,
-            tab_chat_document_llama_4_maverick_image_answer_text,
+            tab_chat_document_xai_grok_4_image_answer_text,
             tab_chat_document_llama_4_scout_image_answer_text,
-            tab_chat_document_llama_3_2_90b_vision_image_answer_text,
             tab_chat_document_openai_gpt4o_image_answer_text,
             tab_chat_document_azure_openai_gpt4o_image_answer_text,
             tab_chat_document_image_limit_k_slider,
             tab_chat_document_image_prompt_text,
         ],
         outputs=[
-            tab_chat_document_llama_4_maverick_image_answer_text,
+            tab_chat_document_xai_grok_4_image_answer_text,
             tab_chat_document_llama_4_scout_image_answer_text,
-            tab_chat_document_llama_3_2_90b_vision_image_answer_text,
             tab_chat_document_openai_gpt4o_image_answer_text,
             tab_chat_document_azure_openai_gpt4o_image_answer_text
         ]
@@ -3176,28 +2680,18 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_use_image_checkbox,
             tab_chat_document_system_message_text,
             tab_chat_document_standard_answer_text,
-            tab_chat_document_xai_grok_3_answer_text,
+            tab_chat_document_xai_grok_4_answer_text,
             tab_chat_document_command_a_answer_text,
-            tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
-            tab_chat_document_llama_3_3_70b_answer_text,
-            tab_chat_document_llama_3_2_90b_vision_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
-            tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
-            tab_chat_document_azure_openai_gpt4_answer_text,
         ],
         outputs=[
-            tab_chat_document_xai_grok_3_evaluation_text,
+            tab_chat_document_xai_grok_4_evaluation_text,
             tab_chat_document_command_a_evaluation_text,
-            tab_chat_document_llama_4_maverick_evaluation_text,
             tab_chat_document_llama_4_scout_evaluation_text,
-            tab_chat_document_llama_3_3_70b_evaluation_text,
-            tab_chat_document_llama_3_2_90b_vision_evaluation_text,
             tab_chat_document_openai_gpt4o_evaluation_text,
-            tab_chat_document_openai_gpt4_evaluation_text,
             tab_chat_document_azure_openai_gpt4o_evaluation_text,
-            tab_chat_document_azure_openai_gpt4_evaluation_text,
         ]
     ).then(
         generate_download_file,
@@ -3211,29 +2705,18 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_doc_id_all_checkbox,
             tab_chat_document_doc_id_checkbox_group,
             tab_chat_document_standard_answer_text,
-            tab_chat_document_xai_grok_3_answer_text,
+            tab_chat_document_xai_grok_4_answer_text,
             tab_chat_document_command_a_answer_text,
-            tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
-            tab_chat_document_llama_3_3_70b_answer_text,
-            tab_chat_document_llama_3_2_90b_vision_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
-            tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
-            tab_chat_document_azure_openai_gpt4_answer_text,
-            tab_chat_document_xai_grok_3_evaluation_text,
+            tab_chat_document_xai_grok_4_evaluation_text,
             tab_chat_document_command_a_evaluation_text,
-            tab_chat_document_llama_4_maverick_evaluation_text,
             tab_chat_document_llama_4_scout_evaluation_text,
-            tab_chat_document_llama_3_3_70b_evaluation_text,
-            tab_chat_document_llama_3_2_90b_vision_evaluation_text,
             tab_chat_document_openai_gpt4o_evaluation_text,
-            tab_chat_document_openai_gpt4_evaluation_text,
             tab_chat_document_azure_openai_gpt4o_evaluation_text,
-            tab_chat_document_azure_openai_gpt4_evaluation_text,
-            tab_chat_document_llama_4_maverick_image_answer_text,
+            tab_chat_document_xai_grok_4_image_answer_text,
             tab_chat_document_llama_4_scout_image_answer_text,
-            tab_chat_document_llama_3_2_90b_vision_image_answer_text,
             tab_chat_document_openai_gpt4o_image_answer_text,
             tab_chat_document_azure_openai_gpt4o_image_answer_text,
         ],
@@ -3258,46 +2741,35 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_llm_answer_checkbox_group,
             tab_chat_document_llm_evaluation_checkbox,
             tab_chat_document_standard_answer_text,
-            tab_chat_document_xai_grok_3_answer_text,
+            tab_chat_document_xai_grok_4_answer_text,
             tab_chat_document_command_a_answer_text,
-            tab_chat_document_llama_4_maverick_answer_text,
             tab_chat_document_llama_4_scout_answer_text,
-            tab_chat_document_llama_3_3_70b_answer_text,
-            tab_chat_document_llama_3_2_90b_vision_answer_text,
             tab_chat_document_openai_gpt4o_answer_text,
-            tab_chat_document_openai_gpt4_answer_text,
             tab_chat_document_azure_openai_gpt4o_answer_text,
-            tab_chat_document_azure_openai_gpt4_answer_text,
-            tab_chat_document_xai_grok_3_evaluation_text,
+            tab_chat_document_xai_grok_4_evaluation_text,
             tab_chat_document_command_a_evaluation_text,
-            tab_chat_document_llama_4_maverick_evaluation_text,
             tab_chat_document_llama_4_scout_evaluation_text,
-            tab_chat_document_llama_3_3_70b_evaluation_text,
-            tab_chat_document_llama_3_2_90b_vision_evaluation_text,
             tab_chat_document_openai_gpt4o_evaluation_text,
-            tab_chat_document_openai_gpt4_evaluation_text,
             tab_chat_document_azure_openai_gpt4o_evaluation_text,
-            tab_chat_document_azure_openai_gpt4_evaluation_text,
-            tab_chat_document_llama_4_maverick_image_answer_text,
+            tab_chat_document_xai_grok_4_image_answer_text,
             tab_chat_document_llama_4_scout_image_answer_text,
-            tab_chat_document_llama_3_2_90b_vision_image_answer_text,
             tab_chat_document_openai_gpt4o_image_answer_text,
             tab_chat_document_azure_openai_gpt4o_image_answer_text,
         ],
         outputs=[]
     )
 
-    tab_chat_document_xai_grok_3_answer_human_eval_feedback_send_button.click(
+    tab_chat_document_xai_grok_4_answer_human_eval_feedback_send_button.click(
         eval_by_human,
         inputs=[
             query_id_state,
-            gr.State(value="xai/grok-3"),
-            tab_chat_document_xai_grok_3_answer_human_eval_feedback_radio,
-            tab_chat_document_xai_grok_3_answer_human_eval_feedback_text,
+            gr.State(value="xai/grok-4"),
+            tab_chat_document_xai_grok_4_answer_human_eval_feedback_radio,
+            tab_chat_document_xai_grok_4_answer_human_eval_feedback_text,
         ],
         outputs=[
-            tab_chat_document_xai_grok_3_answer_human_eval_feedback_radio,
-            tab_chat_document_xai_grok_3_answer_human_eval_feedback_text,
+            tab_chat_document_xai_grok_4_answer_human_eval_feedback_radio,
+            tab_chat_document_xai_grok_4_answer_human_eval_feedback_text,
         ]
     )
 
@@ -3315,20 +2787,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ]
     )
 
-    tab_chat_document_llama_4_maverick_answer_human_eval_feedback_send_button.click(
-        eval_by_human,
-        inputs=[
-            query_id_state,
-            gr.State(value="meta/llama-4-maverick-17b-128e-instruct-fp8"),
-            tab_chat_document_llama_4_maverick_answer_human_eval_feedback_radio,
-            tab_chat_document_llama_4_maverick_answer_human_eval_feedback_text,
-        ],
-        outputs=[
-            tab_chat_document_llama_4_maverick_answer_human_eval_feedback_radio,
-            tab_chat_document_llama_4_maverick_answer_human_eval_feedback_text,
-        ]
-    )
-
     tab_chat_document_llama_4_scout_answer_human_eval_feedback_send_button.click(
         eval_by_human,
         inputs=[
@@ -3340,34 +2798,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_chat_document_llama_4_scout_answer_human_eval_feedback_radio,
             tab_chat_document_llama_4_scout_answer_human_eval_feedback_text,
-        ]
-    )
-
-    tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_send_button.click(
-        eval_by_human,
-        inputs=[
-            query_id_state,
-            gr.State(value="meta/llama-3-3-70b"),
-            tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_radio,
-            tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_text,
-        ],
-        outputs=[
-            tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_radio,
-            tab_chat_document_llama_3_3_70b_answer_human_eval_feedback_text,
-        ]
-    )
-
-    tab_chat_document_llama_3_2_90b_vision_answer_human_eval_feedback_send_button.click(
-        eval_by_human,
-        inputs=[
-            query_id_state,
-            gr.State(value="meta/llama-3-2-90b-vision"),
-            tab_chat_document_llama_3_2_90b_vision_answer_human_eval_feedback_radio,
-            tab_chat_document_llama_3_2_90b_vision_answer_human_eval_feedback_text,
-        ],
-        outputs=[
-            tab_chat_document_llama_3_2_90b_vision_answer_human_eval_feedback_radio,
-            tab_chat_document_llama_3_2_90b_vision_answer_human_eval_feedback_text,
         ]
     )
 
@@ -3385,20 +2815,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ]
     )
 
-    tab_chat_document_openai_gpt4_answer_human_eval_feedback_send_button.click(
-        eval_by_human,
-        inputs=[
-            query_id_state,
-            gr.State(value="openai/gpt-4"),
-            tab_chat_document_openai_gpt4_answer_human_eval_feedback_radio,
-            tab_chat_document_openai_gpt4_answer_human_eval_feedback_text,
-        ],
-        outputs=[
-            tab_chat_document_openai_gpt4_answer_human_eval_feedback_radio,
-            tab_chat_document_openai_gpt4_answer_human_eval_feedback_text,
-        ]
-    )
-
     tab_chat_document_azure_openai_gpt4o_answer_human_eval_feedback_send_button.click(
         eval_by_human,
         inputs=[
@@ -3413,20 +2829,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ]
     )
 
-    tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_send_button.click(
-        eval_by_human,
-        inputs=[
-            query_id_state,
-            gr.State(value="azure_openai/gpt-4"),
-            tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_radio,
-            tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_text,
-        ],
-        outputs=[
-            tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_radio,
-            tab_chat_document_azure_openai_gpt4_answer_human_eval_feedback_text,
-        ]
-    )
-
     tab_download_eval_result_generate_button.click(
         generate_eval_result_file,
         inputs=[],
@@ -3434,7 +2836,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_download_eval_result_download_button,
         ]
     )
-
 
     # RAGPrompt設定のイベントハンドラー
     def save_rag_prompt(prompt_text):
@@ -3445,13 +2846,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         except Exception as e:
             return gr.Warning(f"Promptの保存に失敗しました: {str(e)}")
 
-
     def reset_rag_prompt():
         """RAGPromptをデフォルトに戻す"""
         default_prompt = get_langgpt_rag_prompt("{{context}}", "{{query_text}}", False, False)
         update_langgpt_rag_prompt(default_prompt)
         return default_prompt
-
 
     tab_chat_document_rag_prompt_save_button.click(
         save_rag_prompt,
@@ -3465,7 +2864,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[tab_chat_document_rag_prompt_text]
     )
 
-
     # VisionPrompt設定のイベントハンドラー
     def save_image_prompt(prompt_text):
         """VisionPromptを保存する"""
@@ -3475,13 +2873,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         except Exception as e:
             return gr.Warning(f"VisionPromptの保存に失敗しました: {str(e)}")
 
-
     def reset_image_prompt():
         """VisionPromptをデフォルトに戻す"""
         default_prompt = get_image_qa_prompt("{{query_text}}")
         update_image_qa_prompt(default_prompt)
         return default_prompt
-
 
     # tab_chat_document_image_prompt_save_button.click(
     #     save_image_prompt,

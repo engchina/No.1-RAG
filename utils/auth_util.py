@@ -45,19 +45,19 @@ def create_oci_cred(user_ocid, tenancy_ocid, fingerprint, private_key_file, regi
     has_error = False
     if not user_ocid:
         has_error = True
-        gr.Warning("User OCIDを入力してください")
+        gr.Warning("User OCIDを入力してください")  # ユーザーOCID入力要求メッセージ
     if not tenancy_ocid:
         has_error = True
-        gr.Warning("Tenancy OCIDを入力してください")
+        gr.Warning("Tenancy OCIDを入力してください")  # テナンシーOCID入力要求メッセージ
     if not fingerprint:
         has_error = True
-        gr.Warning("Fingerprintを入力してください")
+        gr.Warning("Fingerprintを入力してください")  # フィンガープリント入力要求メッセージ
     if not private_key_file:
         has_error = True
-        gr.Warning("Private Keyを入力してください")
+        gr.Warning("Private Keyを入力してください")  # 秘密鍵入力要求メッセージ
     if not region:
         has_error = True
-        gr.Warning("Regionを選択してください")
+        gr.Warning("Regionを選択してください")  # リージョン選択要求メッセージ
 
     if has_error:
         return gr.Accordion(), gr.Textbox()
@@ -152,7 +152,7 @@ def create_oci_cred(user_ocid, tenancy_ocid, fingerprint, private_key_file, regi
         );
     END;
     """
-    gr.Info("OCI API Keyの設定が完了しました")
+    gr.Info("OCI API Keyの設定が完了しました")  # OCI API Key設定完了メッセージ
     return gr.Accordion(), gr.Textbox(value=create_oci_cred_sql.strip())
 
 
@@ -169,7 +169,7 @@ def create_cohere_cred(cohere_cred_api_key):
     has_error = False
     if not cohere_cred_api_key:
         has_error = True
-        gr.Warning("Cohere API Keyを入力してください")
+        gr.Warning("Cohere API Keyを入力してください")  # Cohere API Key入力要求メッセージ
     if has_error:
         return gr.Textbox()
     cohere_cred_api_key = cohere_cred_api_key.strip()
@@ -177,7 +177,7 @@ def create_cohere_cred(cohere_cred_api_key):
     os.environ["COHERE_API_KEY"] = cohere_cred_api_key
     set_key(env_path, "COHERE_API_KEY", cohere_cred_api_key, quote_mode="never")
     load_dotenv(env_path)
-    gr.Info("Cohere API Keyの設定が完了しました")
+    gr.Info("Cohere API Keyの設定が完了しました")  # Cohere API Key設定完了メッセージ
     return gr.Textbox(value=cohere_cred_api_key)
 
 
@@ -195,10 +195,10 @@ def create_openai_cred(openai_cred_base_url, openai_cred_api_key):
     has_error = False
     if not openai_cred_base_url:
         has_error = True
-        gr.Warning("OpenAI Base URLを入力してください")
+        gr.Warning("OpenAI Base URLを入力してください")  # OpenAI Base URL入力要求メッセージ
     if not openai_cred_api_key:
         has_error = True
-        gr.Warning("OpenAI API Keyを入力してください")
+        gr.Warning("OpenAI API Keyを入力してください")  # OpenAI API Key入力要求メッセージ
     if has_error:
         return gr.Textbox(), gr.Textbox()
     openai_cred_base_url = openai_cred_base_url.strip()
@@ -209,7 +209,7 @@ def create_openai_cred(openai_cred_base_url, openai_cred_api_key):
     set_key(env_path, "OPENAI_BASE_URL", openai_cred_base_url, quote_mode="never")
     set_key(env_path, "OPENAI_API_KEY", openai_cred_api_key, quote_mode="never")
     load_dotenv(env_path)
-    gr.Info("OpenAI API Keyの設定が完了しました")
+    gr.Info("OpenAI API Keyの設定が完了しました")  # OpenAI API Key設定完了メッセージ
     return (
         gr.Textbox(value=openai_cred_base_url),
         gr.Textbox(value=openai_cred_api_key)
@@ -235,13 +235,13 @@ def create_azure_openai_cred(
     has_error = False
     if not azure_openai_cred_api_key:
         has_error = True
-        gr.Warning("Azure OpenAI API Keyを入力してください")
+        gr.Warning("Azure OpenAI API Keyを入力してください")  # Azure OpenAI API Key入力要求メッセージ
     if not azure_openai_cred_endpoint_gpt_4o:
         has_error = True
-        gr.Warning("Azure OpenAI GPT-4O Endpointを入力してください")
+        gr.Warning("Azure OpenAI GPT-4O Endpointを入力してください")  # Azure OpenAI GPT-4O エンドポイント入力要求メッセージ
     if not azure_openai_cred_endpoint_gpt_4:
         has_error = True
-        gr.Warning("Azure OpenAI GPT-4 Endpointを入力してください")
+        gr.Warning("Azure OpenAI GPT-4 Endpointを入力してください")  # Azure OpenAI GPT-4 エンドポイント入力要求メッセージ
     if has_error:
         return gr.Textbox(), gr.Textbox(), gr.Textbox()
     azure_openai_cred_api_key = azure_openai_cred_api_key.strip()
@@ -255,7 +255,7 @@ def create_azure_openai_cred(
     set_key(env_path, "AZURE_OPENAI_ENDPOINT_GPT_4O", azure_openai_cred_endpoint_gpt_4o, quote_mode="never")
     set_key(env_path, "AZURE_OPENAI_ENDPOINT_GPT_4", azure_openai_cred_endpoint_gpt_4, quote_mode="never")
     load_dotenv(env_path)
-    gr.Info("Azure OpenAI API Keyの設定が完了しました")
+    gr.Info("Azure OpenAI API Keyの設定が完了しました")  # Azure OpenAI API Key設定完了メッセージ
     return (
         gr.Textbox(value=azure_openai_cred_api_key),
         gr.Textbox(value=azure_openai_cred_endpoint_gpt_4o),
@@ -278,13 +278,13 @@ def create_langfuse_cred(langfuse_cred_secret_key, langfuse_cred_public_key, lan
     has_error = False
     if not langfuse_cred_secret_key:
         has_error = True
-        gr.Warning("Langfuse Secret Keyを入力してください")
+        gr.Warning("Langfuse Secret Keyを入力してください")  # Langfuse Secret Key入力要求メッセージ
     if not langfuse_cred_public_key:
         has_error = True
-        gr.Warning("Langfuse Public Keyを入力してください")
+        gr.Warning("Langfuse Public Keyを入力してください")  # Langfuse Public Key入力要求メッセージ
     if not langfuse_cred_host:
         has_error = True
-        gr.Warning("Langfuse Hostを入力してください")
+        gr.Warning("Langfuse Hostを入力してください")  # Langfuse Host入力要求メッセージ
     if has_error:
         return gr.Textbox(), gr.Textbox(), gr.Textbox()
     langfuse_cred_secret_key = langfuse_cred_secret_key.strip()
@@ -298,7 +298,7 @@ def create_langfuse_cred(langfuse_cred_secret_key, langfuse_cred_public_key, lan
     set_key(env_path, "LANGFUSE_PUBLIC_KEY", langfuse_cred_public_key, quote_mode="never")
     set_key(env_path, "LANGFUSE_HOST", langfuse_cred_host, quote_mode="never")
     load_dotenv(env_path)
-    gr.Info("Langfuse API Keyの設定が完了しました")
+    gr.Info("Langfuse API Keyの設定が完了しました")  # Langfuse API Key設定完了メッセージ
     return (
         gr.Textbox(value=langfuse_cred_secret_key),
         gr.Textbox(value=langfuse_cred_public_key),
