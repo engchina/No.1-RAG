@@ -51,7 +51,7 @@ async def chat(
 
     # 応答状態とジェネレーター名の初期化
     responses_status = ["", "", "", "", ""]
-    generator_names = ["XAI grok-4", "Command-A", "Llama-4-Scout",
+    generator_names = ["XAI Grok-4", "Command-A", "Llama-4-Scout",
                        "OpenAI GPT-4o", "Azure OpenAI GPT-4o"]
     iteration_count = 0
 

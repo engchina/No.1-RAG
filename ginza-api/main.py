@@ -96,7 +96,7 @@ def split_query(query: QueryText):
                                 and not re.search(r'[0-9\[\]\(\)\{\}\<\>]+', token.text)
                                 and 1 < len(token.text) < 10]  # 単語長の制限を追加
 
-            # 英文分词处理
+            # 英語の分かち書き処理
             en_split_queries = [token.text for token in nlp_en_core(query.query_text) if
                                 token.pos_ in ['NOUN'] and re.match(r'^[a-zA-Z]', token.text)
                                 and not re.search(r'[0-9\[\]\(\)\{\}\<\>]+', token.text)

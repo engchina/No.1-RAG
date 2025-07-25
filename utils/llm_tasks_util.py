@@ -25,7 +25,7 @@ from utils.image_util import encode_image
 
 
 async def xai_grok_4_task(system_text, query_text, xai_grok_4_checkbox):
-    """XAI grok-4モデルでのタスク処理"""
+    """XAI Grok-4モデルでのタスク処理"""
     region = get_region()
     if xai_grok_4_checkbox:
         xai_grok_4 = ChatOCIGenAI(
