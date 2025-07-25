@@ -68,7 +68,7 @@ conda activate no.1-rag
 pip install -r requirements.txt
 pip install gradio==5.18.0
 pip install aiofiles==24.1.0
-pip install defusedxml==0.7.1 markitdown==0.0.2 pathvalidate==3.2.3 speechrecognition==3.14.1 youtube-transcript-api==1.0.1
+pip install defusedxml==0.7.1 pathvalidate==3.2.3 speechrecognition==3.14.1 youtube-transcript-api==1.0.1
 
 chmod +x main.sh
 nohup ./main.sh &

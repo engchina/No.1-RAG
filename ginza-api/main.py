@@ -7,13 +7,13 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
-# 加载模型
+# モデルをロードする
 nlp_ja_ginza = spacy.load('ja_ginza_electra')
 nlp_ja_core = spacy.load('ja_core_news_lg')
 nlp_zh_core = spacy.load('zh_core_web_lg')
 nlp_en_core = spacy.load('en_core_web_lg')
 
-# 预先合并所有停用词集合
+# すべてのストップワード集合を事前にマージする
 custom_stopwords = {
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
     'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
@@ -36,34 +36,34 @@ all_stopwords.update(nlp_en_core.Defaults.stop_words)
 
 class QueryText(BaseModel):
     query_text: str
-    language: str  # 添加一个语言字段
-    max_tokens: int = 10  # 默认最大返回token数量
+    language: str  # 言語フィールドを追加
+    max_tokens: int = 10  # デフォルトの最大返却トークン数
 
 
 def extract_entities(text, nlp_model):
-    """提取命名实体"""
+    """固有表現を抽出する"""
     doc = nlp_model(text)
     entities = [ent.text for ent in doc.ents]
     return entities
 
 
 def limit_results(tokens, max_count=15):
-    """限制返回结果数量，优先保留短字符串"""
+    """返却結果の数を制限し、短い文字列を優先的に保持する"""
     if len(tokens) <= max_count:
         return tokens
 
-    # 按字符串长度排序，短的优先保留
+    # 文字列の長さでソートし、短いものを優先的に保持
     sorted_tokens = sorted(tokens, key=len)
     return sorted_tokens[:max_count]
 
 
 # 添加一个新的辅助函数来过滤无效token
 def is_valid_token(token):
-    """检查token是否有效（不含特殊字符组合）"""
-    # 过滤掉包含数字和特殊字符组合的token
+    """トークンが有効かどうかをチェック（特殊文字の組み合わせを含まない）"""
+    # 数字と特殊文字の組み合わせを含むトークンをフィルタリング
     if re.search(r'[0-9\[\]\(\)\{\}\<\>]+', token):
         return False
-    # 过滤掉过短的token
+    # 短すぎるトークンをフィルタリング
     if len(token) <= 1:
         return False
     return True
@@ -89,12 +89,12 @@ def split_query(query: QueryText):
 
     try:
         if query.language == 'ja':
-            # 日文分词处理 - 统一词性筛选为名词类
+            # 日本語の分かち書き処理 - 品詞を名詞に統一してフィルタリング
             ja_split_queries = [token.text for token in nlp_ja_ginza(query.query_text) if
                                 any(token.tag_.startswith(tag) for tag in
                                     ['名詞-普通名詞', '名詞-固有名詞'])
                                 and not re.search(r'[0-9\[\]\(\)\{\}\<\>]+', token.text)
-                                and 1 < len(token.text) < 10]  # 添加词长限制
+                                and 1 < len(token.text) < 10]  # 単語長の制限を追加
 
             # 英文分词处理
             en_split_queries = [token.text for token in nlp_en_core(query.query_text) if
@@ -102,57 +102,57 @@ def split_query(query: QueryText):
                                 and not re.search(r'[0-9\[\]\(\)\{\}\<\>]+', token.text)
                                 and 2 < len(token.text) < 15]  # 添加词长限制
 
-            # 提取实体
+            # エンティティを抽出
             ja_entities = extract_entities(query.query_text, nlp_ja_core)
             entities.extend(ja_entities)
 
             final_split_queries = list(set(ja_split_queries + en_split_queries))
 
-        elif query.language == 'zh':  # 使用jieba进行中文分词
+        elif query.language == 'zh':  # jiebaを使用して中国語の分かち書きを行う
             jieba_split_queries = list(jieba.cut(query.query_text))
 
-            # 使用spaCy的中文模型处理jieba的分词结果
+            # spaCyの中国語モデルを使用してjiebaの分かち書き結果を処理
             docs = nlp_zh_core.pipe(jieba_split_queries)
             zh_split_queries = [token.text for doc in docs for token in doc if
-                                token.pos_ in ['NOUN', 'PROPN']  # 只保留名词类
+                                token.pos_ in ['NOUN', 'PROPN']  # 名詞のみを保持
                                 and 1 < len(token.text) < 5
                                 and not re.search(r'[0-9\[\]\(\)\{\}\<\>]+', token.text)]
 
-            # 英文分词处理（中文文本中可能包含英文）
+            # 英語の分かち書き処理（中国語テキストに英語が含まれる場合がある）
             en_split_queries = [token.text for token in nlp_en_core(query.query_text) if
                                 token.pos_ in ['NOUN'] and re.match(r'^[a-zA-Z]+$', token.text)
                                 and not re.search(r'[0-9\[\]\(\)\{\}\<\>]+', token.text)
-                                and 2 < len(token.text) < 15]  # 添加词长限制
+                                and 2 < len(token.text) < 15]  # 単語長の制限を追加
 
-            # 提取实体
+            # エンティティを抽出
             zh_entities = extract_entities(query.query_text, nlp_zh_core)
             entities.extend(zh_entities)
 
             final_split_queries = list(set(zh_split_queries + en_split_queries))
 
         elif query.language == 'en':
-            # 只做英文分词处理
+            # 英語の分かち書き処理のみを行う
             final_split_queries = [token.text for token in nlp_en_core(query.query_text) if
                                    token.pos_ in ['NOUN'] and re.match(r'^[a-zA-Z]', token.text)
                                    and not re.search(r'[0-9\[\]\(\)\{\}\<\>]+', token.text)
-                                   and 2 < len(token.text) < 15]  # 添加词长限制
+                                   and 2 < len(token.text) < 15]  # 単語長の制限を追加
 
-            # 提取实体
+            # エンティティを抽出
             en_entities = extract_entities(query.query_text, nlp_en_core)
             entities.extend(en_entities)
 
-        # 过滤掉停用词 - 使用预先合并的停用词集合
+        # ストップワードをフィルタリング - 事前にマージされたストップワード集合を使用
         final_split_queries = [word for word in set(final_split_queries) if word.lower() not in all_stopwords]
         entities = [entity for entity in entities if entity.lower() not in all_stopwords]
 
-        # 添加实体到结果中
+        # 結果にエンティティを追加
         final_split_queries.extend(entities)
         final_split_queries = list(set(final_split_queries))  # 去重
         
-        # 额外过滤包含特殊字符的token
+        # 特殊文字を含むトークンを追加でフィルタリング
         final_split_queries = [token for token in final_split_queries if is_valid_token(token)]
 
-        # 限制返回结果数量
+        # 返却結果の数を制限
         final_split_queries = limit_results(final_split_queries, query.max_tokens)
 
         print(f"{final_split_queries=}")

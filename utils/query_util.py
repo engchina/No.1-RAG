@@ -21,29 +21,17 @@ def insert_query_result(
         llm_answer_checkbox_group,
         llm_evaluation_checkbox,
         standard_answer_text,
-        xai_grok_3_response,
+        xai_grok_4_response,
         command_a_response,
-        llama_4_maverick_response,
         llama_4_scout_response,
-        llama_3_3_70b_response,
-        llama_3_2_90b_vision_response,
         openai_gpt4o_response,
-        openai_gpt4_response,
         azure_openai_gpt4o_response,
-        azure_openai_gpt4_response,
-        xai_grok_3_evaluation,
+        xai_grok_4_evaluation,
         command_a_evaluation,
-        llama_4_maverick_evaluation,
         llama_4_scout_evaluation,
-        llama_3_3_70b_evaluation,
-        llama_3_2_90b_vision_evaluation,
         openai_gpt4o_evaluation,
-        openai_gpt4_evaluation,
         azure_openai_gpt4o_evaluation,
-        azure_openai_gpt4_evaluation,
-        llama_4_maverick_image_response,
         llama_4_scout_image_response,
-        llama_3_2_90b_vision_image_response,
         openai_gpt4o_image_response,
         azure_openai_gpt4o_image_response
 ):
@@ -96,12 +84,12 @@ def insert_query_result(
                 ]
             )
 
-            if "xai/grok-3" in llm_answer_checkbox_group:
-                xai_grok_3_response = xai_grok_3_response
+            if "xai/grok-4" in llm_answer_checkbox_group:
+                xai_grok_4_response = xai_grok_4_response
                 if llm_evaluation_checkbox:
-                    xai_grok_3_evaluation = xai_grok_3_evaluation
+                    xai_grok_4_evaluation = xai_grok_4_evaluation
                 else:
-                    xai_grok_3_evaluation = ""
+                    xai_grok_4_evaluation = ""
 
                 insert_sql = """
                              INSERT INTO RAG_QA_FEEDBACK (query_id,
@@ -120,10 +108,10 @@ def insert_query_result(
                     insert_sql,
                     [
                         query_id,
-                        "xai/grok-3",
-                        xai_grok_3_response,
+                        "xai/grok-4",
+                        xai_grok_4_response,
                         "",  # Vision機能なし
-                        xai_grok_3_evaluation
+                        xai_grok_4_evaluation
                     ]
                 )
 
@@ -158,37 +146,6 @@ def insert_query_result(
                     ]
                 )
 
-            if "meta/llama-4-maverick-17b-128e-instruct-fp8" in llm_answer_checkbox_group:
-                llama_4_maverick_response = llama_4_maverick_response
-                if llm_evaluation_checkbox:
-                    llama_4_maverick_evaluation = llama_4_maverick_evaluation
-                else:
-                    llama_4_maverick_evaluation = ""
-
-                insert_sql = """
-                             INSERT INTO RAG_QA_FEEDBACK (query_id,
-                                                          llm_name,
-                                                          llm_answer,
-                                                          vlm_answer,
-                                                          ragas_evaluation_result)
-                             VALUES (:1,
-                                     :2,
-                                     :3,
-                                     :4,
-                                     :5) \
-                             """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB, oracledb.CLOB)
-                cursor.execute(
-                    insert_sql,
-                    [
-                        query_id,
-                        "meta/llama-4-maverick-17b-128e-instruct-fp8",
-                        llama_4_maverick_response,
-                        remove_base64_images_from_text(llama_4_maverick_image_response),
-                        llama_4_maverick_evaluation
-                    ]
-                )
-
             if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox_group:
                 llama_4_scout_response = llama_4_scout_response
                 if llm_evaluation_checkbox:
@@ -217,68 +174,6 @@ def insert_query_result(
                         llama_4_scout_response,
                         remove_base64_images_from_text(llama_4_scout_image_response),
                         llama_4_scout_evaluation
-                    ]
-                )
-
-            if "meta/llama-3-3-70b" in llm_answer_checkbox_group:
-                llama_3_3_70b_response = llama_3_3_70b_response
-                if llm_evaluation_checkbox:
-                    llama_3_3_70b_evaluation = llama_3_3_70b_evaluation
-                else:
-                    llama_3_3_70b_evaluation = ""
-
-                insert_sql = """
-                             INSERT INTO RAG_QA_FEEDBACK (query_id,
-                                                          llm_name,
-                                                          llm_answer,
-                                                          vlm_answer,
-                                                          ragas_evaluation_result)
-                             VALUES (:1,
-                                     :2,
-                                     :3,
-                                     :4,
-                                     :5) \
-                             """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB, oracledb.CLOB)
-                cursor.execute(
-                    insert_sql,
-                    [
-                        query_id,
-                        "meta/llama-3-3-70b",
-                        llama_3_3_70b_response,
-                        "",  # Vision機能なし
-                        llama_3_3_70b_evaluation
-                    ]
-                )
-
-            if "meta/llama-3-2-90b-vision" in llm_answer_checkbox_group:
-                llama_3_2_90b_vision_response = llama_3_2_90b_vision_response
-                if llm_evaluation_checkbox:
-                    llama_3_2_90b_vision_evaluation = llama_3_2_90b_vision_evaluation
-                else:
-                    llama_3_2_90b_vision_evaluation = ""
-
-                insert_sql = """
-                             INSERT INTO RAG_QA_FEEDBACK (query_id,
-                                                          llm_name,
-                                                          llm_answer,
-                                                          vlm_answer,
-                                                          ragas_evaluation_result)
-                             VALUES (:1,
-                                     :2,
-                                     :3,
-                                     :4,
-                                     :5) \
-                             """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB, oracledb.CLOB)
-                cursor.execute(
-                    insert_sql,
-                    [
-                        query_id,
-                        "meta/llama-3-2-90b-vision",
-                        llama_3_2_90b_vision_response,
-                        remove_base64_images_from_text(llama_3_2_90b_vision_image_response),
-                        llama_3_2_90b_vision_evaluation
                     ]
                 )
 
@@ -313,37 +208,6 @@ def insert_query_result(
                     ]
                 )
 
-            if "openai/gpt-4" in llm_answer_checkbox_group:
-                openai_gpt4_response = openai_gpt4_response
-                if llm_evaluation_checkbox:
-                    openai_gpt4_evaluation = openai_gpt4_evaluation
-                else:
-                    openai_gpt4_evaluation = ""
-
-                insert_sql = """
-                             INSERT INTO RAG_QA_FEEDBACK (query_id,
-                                                          llm_name,
-                                                          llm_answer,
-                                                          vlm_answer,
-                                                          ragas_evaluation_result)
-                             VALUES (:1,
-                                     :2,
-                                     :3,
-                                     :4,
-                                     :5) \
-                             """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB, oracledb.CLOB)
-                cursor.execute(
-                    insert_sql,
-                    [
-                        query_id,
-                        "openai/gpt-4",
-                        openai_gpt4_response,
-                        "",  # Vision機能なし
-                        openai_gpt4_evaluation
-                    ]
-                )
-
             if "azure_openai/gpt-4o" in llm_answer_checkbox_group:
                 azure_openai_gpt4o_response = azure_openai_gpt4o_response
                 if llm_evaluation_checkbox:
@@ -372,37 +236,6 @@ def insert_query_result(
                         azure_openai_gpt4o_response,
                         remove_base64_images_from_text(azure_openai_gpt4o_image_response),
                         azure_openai_gpt4o_evaluation
-                    ]
-                )
-
-            if "azure_openai/gpt-4" in llm_answer_checkbox_group:
-                azure_openai_gpt4_response = azure_openai_gpt4_response
-                if llm_evaluation_checkbox:
-                    azure_openai_gpt4_evaluation = azure_openai_gpt4_evaluation
-                else:
-                    azure_openai_gpt4_evaluation = ""
-
-                insert_sql = """
-                             INSERT INTO RAG_QA_FEEDBACK (query_id,
-                                                          llm_name,
-                                                          llm_answer,
-                                                          vlm_answer,
-                                                          ragas_evaluation_result)
-                             VALUES (:1,
-                                     :2,
-                                     :3,
-                                     :4,
-                                     :5) \
-                             """
-                cursor.setinputsizes(None, None, oracledb.CLOB, oracledb.CLOB, oracledb.CLOB)
-                cursor.execute(
-                    insert_sql,
-                    [
-                        query_id,
-                        "azure_openai/gpt-4",
-                        azure_openai_gpt4_response,
-                        "",  # Vision機能なし
-                        azure_openai_gpt4_evaluation
                     ]
                 )
 
