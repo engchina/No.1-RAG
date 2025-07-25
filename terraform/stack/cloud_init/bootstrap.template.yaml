@@ -25,6 +25,14 @@ packages:
   - libreoffice
   - pandoc
   - dos2unix
+  - fonts-noto-cjk
+  - fonts-noto-cjk-extra
+  - fonts-ipafont
+  - fonts-takao
+  - fonts-takao-gothic
+  - fonts-takao-mincho
+  - fonts-wqy-microhei
+  - fonts-wqy-zenhei
 write_files:
   - path: "/u01/aipoc/props/db.env"
     permissions: "0644"
