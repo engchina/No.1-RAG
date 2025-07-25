@@ -1011,7 +1011,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             value=[]
                         )
                 with gr.Accordion(
-                        label="XAI grok-4 メッセージ",
+                        label="XAI Grok-4 メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_xai_grok_4_accordion:
