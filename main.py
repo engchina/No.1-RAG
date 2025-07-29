@@ -344,22 +344,22 @@ def generate_query(query_text, generate_query_radio):
         return gr.Textbox(value=generate_query1), gr.Textbox(value=generate_query2), gr.Textbox(value=generate_query3)
 
     region = get_region()
-    if region == "us-chicago-1":
-        chat_llm = ChatOCIGenAI(
-            model_id="xai.grok-4",
-            provider="xai",
-            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
-            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 600},
-        )
-    else:
-        chat_llm = ChatOCIGenAI(
-            model_id="cohere.command-a-03-2025",
-            provider="cohere",
-            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
-            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 600},
-        )
+    # if region == "us-chicago-1":
+    #     chat_llm = ChatOCIGenAI(
+    #         model_id="xai.grok-4",
+    #         provider="xai",
+    #         service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+    #         compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+    #         model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 2048},
+    #     )
+    # else:
+    chat_llm = ChatOCIGenAI(
+        model_id="cohere.command-a-03-2025",
+        provider="cohere",
+        service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+        compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+        model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 600},
+    )
 
     # RAG-Fusion
     if generate_query_radio == "Sub-Query":
@@ -388,9 +388,18 @@ def generate_query(query_text, generate_query_radio):
         print(f"{sub_queries=}")
 
         if isinstance(sub_queries, list):
-            generate_query1 = re.sub(r'^1\. ', '', sub_queries[0])
-            generate_query2 = re.sub(r'^2\. ', '', sub_queries[1])
-            generate_query3 = re.sub(r'^3\. ', '', sub_queries[2])
+            try:
+                generate_query1 = re.sub(r'^1\. ', '', sub_queries[0])
+            except (IndexError, TypeError):
+                generate_query1 = ""
+            try:
+                generate_query2 = re.sub(r'^2\. ', '', sub_queries[1])
+            except (IndexError, TypeError):
+                generate_query2 = ""
+            try:
+                generate_query3 = re.sub(r'^3\. ', '', sub_queries[2])
+            except (IndexError, TypeError):
+                generate_query3 = ""
     elif generate_query_radio == "RAG-Fusion":
         # v1
         # rag_fusion_prompt = ChatPromptTemplate.from_messages([
@@ -411,9 +420,18 @@ def generate_query(query_text, generate_query_radio):
         print(f"{rag_fusion_queries=}")
 
         if isinstance(rag_fusion_queries, list):
-            generate_query1 = re.sub(r'^1\. ', '', rag_fusion_queries[0])
-            generate_query2 = re.sub(r'^2\. ', '', rag_fusion_queries[1])
-            generate_query3 = re.sub(r'^3\. ', '', rag_fusion_queries[2])
+            try:
+                generate_query1 = re.sub(r'^1\. ', '', rag_fusion_queries[0])
+            except (IndexError, TypeError):
+                generate_query1 = ""
+            try:
+                generate_query2 = re.sub(r'^2\. ', '', rag_fusion_queries[1])
+            except (IndexError, TypeError):
+                generate_query2 = ""
+            try:
+                generate_query3 = re.sub(r'^3\. ', '', rag_fusion_queries[2])
+            except (IndexError, TypeError):
+                generate_query3 = ""
     elif generate_query_radio == "HyDE":
         hyde_prompt = ChatPromptTemplate.from_messages([
             ("system", get_hyde_prompt()),
@@ -427,9 +445,18 @@ def generate_query(query_text, generate_query_radio):
         print(f"{hyde_answers=}")
 
         if isinstance(hyde_answers, list):
-            generate_query1 = re.sub(r'^1\. ', '', hyde_answers[0])
-            generate_query2 = re.sub(r'^2\. ', '', hyde_answers[1])
-            generate_query3 = re.sub(r'^3\. ', '', hyde_answers[2])
+            try:
+                generate_query1 = re.sub(r'^1\. ', '', hyde_answers[0])
+            except (IndexError, TypeError):
+                generate_query1 = ""
+            try:
+                generate_query2 = re.sub(r'^2\. ', '', hyde_answers[1])
+            except (IndexError, TypeError):
+                generate_query2 = ""
+            try:
+                generate_query3 = re.sub(r'^3\. ', '', hyde_answers[2])
+            except (IndexError, TypeError):
+                generate_query3 = ""
     elif generate_query_radio == "Step-Back-Prompting":
         step_back_prompt = ChatPromptTemplate.from_messages([
             ("system", get_step_back_prompt()),
@@ -443,9 +470,18 @@ def generate_query(query_text, generate_query_radio):
         print(f"{step_back_queries=}")
 
         if isinstance(step_back_queries, list):
-            generate_query1 = re.sub(r'^1\. ', '', step_back_queries[0])
-            generate_query2 = re.sub(r'^2\. ', '', step_back_queries[1])
-            generate_query3 = re.sub(r'^3\. ', '', step_back_queries[2])
+            try:
+                generate_query1 = re.sub(r'^1\. ', '', step_back_queries[0])
+            except (IndexError, TypeError):
+                generate_query1 = ""
+            try:
+                generate_query2 = re.sub(r'^2\. ', '', step_back_queries[1])
+            except (IndexError, TypeError):
+                generate_query2 = ""
+            try:
+                generate_query3 = re.sub(r'^3\. ', '', step_back_queries[2])
+            except (IndexError, TypeError):
+                generate_query3 = ""
     elif generate_query_radio == "Customized-Multi-Step-Query":
         region = get_region()
         select_multi_step_query_sql = f"""
@@ -2061,7 +2097,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_create_oci_cred_private_key_file
         ]
     )
-    
+
     tab_create_oci_cred_button.click(
         create_oci_cred,
         inputs=[
@@ -2076,7 +2112,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_create_oci_cred_sql_text
         ]
     )
-    
+
     tab_create_oci_cred_test_button.click(
         test_oci_cred,
         inputs=[
@@ -2086,7 +2122,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_create_oci_cred_test_vector_text
         ]
     )
-    
+
     tab_create_cohere_cred_button.click(
         create_cohere_cred,
         inputs=[
@@ -2096,7 +2132,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_create_cohere_cred_api_key_text
         ]
     )
-    
+
     tab_create_openai_cred_button.click(
         create_openai_cred,
         inputs=[
@@ -2108,7 +2144,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_create_openai_cred_api_key_text
         ]
     )
-    
+
     tab_create_azure_openai_cred_button.click(
         create_azure_openai_cred,
         inputs=[
@@ -2134,7 +2170,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_create_langfuse_cred_host_text
         ]
     )
-    
+
     tab_chat_with_llm_answer_checkbox_group.change(
         set_chat_llm_answer,
         inputs=[
@@ -2148,7 +2184,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_llm_azure_openai_gpt4o_accordion,
         ]
     )
-    
+
     tab_chat_with_llm_clear_button.add(
         [
             tab_chat_with_llm_query_image,
@@ -2161,7 +2197,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_with_azure_openai_gpt4o_answer_text
         ]
     )
-    
+
     tab_chat_with_llm_chat_button.click(
         chat_stream,
         inputs=[
@@ -2222,7 +2258,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_load_document_page_content_text
         ],
     )
-    
+
     tab_split_document.select(
         refresh_doc_list,
         inputs=[],
