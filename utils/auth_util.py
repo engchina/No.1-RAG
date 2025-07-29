@@ -219,7 +219,6 @@ def create_openai_cred(openai_cred_base_url, openai_cred_api_key):
 def create_azure_openai_cred(
         azure_openai_cred_api_key,
         azure_openai_cred_endpoint_gpt_4o,
-        azure_openai_cred_endpoint_gpt_4,
 ):
     """
     Azure OpenAI認証情報を設定する
@@ -227,10 +226,9 @@ def create_azure_openai_cred(
     Args:
         azure_openai_cred_api_key: Azure OpenAI API Key
         azure_openai_cred_endpoint_gpt_4o: GPT-4o エンドポイント
-        azure_openai_cred_endpoint_gpt_4: GPT-4 エンドポイント
 
     Returns:
-        tuple: (API Key Textbox, GPT-4o Endpoint Textbox, GPT-4 Endpoint Textbox) のタプル
+        tuple: (API Key Textbox, GPT-4o Endpoint Textbox) のタプル
     """
     has_error = False
     if not azure_openai_cred_api_key:
@@ -239,27 +237,20 @@ def create_azure_openai_cred(
     if not azure_openai_cred_endpoint_gpt_4o:
         has_error = True
         gr.Warning("Azure OpenAI GPT-4O Endpointを入力してください")
-    if not azure_openai_cred_endpoint_gpt_4:
-        has_error = True
-        gr.Warning("Azure OpenAI GPT-4 Endpointを入力してください")
     if has_error:
         return gr.Textbox(), gr.Textbox(), gr.Textbox()
     azure_openai_cred_api_key = azure_openai_cred_api_key.strip()
     azure_openai_cred_endpoint_gpt_4o = azure_openai_cred_endpoint_gpt_4o.strip()
-    azure_openai_cred_endpoint_gpt_4 = azure_openai_cred_endpoint_gpt_4.strip()
     env_path = find_dotenv()
     os.environ["AZURE_OPENAI_API_KEY"] = azure_openai_cred_api_key
     os.environ["AZURE_OPENAI_ENDPOINT_GPT_4O"] = azure_openai_cred_endpoint_gpt_4o
-    os.environ["AZURE_OPENAI_ENDPOINT_GPT_4"] = azure_openai_cred_endpoint_gpt_4
     set_key(env_path, "AZURE_OPENAI_API_KEY", azure_openai_cred_api_key, quote_mode="never")
     set_key(env_path, "AZURE_OPENAI_ENDPOINT_GPT_4O", azure_openai_cred_endpoint_gpt_4o, quote_mode="never")
-    set_key(env_path, "AZURE_OPENAI_ENDPOINT_GPT_4", azure_openai_cred_endpoint_gpt_4, quote_mode="never")
     load_dotenv(env_path)
     gr.Info("Azure OpenAI API Keyの設定が完了しました")
     return (
         gr.Textbox(value=azure_openai_cred_api_key),
-        gr.Textbox(value=azure_openai_cred_endpoint_gpt_4o),
-        gr.Textbox(value=azure_openai_cred_endpoint_gpt_4)
+        gr.Textbox(value=azure_openai_cred_endpoint_gpt_4o)
     )
 
 

@@ -959,13 +959,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         )
                 with gr.Row():
                     with gr.Column():
-                        tab_create_azure_openai_cred_endpoint_gpt_4_text = gr.Textbox(
-                            label="GPT-4 Endpoint(オプション)",
-                            lines=1,
-                            interactive=True
-                        )
-                with gr.Row():
-                    with gr.Column():
                         tab_create_azure_openai_cred_button = gr.Button(value="設定/再設定", variant="primary")
 
             with gr.TabItem(label="Langfuseの設定(オプション)") as tab_create_langfuse_cred:
@@ -2121,12 +2114,10 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         inputs=[
             tab_create_azure_openai_cred_api_key_text,
             tab_create_azure_openai_cred_endpoint_gpt_4o_text,
-            tab_create_azure_openai_cred_endpoint_gpt_4_text,
         ],
         outputs=[
             tab_create_azure_openai_cred_api_key_text,
             tab_create_azure_openai_cred_endpoint_gpt_4o_text,
-            tab_create_azure_openai_cred_endpoint_gpt_4_text,
         ]
     )
 
