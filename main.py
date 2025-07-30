@@ -3852,6 +3852,8 @@ async def eval_by_ragas(
         eval_command_a_response = ""
         eval_command_r_response = ""
         eval_command_r_plus_response = ""
+        eval_llama_4_maverick_response = ""
+        eval_llama_4_scout_response = "" 
         eval_llama_3_3_70b_response = ""
         eval_llama_3_2_90b_vision_response = ""
         eval_openai_gpt4o_response = ""
@@ -5055,8 +5057,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 "cohere/command-a",
                                 "cohere/command-r",
                                 # "cohere/command-r-plus",
-                                "meta/llama-4-maverick-17b-128e-instruct-fp8",
-                                "meta/llama-4-scout-17b-16e-instruct",
+                                # "meta/llama-4-maverick-17b-128e-instruct-fp8",
+                                # "meta/llama-4-scout-17b-16e-instruct",
                                 "meta/llama-3-3-70b",
                                 "meta/llama-3-2-90b-vision",
                                 "openai/gpt-4o",
@@ -5258,8 +5260,10 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         max_lines=15,
                         value=get_chat_system_message()
                     )
+                # with gr.Accordion(open=False,
+                #                   label="画像ファイル(オプション) - Llama-4-Maverick、Llama-4-Scout、Llama-3.2-90B-Visionモデルを利用する場合に限り、この画像入力が適用されます。"):
                 with gr.Accordion(open=False,
-                                  label="画像ファイル(オプション) - Llama-4-Maverick、Llama-4-Scout、Llama-3.2-90B-Visionモデルを利用する場合に限り、この画像入力が適用されます。"):
+                                  label="画像ファイル(オプション) - Llama-3.2-90B-Visionモデルを利用する場合に限り、この画像入力が適用されます。"):
                     tab_chat_with_llm_query_image = gr.Image(
                         label="",
                         interactive=True,
@@ -5594,8 +5598,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 "cohere/command-a",
                                 "cohere/command-r",
                                 # "cohere/command-r-plus",
-                                "meta/llama-4-maverick-17b-128e-instruct-fp8",
-                                "meta/llama-4-scout-17b-16e-instruct",
+                                # "meta/llama-4-maverick-17b-128e-instruct-fp8",
+                                # "meta/llama-4-scout-17b-16e-instruct",
                                 "meta/llama-3-3-70b",
                                 "meta/llama-3-2-90b-vision",
                                 "openai/gpt-4o",
