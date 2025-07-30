@@ -128,10 +128,23 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
             # Avoid for: Error uploading media: HTTPConnectionPool(host='minio', port=9000)
             # async for chunk in llm.astream(messages, config={"callbacks": [langfuse_handler],
             #                                                  "metadata": {"ls_model_name": model}}):
+            chunk_count = 0
+            has_content = False
+
             async for chunk in llm.astream(messages):
+                chunk_count += 1
                 if chunk.content:
+                    has_content = True
                     print(chunk.content, end="", flush=True)
                     yield chunk.content
+
+            # コンテンツが生成されなかった場合の処理
+            if chunk_count == 0:
+                print(f"\n警告: {model} からストリーミングイベントが返されませんでした")
+                yield f"\n\n警告: {model} からの応答がありませんでした。モデルが利用できない可能性があります。\n\n"
+            elif not has_content:
+                print(f"\n警告: {model} から有効なコンテンツが生成されませんでした")
+                yield f"\n\n警告: {model} から有効なコンテンツが生成されませんでした。\n\n"
 
             end_time = time.time()
             inference_time = end_time - start_time
@@ -144,7 +157,12 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
 
         except Exception as e:
             print(f"モデル {model} でエラーが発生しました: {e}")
-            yield f"\n\nエラーが発生しました: {str(e)}\n\n"
+            # より詳細なエラー情報を提供
+            error_details = str(e)
+            if "No generation chunks were returned" in error_details:
+                yield f"\n\n{model} からの応答が生成されませんでした。モデルが一時的に利用できない可能性があります。しばらく待ってから再試行してください。\n\n"
+            else:
+                yield f"\n\nエラーが発生しました: {error_details}\n\n"
             yield "TASK_DONE"
         finally:
             # LLMインスタンスのクリーンアップ
@@ -1042,10 +1060,23 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
             yield header_text
 
             # ストリーミングで回答を取得
+            chunk_count = 0
+            has_content = False
+
             async for chunk in llm.astream(messages):
+                chunk_count += 1
                 if chunk.content:
+                    has_content = True
                     print(chunk.content, end="", flush=True)
                     yield chunk.content
+
+            # コンテンツが生成されなかった場合の処理
+            if chunk_count == 0:
+                print(f"\n警告: {model} からストリーミングイベントが返されませんでした")
+                yield f"\n\n警告: {model} からの応答がありませんでした。モデルが利用できない可能性があります。\n\n"
+            elif not has_content:
+                print(f"\n警告: {model} から有効なコンテンツが生成されませんでした")
+                yield f"\n\n警告: {model} から有効なコンテンツが生成されませんでした。\n\n"
 
             end_time = time.time()
             inference_time = end_time - start_time
@@ -1058,8 +1089,12 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
 
         except Exception as e:
             print(f"エラーが発生しました ({model}): {e}")
-            # 表示用に画像を圧縮してエラーメッセージを作成
-            error_text = f"\n\nエラーが発生しました: {e}\n\n"
+            # より詳細なエラー情報を提供
+            error_details = str(e)
+            if "No generation chunks were returned" in error_details:
+                error_text = f"\n\n{model} からの応答が生成されませんでした。モデルが一時的に利用できない可能性があります。しばらく待ってから再試行してください。\n\n"
+            else:
+                error_text = f"\n\nエラーが発生しました: {error_details}\n\n"
             yield error_text
             yield "TASK_DONE"
         finally:
@@ -1100,7 +1135,7 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
 
                 try:
                     # タイムアウト付きでanextを実行
-                    response = await asyncio.wait_for(anext(gen), timeout=30.0)
+                    response = await asyncio.wait_for(anext(gen), timeout=120.0)
                     if response:
                         if response == "TASK_DONE":
                             responses_status[i] = response
