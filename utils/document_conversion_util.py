@@ -40,10 +40,10 @@ class _ImageOptimizationConfig:
     def optimize_image(self, image: Image.Image) -> Image.Image:
         """
         画像を最適化してサイズを削減
-        
+
         Args:
             image: 最適化する画像
-            
+
         Returns:
             最適化された画像
         """
@@ -68,10 +68,10 @@ class _ImageOptimizationConfig:
     def get_save_options(self, file_format: str) -> dict:
         """
         ファイル形式に応じた保存オプションを取得
-        
+
         Args:
             file_format: ファイル形式（'PNG', 'JPEG'など）
-            
+
         Returns:
             保存オプション辞書
         """
@@ -96,7 +96,7 @@ class _ImageOptimizationConfig:
 def _save_optimized_image(image: Image.Image, filepath: str):
     """
     最適化設定で画像を保存
-    
+
     Args:
         image: 保存する画像
         filepath: 保存先パス
@@ -125,10 +125,10 @@ def _save_optimized_image(image: Image.Image, filepath: str):
 def convert_excel_to_text_document(file_path):
     """
     ExcelファイルをJSONライン形式のテキストドキュメントに変換する
-    
+
     Args:
         file_path: アップロードされたファイルのパス
-        
+
     Returns:
         tuple: (クリアされたファイル入力, 変換されたファイル)
     """
@@ -159,13 +159,68 @@ def convert_excel_to_text_document(file_path):
     )
 
 
+def convert_json_to_text_document(file_path):
+    """
+    JSONファイルをテキストドキュメントに変換する
+
+    Args:
+        file_path: アップロードされたファイルのパス
+
+    Returns:
+        tuple: (クリアされたファイル入力, 変換されたファイル)
+    """
+    has_error = False
+    if not file_path:
+        has_error = True
+        gr.Warning("ファイルを選択してください")
+    if has_error:
+        return gr.File(value=None), gr.File()
+
+    # 出力ファイルパスを生成（元のファイル名 + .txt）
+    output_file_path = file_path.name + '.txt'
+
+    try:
+        # JSONファイルを読み込み
+        with open(file_path.name, 'r', encoding='utf-8') as f:
+            json_data = json.load(f)
+
+        # JSONデータが配列であることを確認
+        if not isinstance(json_data, list):
+            gr.Warning("JSONファイルは配列形式である必要があります: [{}、{}、{}]")
+            return gr.File(value=None), gr.File()
+
+        # テキストファイルに変換
+        with open(output_file_path, 'w', encoding='utf-8') as f:
+            for item in json_data:
+                if isinstance(item, dict):
+                    # 辞書オブジェクトをJSON文字列に変換
+                    json_line = json.dumps(item, ensure_ascii=False)
+                    f.write(json_line + ' <FIXED_DELIMITER>\n')
+                else:
+                    # 辞書以外のオブジェクトもJSON文字列として処理
+                    json_line = json.dumps(item, ensure_ascii=False)
+                    f.write(json_line + ' <FIXED_DELIMITER>\n')
+
+        return (
+            gr.File(),
+            gr.File(value=output_file_path)
+        )
+
+    except json.JSONDecodeError as e:
+        gr.Warning(f"JSONファイルの解析に失敗しました: {str(e)}")
+        return gr.File(value=None), gr.File()
+    except Exception as e:
+        gr.Warning(f"ファイル変換中にエラーが発生しました: {str(e)}")
+        return gr.File(value=None), gr.File()
+
+
 def convert_pdf_to_markdown(file_path):
     """
     PDFファイルをMarkdownドキュメントに変換する
-    
+
     Args:
         file_path: アップロードされたファイルのパス
-        
+
     Returns:
         tuple: (クリアされたファイル入力, 変換されたファイル)
     """

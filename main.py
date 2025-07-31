@@ -28,7 +28,7 @@ from utils.common_util import get_region
 from utils.css_gradio_util import custom_css
 from utils.database_util import create_table as create_table_util
 from utils.document_conversion_util import (
-    convert_excel_to_text_document, convert_pdf_to_markdown
+    convert_pdf_to_markdown, convert_excel_to_text_document, convert_json_to_text_document
 )
 from utils.document_embed_util import embed_save_document_by_unstructured as embed_save_document_util
 from utils.document_loader_util import load_document as load_document_util
@@ -1160,8 +1160,24 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             )
                     with gr.Row():
                         with gr.Column():
-                            tab_convert_document_convert_button = gr.Button(
+                            tab_convert_excel_to_text_button = gr.Button(
                                 value="ExcelをTextへ変換",
+                                variant="primary")
+                with gr.TabItem(label="Json2Text") as tab_convert_json_to_text_document:
+                    with gr.Row():
+                        with gr.Column():
+                            tab_convert_document_convert_json_to_text_file_text = gr.File(
+                                label="変換前のファイル*",
+                                file_types=[
+                                    ".json",
+                                ],
+                                type="filepath",
+                                interactive=True,
+                            )
+                    with gr.Row():
+                        with gr.Column():
+                            tab_convert_json_to_text_button = gr.Button(
+                                value="JsonをTextへ変換",
                                 variant="primary")
             with gr.TabItem(label="Step-1.読込み") as tab_load_document:
                 with gr.Accordion(label="使用されたSQL", open=False) as tab_load_document_sql_accordion:
@@ -1204,7 +1220,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 ".txt", ".csv", ".doc", ".docx", ".epub", ".image",
                                 ".md", ".msg", ".odt", ".org", ".pdf", ".ppt",
                                 ".pptx",
-                                ".rtf", ".rst", ".tsv", ".xls", ".xlsx"
+                                ".rtf", ".rst", ".tsv", ".xls", ".xlsx",
+                                ".xml"
                             ],
                             type="filepath")
                     with gr.Column():
@@ -2233,13 +2250,24 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ]
     )
 
-    tab_convert_document_convert_button.click(
+    tab_convert_excel_to_text_button.click(
         convert_excel_to_text_document,
         inputs=[
             tab_convert_document_convert_excel_to_text_file_text,
         ],
         outputs=[
             tab_convert_document_convert_excel_to_text_file_text,
+            tab_load_document_file_text,
+        ],
+    )
+
+    tab_convert_json_to_text_button.click(
+        convert_json_to_text_document,
+        inputs=[
+            tab_convert_document_convert_json_to_text_file_text,
+        ],
+        outputs=[
+            tab_convert_document_convert_json_to_text_file_text,
             tab_load_document_file_text,
         ],
     )
