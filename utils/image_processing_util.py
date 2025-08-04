@@ -1115,8 +1115,8 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
     # 各モデルの状態を追跡
     responses_status = ["", "", ""]
 
-    # タイムアウト設定（最大5分）
-    timeout_seconds = 300
+    # タイムアウト設定（最大2分）
+    timeout_seconds = 120
     start_time = time.time()
 
     try:
@@ -1135,7 +1135,7 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
 
                 try:
                     # タイムアウト付きでanextを実行
-                    response = await asyncio.wait_for(anext(gen), timeout=120.0)
+                    response = await asyncio.wait_for(anext(gen), timeout=60.0)
                     if response:
                         if response == "TASK_DONE":
                             responses_status[i] = response
@@ -1145,9 +1145,11 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
                     responses_status[i] = "TASK_DONE"
                 except asyncio.TimeoutError:
                     print(f"モデル {i} の処理がタイムアウトしました")
+                    responses[i] = (f"モデルの処理がタイムアウトしました")
                     responses_status[i] = "TASK_DONE"
                 except Exception as e:
                     print(f"モデル {i} の処理中にエラーが発生しました: {e}")
+                    responses[i] = (f"モデルの処理中にエラーが発生しました: {e}")
                     responses_status[i] = "TASK_DONE"
 
             # 応答を蓄積
