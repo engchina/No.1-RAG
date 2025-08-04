@@ -12,6 +12,7 @@ import os
 import time
 
 import gradio as gr
+import oci
 from dotenv import load_dotenv, find_dotenv
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
@@ -135,7 +136,7 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
                 chunk_count += 1
                 if chunk.content:
                     has_content = True
-                    print(chunk.content, end="", flush=True)
+                    # print(chunk.content, end="", flush=True)
                     yield chunk.content
 
             # コンテンツが生成されなかった場合の処理
@@ -834,7 +835,7 @@ async def process_image_answers_streaming(
                                                 if prev_result:
                                                     base64_data = prev_result[0].read() if hasattr(prev_result[0],
                                                                                                    'read') else \
-                                                    prev_result[0]
+                                                        prev_result[0]
                                                     img_id = int(prev_result[2]) if prev_result[2] is not None else None
                                                     if base64_data and img_id is not None and img_id not in searched_img_ids:
                                                         additional_images.append((base64_data, prev_result[1], img_id))
@@ -854,7 +855,7 @@ async def process_image_answers_streaming(
                                                 if next_result:
                                                     base64_data = next_result[0].read() if hasattr(next_result[0],
                                                                                                    'read') else \
-                                                    next_result[0]
+                                                        next_result[0]
                                                     # img_idはNUMBER型なので、直接使用するか安全に変換
                                                     img_id = next_result[2] if isinstance(next_result[2],
                                                                                           (int, float)) and next_result[
@@ -1115,8 +1116,8 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
     # 各モデルの状態を追跡
     responses_status = ["", "", ""]
 
-    # タイムアウト設定（最大5分）
-    timeout_seconds = 300
+    # タイムアウト設定（最大2分）
+    timeout_seconds = 120
     start_time = time.time()
 
     try:
@@ -1135,7 +1136,7 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
 
                 try:
                     # タイムアウト付きでanextを実行
-                    response = await asyncio.wait_for(anext(gen), timeout=120.0)
+                    response = await asyncio.wait_for(anext(gen), timeout=60.0)
                     if response:
                         if response == "TASK_DONE":
                             responses_status[i] = response
@@ -1145,9 +1146,11 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
                     responses_status[i] = "TASK_DONE"
                 except asyncio.TimeoutError:
                     print(f"モデル {i} の処理がタイムアウトしました")
+                    responses[i] = (f"モデルの処理がタイムアウトしました")
                     responses_status[i] = "TASK_DONE"
                 except Exception as e:
                     print(f"モデル {i} の処理中にエラーが発生しました: {e}")
+                    responses[i] = (f"モデルの処理中にエラーが発生しました: {e}")
                     responses_status[i] = "TASK_DONE"
 
             # 応答を蓄積
