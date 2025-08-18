@@ -24,11 +24,73 @@ from utils.langfuse_util import get_safe_stream_config
 from utils.image_util import encode_image
 
 
-async def xai_grok_4_task(system_text, query_text, xai_grok_4_checkbox):
+async def oci_openai_o3_task(system_text, query_image, query_text, oci_openai_o3_checkbox):
+    """OCI OpenAI o3モデルでのタスク処理"""
+    region = get_region()
+    if oci_openai_o3_checkbox:
+        oci_openai_o3 = ChatOCIGenAI(
+            model_id="openai.o3",
+            provider="openai",
+            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+        )
+
+        # 画像がある場合とない場合でメッセージを分ける
+        if query_image is not None:
+            # 画像がある場合
+            base64_image = encode_image(query_image)
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=[
+                    {
+                        "type": "text",
+                        "text": query_text
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                    },
+                ])
+            ]
+        else:
+            # 画像がない場合
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=query_text)
+            ]
+
+        stream_config = get_safe_stream_config("openai.o3")
+        start_time = time.time()
+
+        chunk_count = 0
+        total_content = ""
+        try:
+            async for chunk in oci_openai_o3.astream(messages, config=stream_config):
+                chunk_count += 1
+                content = chunk.content if chunk.content else ""
+                total_content += content
+                yield content
+        except Exception as e:
+            logger.error(f"OCI OpenAI o3 ストリーム処理中にエラーが発生しました: {e}")
+            print(f"ERROR: OCI OpenAI o3 streaming failed after {chunk_count} chunks: {e}")
+            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
+
+        end_time = time.time()
+        inference_time = end_time - start_time
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
+        yield "TASK_DONE"
+    else:
+        yield "TASK_DONE"
+
+
+async def oci_xai_grok_4_task(system_text, query_text, oci_xai_grok_4_checkbox):
     """XAI Grok-4モデルでのタスク処理"""
     region = get_region()
-    if xai_grok_4_checkbox:
-        xai_grok_4 = ChatOCIGenAI(
+    if oci_xai_grok_4_checkbox:
+        oci_xai_grok_4 = ChatOCIGenAI(
             model_id="xai.grok-4",
             provider="xai",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
@@ -53,7 +115,7 @@ async def xai_grok_4_task(system_text, query_text, xai_grok_4_checkbox):
         chunk_count = 0
         total_content = ""
         try:
-            async for chunk in xai_grok_4.astream(messages, config=stream_config):
+            async for chunk in oci_xai_grok_4.astream(messages, config=stream_config):
                 chunk_count += 1
                 content = chunk.content if chunk.content else ""
                 total_content += content
@@ -72,11 +134,11 @@ async def xai_grok_4_task(system_text, query_text, xai_grok_4_checkbox):
         yield "TASK_DONE"
 
 
-async def command_a_task(system_text, query_text, command_a_checkbox):
+async def oci_cohere_command_a_task(system_text, query_text, oci_cohere_command_a_checkbox):
     """Command-Aモデルでのタスク処理"""
     region = get_region()
-    if command_a_checkbox:
-        command_a = ChatOCIGenAI(
+    if oci_cohere_command_a_checkbox:
+        oci_cohere_command_a = ChatOCIGenAI(
             model_id="cohere.command-a-03-2025",
             provider="cohere",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
@@ -101,7 +163,7 @@ async def command_a_task(system_text, query_text, command_a_checkbox):
         chunk_count = 0
         total_content = ""
         try:
-            async for chunk in command_a.astream(messages, config=stream_config):
+            async for chunk in oci_cohere_command_a.astream(messages, config=stream_config):
                 chunk_count += 1
                 content = chunk.content if chunk.content else ""
                 total_content += content
@@ -121,11 +183,11 @@ async def command_a_task(system_text, query_text, command_a_checkbox):
         yield "TASK_DONE"
 
 
-async def llama_4_scout_task(system_text, query_image, query_text, llama_4_scout_checkbox):
+async def oci_meta_llama_4_scout_task(system_text, query_image, query_text, oci_meta_llama_4_scout_checkbox):
     """Llama-4-Scoutモデルでのタスク処理"""
     region = get_region()
-    if llama_4_scout_checkbox:
-        llama_4_scout = ChatOCIGenAI(
+    if oci_meta_llama_4_scout_checkbox:
+        oci_meta_llama_4_scout = ChatOCIGenAI(
             model_id="meta.llama-4-scout-17b-16e-instruct",
             provider="meta",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
@@ -163,7 +225,7 @@ async def llama_4_scout_task(system_text, query_image, query_text, llama_4_scout
         chunk_count = 0
         total_content = ""
         try:
-            async for chunk in llama_4_scout.astream(messages, config=stream_config):
+            async for chunk in oci_meta_llama_4_scout.astream(messages, config=stream_config):
                 chunk_count += 1
                 content = chunk.content if chunk.content else ""
                 total_content += content
@@ -181,7 +243,7 @@ async def llama_4_scout_task(system_text, query_image, query_text, llama_4_scout
         yield "TASK_DONE"
     else:
         yield "TASK_DONE"
-        
+
 
 async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
     """OpenAI GPT-4oモデルでのタスク処理"""

@@ -1,7 +1,6 @@
 import base64
 import json
 import logging
-import os
 import shutil
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -9,10 +8,7 @@ from pathlib import Path
 import gradio as gr
 import pandas as pd
 from PIL import Image
-from langchain_community.chat_models import ChatOCIGenAI
 from pdf2image import convert_from_path
-
-from utils.common_util import get_region
 
 logger = logging.getLogger(__name__)
 
@@ -190,14 +186,14 @@ def convert_pdf_to_markdown(file_path):
 
 
 def convert_xml_to_text_document(
-    file_path,
-    global_tag_text,
-    fixed_tag_text,
-    replace_tag_text,
-    prefix_tag_text,
-    main_tag_text,
-    suffix_tag_text,
-    merge_checkbox
+        file_path,
+        global_tag_text,
+        fixed_tag_text,
+        replace_tag_text,
+        prefix_tag_text,
+        main_tag_text,
+        suffix_tag_text,
+        merge_checkbox
 ):
     """
     XMLファイルをテキストドキュメントに変換する
@@ -233,14 +229,14 @@ def convert_xml_to_text_document(
     if has_error:
         return (
             gr.File(),  # tab_convert_document_convert_xml_to_text_file_text
-            global_tag_text,      # tab_convert_document_convert_xml_global_tag_text
-            fixed_tag_text,       # tab_convert_document_convert_xml_fixed_tag_text
-            replace_tag_text,     # tab_convert_document_convert_xml_replace_tag_text
-            prefix_tag_text,      # tab_convert_document_convert_xml_prefix_tag_text
-            main_tag_text,        # tab_convert_document_convert_xml_main_tag_text
-            suffix_tag_text,      # tab_convert_document_convert_xml_suffix_tag_text
-            merge_checkbox,       # tab_convert_document_convert_xml_merge_checkbox
-            gr.File()             # tab_load_document_file_text
+            global_tag_text,  # tab_convert_document_convert_xml_global_tag_text
+            fixed_tag_text,  # tab_convert_document_convert_xml_fixed_tag_text
+            replace_tag_text,  # tab_convert_document_convert_xml_replace_tag_text
+            prefix_tag_text,  # tab_convert_document_convert_xml_prefix_tag_text
+            main_tag_text,  # tab_convert_document_convert_xml_main_tag_text
+            suffix_tag_text,  # tab_convert_document_convert_xml_suffix_tag_text
+            merge_checkbox,  # tab_convert_document_convert_xml_merge_checkbox
+            gr.File()  # tab_load_document_file_text
         )
 
     try:
@@ -262,14 +258,14 @@ def convert_xml_to_text_document(
             gr.Warning(f"指定された主タグ '{main_tag_text}' が見つかりません")
             return (
                 gr.File(),  # tab_convert_document_convert_xml_to_text_file_text
-                global_tag_text,      # tab_convert_document_convert_xml_global_tag_text
-                fixed_tag_text,       # tab_convert_document_convert_xml_fixed_tag_text
-                replace_tag_text,     # tab_convert_document_convert_xml_replace_tag_text
-                prefix_tag_text,      # tab_convert_document_convert_xml_prefix_tag_text
-                main_tag_text,        # tab_convert_document_convert_xml_main_tag_text
-                suffix_tag_text,      # tab_convert_document_convert_xml_suffix_tag_text
-                merge_checkbox,       # tab_convert_document_convert_xml_merge_checkbox
-                gr.File()             # tab_load_document_file_text
+                global_tag_text,  # tab_convert_document_convert_xml_global_tag_text
+                fixed_tag_text,  # tab_convert_document_convert_xml_fixed_tag_text
+                replace_tag_text,  # tab_convert_document_convert_xml_replace_tag_text
+                prefix_tag_text,  # tab_convert_document_convert_xml_prefix_tag_text
+                main_tag_text,  # tab_convert_document_convert_xml_main_tag_text
+                suffix_tag_text,  # tab_convert_document_convert_xml_suffix_tag_text
+                merge_checkbox,  # tab_convert_document_convert_xml_merge_checkbox
+                gr.File()  # tab_load_document_file_text
             )
 
         # テキストファイルに変換
@@ -287,8 +283,10 @@ def convert_xml_to_text_document(
                 all_merged_groups = []
 
                 for parent_element, parent_main_elements in parent_groups.items():
-                    merged_groups = _merge_adjacent_main_tags(parent_main_elements, root, main_tag_text, global_tag_text, fixed_tag_text,
-                                                            prefix_tag_text, suffix_tag_text, replace_tag_text, element_id_map)
+                    merged_groups = _merge_adjacent_main_tags(parent_main_elements, root, main_tag_text,
+                                                              global_tag_text, fixed_tag_text,
+                                                              prefix_tag_text, suffix_tag_text, replace_tag_text,
+                                                              element_id_map)
                     all_merged_groups.extend(merged_groups)
 
                 # 各グループの最初の主要素の元の位置でソート
@@ -319,21 +317,21 @@ def convert_xml_to_text_document(
                 for parent_element, parent_main_elements in parent_groups.items():
                     for i, element in enumerate(parent_main_elements):
                         element_dict = _xml_element_to_dict(element, root, global_tag_text, fixed_tag_text,
-                                                          prefix_tag_text, suffix_tag_text, replace_tag_text,
-                                                          parent_main_elements, i, element_id_map)
+                                                            prefix_tag_text, suffix_tag_text, replace_tag_text,
+                                                            parent_main_elements, i, element_id_map)
 
                         json_line = json.dumps(element_dict, ensure_ascii=False)
                         f.write(json_line + ' <FIXED_DELIMITER>\n')
 
         return (
             gr.File(),  # tab_convert_document_convert_xml_to_text_file_text
-            global_tag_text,       # tab_convert_document_convert_xml_global_tag_text
-            fixed_tag_text,        # tab_convert_document_convert_xml_fixed_tag_text
-            replace_tag_text,      # tab_convert_document_convert_xml_replace_tag_text
-            prefix_tag_text,       # tab_convert_document_convert_xml_prefix_tag_text
-            main_tag_text,         # tab_convert_document_convert_xml_main_tag_text
-            suffix_tag_text,       # tab_convert_document_convert_xml_suffix_tag_text
-            merge_checkbox,        # tab_convert_document_convert_xml_merge_checkbox
+            global_tag_text,  # tab_convert_document_convert_xml_global_tag_text
+            fixed_tag_text,  # tab_convert_document_convert_xml_fixed_tag_text
+            replace_tag_text,  # tab_convert_document_convert_xml_replace_tag_text
+            prefix_tag_text,  # tab_convert_document_convert_xml_prefix_tag_text
+            main_tag_text,  # tab_convert_document_convert_xml_main_tag_text
+            suffix_tag_text,  # tab_convert_document_convert_xml_suffix_tag_text
+            merge_checkbox,  # tab_convert_document_convert_xml_merge_checkbox
             gr.File(value=output_file_path)  # tab_load_document_file_text
         )
 
@@ -341,27 +339,27 @@ def convert_xml_to_text_document(
         gr.Warning(f"XMLファイルの解析に失敗しました: {str(e)}")
         return (
             gr.File(),  # tab_convert_document_convert_xml_to_text_file_text
-            global_tag_text,      # tab_convert_document_convert_xml_global_tag_text
-            fixed_tag_text,       # tab_convert_document_convert_xml_fixed_tag_text
-            replace_tag_text,     # tab_convert_document_convert_xml_replace_tag_text
-            prefix_tag_text,      # tab_convert_document_convert_xml_prefix_tag_text
-            main_tag_text,        # tab_convert_document_convert_xml_main_tag_text
-            suffix_tag_text,      # tab_convert_document_convert_xml_suffix_tag_text
-            merge_checkbox,       # tab_convert_document_convert_xml_merge_checkbox
-            gr.File()             # tab_load_document_file_text
+            global_tag_text,  # tab_convert_document_convert_xml_global_tag_text
+            fixed_tag_text,  # tab_convert_document_convert_xml_fixed_tag_text
+            replace_tag_text,  # tab_convert_document_convert_xml_replace_tag_text
+            prefix_tag_text,  # tab_convert_document_convert_xml_prefix_tag_text
+            main_tag_text,  # tab_convert_document_convert_xml_main_tag_text
+            suffix_tag_text,  # tab_convert_document_convert_xml_suffix_tag_text
+            merge_checkbox,  # tab_convert_document_convert_xml_merge_checkbox
+            gr.File()  # tab_load_document_file_text
         )
     except Exception as e:
         gr.Warning(f"ファイル変換中にエラーが発生しました: {str(e)}")
         return (
             gr.File(),  # tab_convert_document_convert_xml_to_text_file_text
-            global_tag_text,      # tab_convert_document_convert_xml_global_tag_text
-            fixed_tag_text,       # tab_convert_document_convert_xml_fixed_tag_text
-            replace_tag_text,     # tab_convert_document_convert_xml_replace_tag_text
-            prefix_tag_text,      # tab_convert_document_convert_xml_prefix_tag_text
-            main_tag_text,        # tab_convert_document_convert_xml_main_tag_text
-            suffix_tag_text,      # tab_convert_document_convert_xml_suffix_tag_text
-            merge_checkbox,       # tab_convert_document_convert_xml_merge_checkbox
-            gr.File()             # tab_load_document_file_text
+            global_tag_text,  # tab_convert_document_convert_xml_global_tag_text
+            fixed_tag_text,  # tab_convert_document_convert_xml_fixed_tag_text
+            replace_tag_text,  # tab_convert_document_convert_xml_replace_tag_text
+            prefix_tag_text,  # tab_convert_document_convert_xml_prefix_tag_text
+            main_tag_text,  # tab_convert_document_convert_xml_main_tag_text
+            suffix_tag_text,  # tab_convert_document_convert_xml_suffix_tag_text
+            merge_checkbox,  # tab_convert_document_convert_xml_merge_checkbox
+            gr.File()  # tab_load_document_file_text
         )
 
 
@@ -395,7 +393,8 @@ def _group_main_elements_by_parent(main_elements, root_element):
 
 
 def _xml_element_to_dict(element, root_element, global_tag=None, fixed_tag=None, prefix_tag=None,
-                        suffix_tag=None, replace_tag=None, main_elements=None, current_index=None, element_id_map=None):
+                         suffix_tag=None, replace_tag=None, main_elements=None, current_index=None,
+                         element_id_map=None):
     """
     XML要素を辞書に変換する
 
@@ -534,10 +533,8 @@ def _xml_element_to_dict(element, root_element, global_tag=None, fixed_tag=None,
     # 子要素を再帰的に処理
     for child in element:
         child_dict = _xml_element_to_dict(child, root_element, global_tag, fixed_tag, prefix_tag,
-                                        suffix_tag, replace_tag, None, None)
+                                          suffix_tag, replace_tag, None, None)
         result.update(child_dict)
-
-
 
     # 6. 後付けタグを追加
     suffix_data = {}
@@ -717,7 +714,7 @@ def convert_json_to_text_document(file_path):
 
 
 def _merge_adjacent_main_tags(main_elements, root_element, main_tag=None, global_tag=None, fixed_tag=None,
-                             prefix_tag=None, suffix_tag=None, replace_tag=None, element_id_map=None):
+                              prefix_tag=None, suffix_tag=None, replace_tag=None, element_id_map=None):
     """
     相邻的主タグ内容をマージしてグループ化する
 
@@ -836,7 +833,8 @@ def _merge_adjacent_main_tags(main_elements, root_element, main_tag=None, global
                     # 新しいグループのセクションタグを設定（連続する場合は\nで連結）
                     if child.tag in current_group_data['prefix']:
                         # 既存の値と新しい値を\nで連結
-                        current_group_data['prefix'][child.tag] = current_group_data['prefix'][child.tag] + "\n" + child.text.strip()
+                        current_group_data['prefix'][child.tag] = current_group_data['prefix'][
+                                                                      child.tag] + "\n" + child.text.strip()
                     else:
                         current_group_data['prefix'][child.tag] = child.text.strip()
 
@@ -846,7 +844,8 @@ def _merge_adjacent_main_tags(main_elements, root_element, main_tag=None, global
                             attr_key = f"{child.tag}@{attr_name}"
                             if attr_key in current_group_data['prefix']:
                                 # 既存の値と新しい値を\nで連結
-                                current_group_data['prefix'][attr_key] = current_group_data['prefix'][attr_key] + "\n" + attr_value
+                                current_group_data['prefix'][attr_key] = current_group_data['prefix'][
+                                                                             attr_key] + "\n" + attr_value
                             else:
                                 current_group_data['prefix'][attr_key] = attr_value
 
@@ -855,7 +854,8 @@ def _merge_adjacent_main_tags(main_elements, root_element, main_tag=None, global
                     # 後付けタグを現在のグループに追加（連続する場合は\nで連結）
                     if child.tag in current_group_data['suffix']:
                         # 既存の値と新しい値を\nで連結
-                        current_group_data['suffix'][child.tag] = current_group_data['suffix'][child.tag] + "\n" + child.text.strip()
+                        current_group_data['suffix'][child.tag] = current_group_data['suffix'][
+                                                                      child.tag] + "\n" + child.text.strip()
                     else:
                         current_group_data['suffix'][child.tag] = child.text.strip()
 
@@ -865,7 +865,8 @@ def _merge_adjacent_main_tags(main_elements, root_element, main_tag=None, global
                             attr_key = f"{child.tag}@{attr_name}"
                             if attr_key in current_group_data['suffix']:
                                 # 既存の値と新しい値を\nで連結
-                                current_group_data['suffix'][attr_key] = current_group_data['suffix'][attr_key] + "\n" + attr_value
+                                current_group_data['suffix'][attr_key] = current_group_data['suffix'][
+                                                                             attr_key] + "\n" + attr_value
                             else:
                                 current_group_data['suffix'][attr_key] = attr_value
 

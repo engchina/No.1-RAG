@@ -64,29 +64,34 @@ async def chat_document(
             gr.Markdown(value=""),
             gr.Markdown(value=""),
             gr.Markdown(value=""),
+            gr.Markdown(value=""),
             gr.Markdown(value="")
         )
         return
 
     query_text = query_text.strip()
 
-    xai_grok_4_response = ""
-    command_a_response = ""
-    llama_4_scout_response = ""
+    oci_openai_o3_response = ""
+    oci_xai_grok_4_response = ""
+    oci_cohere_command_a_response = ""
+    oci_meta_llama_4_scout_response = ""
     openai_gpt4o_response = ""
     azure_openai_gpt4o_response = ""
 
-    xai_grok_4_checkbox = False
-    command_a_checkbox = False
-    llama_4_scout_checkbox = False
+    oci_openai_o3_checkbox = False
+    oci_xai_grok_4_checkbox = False
+    oci_cohere_command_a_checkbox = False
+    oci_meta_llama_4_scout_checkbox = False
     openai_gpt4o_checkbox = False
     azure_openai_gpt4o_checkbox = False
-    if "xai/grok-4" in llm_answer_checkbox:
-        xai_grok_4_checkbox = True
-    if "cohere/command-a" in llm_answer_checkbox:
-        command_a_checkbox = True
-    if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
-        llama_4_scout_checkbox = True
+    if "oci_openai/o3" in llm_answer_checkbox:
+        oci_openai_o3_checkbox = True
+    if "oci_xai/grok-4" in llm_answer_checkbox:
+        oci_xai_grok_4_checkbox = True
+    if "oci_cohere/command-a" in llm_answer_checkbox:
+        oci_cohere_command_a_checkbox = True
+    if "oci_meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
+        oci_meta_llama_4_scout_checkbox = True
     if "openai/gpt-4o" in llm_answer_checkbox:
         openai_gpt4o_checkbox = True
     if "azure_openai/gpt-4o" in llm_answer_checkbox:
@@ -110,21 +115,24 @@ async def chat_document(
         user_text = get_langgpt_rag_prompt(context, query_text, include_citation, include_current_time,
                                            rag_prompt_template)
 
-    xai_grok_4_user_text = user_text
-    command_a_user_text = user_text
-    llama_4_scout_user_text = user_text
+    oci_openai_o3_user_text = user_text
+    oci_xai_grok_4_user_text = user_text
+    oci_cohere_command_a_user_text = user_text
+    oci_meta_llama_4_scout_user_text = user_text
     openai_gpt4o_user_text = user_text
     azure_openai_gpt4o_user_text = user_text
 
     # Vision 回答がオンの場合、固定メッセージを即座に返す
     if use_image:
         # 選択されたLLMに対してのみ固定メッセージを設定
-        if xai_grok_4_checkbox:
-            xai_grok_4_response = fixed_image_message
-        if command_a_checkbox:
-            command_a_response = fixed_image_message
-        if llama_4_scout_checkbox:
-            llama_4_scout_response = fixed_image_message
+        if oci_openai_o3_checkbox:
+            oci_openai_o3_response = fixed_image_message
+        if oci_xai_grok_4_checkbox:
+            oci_xai_grok_4_response = fixed_image_message
+        if oci_cohere_command_a_checkbox:
+            oci_cohere_command_a_response = fixed_image_message
+        if oci_meta_llama_4_scout_checkbox:
+            oci_meta_llama_4_scout_response = fixed_image_message
         if openai_gpt4o_checkbox:
             openai_gpt4o_response = fixed_image_message
         if azure_openai_gpt4o_checkbox:
@@ -132,37 +140,43 @@ async def chat_document(
 
         # 固定メッセージを一度だけ返す
         yield (
-            gr.Markdown(value=xai_grok_4_response),
-            gr.Markdown(value=command_a_response),
-            gr.Markdown(value=llama_4_scout_response),
+            gr.Markdown(value=oci_openai_o3_response),
+            gr.Markdown(value=oci_xai_grok_4_response),
+            gr.Markdown(value=oci_cohere_command_a_response),
+            gr.Markdown(value=oci_meta_llama_4_scout_response),
             gr.Markdown(value=openai_gpt4o_response),
             gr.Markdown(value=azure_openai_gpt4o_response),
         )
     else:
         # 通常のLLM処理
-        async for xai_grok_4, command_a, llama_4_scout, gpt4o, azure_gpt4o in chat(
+        async for oci_openai_o3, oci_xai_grok_4, oci_cohere_command_a, oci_meta_llama_4_scout, gpt4o, azure_gpt4o in chat(
                 system_text,
-                xai_grok_4_user_text,
-                command_a_user_text,
                 None,
-                llama_4_scout_user_text,
+                oci_openai_o3_user_text,
+                oci_xai_grok_4_user_text,
+                oci_cohere_command_a_user_text,
+                None,
+                oci_meta_llama_4_scout_user_text,
                 openai_gpt4o_user_text,
                 azure_openai_gpt4o_user_text,
-                xai_grok_4_checkbox,
-                command_a_checkbox,
-                llama_4_scout_checkbox,
+                oci_openai_o3_checkbox,
+                oci_xai_grok_4_checkbox,
+                oci_cohere_command_a_checkbox,
+                oci_meta_llama_4_scout_checkbox,
                 openai_gpt4o_checkbox,
                 azure_openai_gpt4o_checkbox,
         ):
-            xai_grok_4_response += xai_grok_4
-            command_a_response += command_a
-            llama_4_scout_response += llama_4_scout
+            oci_openai_o3_response += oci_openai_o3
+            oci_xai_grok_4_response += oci_xai_grok_4
+            oci_cohere_command_a_response += oci_cohere_command_a
+            oci_meta_llama_4_scout_response += oci_meta_llama_4_scout
             openai_gpt4o_response += gpt4o
             azure_openai_gpt4o_response += azure_gpt4o
             yield (
-                gr.Markdown(value=xai_grok_4_response),
-                gr.Markdown(value=command_a_response),
-                gr.Markdown(value=llama_4_scout_response),
+                gr.Markdown(value=oci_openai_o3_response),
+                gr.Markdown(value=oci_xai_grok_4_response),
+                gr.Markdown(value=oci_cohere_command_a_response),
+                gr.Markdown(value=oci_meta_llama_4_scout_response),
                 gr.Markdown(value=openai_gpt4o_response),
                 gr.Markdown(value=azure_openai_gpt4o_response),
             )
@@ -176,9 +190,10 @@ async def append_citation(
         query_text,
         doc_id_all_checkbox_input,
         doc_id_checkbox_group_input,
-        xai_grok_4_answer_text,
-        command_a_answer_text,
-        llama_4_scout_answer_text,
+        oci_openai_o3_answer_text,
+        oci_xai_grok_4_answer_text,
+        oci_cohere_command_a_answer_text,
+        oci_meta_llama_4_scout_answer_text,
         openai_gpt4o_answer_text,
         azure_openai_gpt4o_answer_text,
 ):
@@ -215,9 +230,10 @@ async def append_citation(
         # gr.Warning("検索結果が見つかりませんでした。設定もしくはクエリを変更して再度ご確認ください。")
     if has_error:
         yield (
-            gr.Markdown(value=xai_grok_4_answer_text),
-            gr.Markdown(value=command_a_answer_text),
-            gr.Markdown(value=llama_4_scout_answer_text),
+            gr.Markdown(value=oci_openai_o3_answer_text),
+            gr.Markdown(value=oci_xai_grok_4_answer_text),
+            gr.Markdown(value=oci_cohere_command_a_answer_text),
+            gr.Markdown(value=oci_meta_llama_4_scout_answer_text),
             gr.Markdown(value=openai_gpt4o_answer_text),
             gr.Markdown(value=azure_openai_gpt4o_answer_text),
         )
@@ -225,28 +241,32 @@ async def append_citation(
 
     if not include_citation:
         yield (
-            gr.Markdown(value=xai_grok_4_answer_text),
-            gr.Markdown(value=command_a_answer_text),
-            gr.Markdown(value=llama_4_scout_answer_text),
+            gr.Markdown(value=oci_openai_o3_answer_text),
+            gr.Markdown(value=oci_xai_grok_4_answer_text),
+            gr.Markdown(value=oci_cohere_command_a_answer_text),
+            gr.Markdown(value=oci_meta_llama_4_scout_answer_text),
             gr.Markdown(value=openai_gpt4o_answer_text),
             gr.Markdown(value=azure_openai_gpt4o_answer_text),
         )
         return
 
-    if "xai/grok-4" in llm_answer_checkbox:
-        xai_grok_4_answer_text = extract_and_format(xai_grok_4_answer_text, search_result)
-    if "cohere/command-a" in llm_answer_checkbox:
-        command_a_answer_text = extract_and_format(command_a_answer_text, search_result)
-    if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
-        llama_4_scout_answer_text = extract_and_format(llama_4_scout_answer_text, search_result)
+    if "oci_openai/o3" in llm_answer_checkbox:
+        oci_openai_o3_answer_text = extract_and_format(oci_openai_o3_answer_text, search_result)
+    if "oci_xai/grok-4" in llm_answer_checkbox:
+        oci_xai_grok_4_answer_text = extract_and_format(oci_xai_grok_4_answer_text, search_result)
+    if "oci_cohere/command-a" in llm_answer_checkbox:
+        oci_cohere_command_a_answer_text = extract_and_format(oci_cohere_command_a_answer_text, search_result)
+    if "oci_meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
+        oci_meta_llama_4_scout_answer_text = extract_and_format(oci_meta_llama_4_scout_answer_text, search_result)
     if "openai/gpt-4o" in llm_answer_checkbox:
         openai_gpt4o_answer_text = extract_and_format(openai_gpt4o_answer_text, search_result)
     if "azure_openai/gpt-4o" in llm_answer_checkbox:
         azure_openai_gpt4o_answer_text = extract_and_format(azure_openai_gpt4o_answer_text, search_result)
     yield (
-        gr.Markdown(value=xai_grok_4_answer_text),
-        gr.Markdown(value=command_a_answer_text),
-        gr.Markdown(value=llama_4_scout_answer_text),
+        gr.Markdown(value=oci_openai_o3_answer_text),
+        gr.Markdown(value=oci_xai_grok_4_answer_text),
+        gr.Markdown(value=oci_cohere_command_a_answer_text),
+        gr.Markdown(value=oci_meta_llama_4_scout_answer_text),
         gr.Markdown(value=openai_gpt4o_answer_text),
         gr.Markdown(value=azure_openai_gpt4o_answer_text),
     )

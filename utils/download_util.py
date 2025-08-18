@@ -21,17 +21,20 @@ def generate_download_file(
         doc_id_all_checkbox_input,
         doc_id_checkbox_group_input,
         standard_answer_text,
-        xai_grok_4_response,
-        command_a_response,
-        llama_4_scout_response,
+        oci_openai_o3_response,
+        oci_xai_grok_4_response,
+        oci_cohere_command_a_response,
+        oci_meta_llama_4_scout_response,
         openai_gpt4o_response,
         azure_openai_gpt4o_response,
-        xai_grok_4_evaluation,
-        command_a_evaluation,
-        llama_4_scout_evaluation,
+        oci_openai_o3_evaluation,
+        oci_xai_grok_4_evaluation,
+        oci_cohere_command_a_evaluation,
+        oci_meta_llama_4_scout_evaluation,
         openai_gpt4o_evaluation,
         azure_openai_gpt4o_evaluation,
-        llama_4_scout_image_response,
+        oci_openai_o3_image_response,
+        oci_meta_llama_4_scout_image_response,
         openai_gpt4o_image_response,
         azure_openai_gpt4o_image_response
 ):
@@ -76,47 +79,63 @@ def generate_download_file(
 
     df2 = search_result
 
-    if "xai/grok-4" in llm_answer_checkbox_group:
-        xai_grok_4_response = xai_grok_4_response
-        xai_grok_4_referenced_contexts = ""
+    if "oci_openai/o3" in llm_answer_checkbox_group:
+        oci_openai_o3_response = oci_openai_o3_response
+        oci_openai_o3_referenced_contexts = ""
         if include_citation:
-            xai_grok_4_response, xai_grok_4_referenced_contexts = extract_citation(xai_grok_4_response)
+            oci_openai_o3_response, oci_openai_o3_referenced_contexts = extract_citation(oci_openai_o3_response)
         if llm_evaluation_checkbox:
-            xai_grok_4_evaluation = xai_grok_4_evaluation
+            oci_openai_o3_evaluation = oci_openai_o3_evaluation
         else:
-            xai_grok_4_evaluation = ""
+            oci_openai_o3_evaluation = ""
     else:
-        xai_grok_4_response = ""
-        xai_grok_4_evaluation = ""
-        xai_grok_4_referenced_contexts = ""
+        oci_openai_o3_response = ""
+        oci_openai_o3_evaluation = ""
+        oci_openai_o3_referenced_contexts = ""
 
-    if "cohere/command-a" in llm_answer_checkbox_group:
-        command_a_response = command_a_response
-        command_a_referenced_contexts = ""
+    if "oci_xai/grok-4" in llm_answer_checkbox_group:
+        oci_xai_grok_4_response = oci_xai_grok_4_response
+        oci_xai_grok_4_referenced_contexts = ""
         if include_citation:
-            command_a_response, command_a_referenced_contexts = extract_citation(command_a_response)
+            oci_xai_grok_4_response, oci_xai_grok_4_referenced_contexts = extract_citation(oci_xai_grok_4_response)
         if llm_evaluation_checkbox:
-            command_a_evaluation = command_a_evaluation
+            oci_xai_grok_4_evaluation = oci_xai_grok_4_evaluation
         else:
-            command_a_evaluation = ""
+            oci_xai_grok_4_evaluation = ""
     else:
-        command_a_response = ""
-        command_a_evaluation = ""
-        command_a_referenced_contexts = ""
+        oci_xai_grok_4_response = ""
+        oci_xai_grok_4_evaluation = ""
+        oci_xai_grok_4_referenced_contexts = ""
 
-    if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox_group:
-        llama_4_scout_response = llama_4_scout_response
-        llama_4_scout_referenced_contexts = ""
+    if "oci_cohere/command-a" in llm_answer_checkbox_group:
+        oci_cohere_command_a_response = oci_cohere_command_a_response
+        oci_cohere_command_a_referenced_contexts = ""
         if include_citation:
-            llama_4_scout_response, llama_4_scout_referenced_contexts = extract_citation(llama_4_scout_response)
+            oci_cohere_command_a_response, oci_cohere_command_a_referenced_contexts = extract_citation(
+                oci_cohere_command_a_response)
         if llm_evaluation_checkbox:
-            llama_4_scout_evaluation = llama_4_scout_evaluation
+            oci_cohere_command_a_evaluation = oci_cohere_command_a_evaluation
         else:
-            llama_4_scout_evaluation = ""
+            oci_cohere_command_a_evaluation = ""
     else:
-        llama_4_scout_response = ""
-        llama_4_scout_evaluation = ""
-        llama_4_scout_referenced_contexts = ""
+        oci_cohere_command_a_response = ""
+        oci_cohere_command_a_evaluation = ""
+        oci_cohere_command_a_referenced_contexts = ""
+
+    if "oci_meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox_group:
+        oci_meta_llama_4_scout_response = oci_meta_llama_4_scout_response
+        oci_meta_llama_4_scout_referenced_contexts = ""
+        if include_citation:
+            oci_meta_llama_4_scout_response, oci_meta_llama_4_scout_referenced_contexts = extract_citation(
+                oci_meta_llama_4_scout_response)
+        if llm_evaluation_checkbox:
+            oci_meta_llama_4_scout_evaluation = oci_meta_llama_4_scout_evaluation
+        else:
+            oci_meta_llama_4_scout_evaluation = ""
+    else:
+        oci_meta_llama_4_scout_response = ""
+        oci_meta_llama_4_scout_evaluation = ""
+        oci_meta_llama_4_scout_referenced_contexts = ""
 
     if "openai/gpt-4o" in llm_answer_checkbox_group:
         openai_gpt4o_response = openai_gpt4o_response
@@ -151,37 +170,42 @@ def generate_download_file(
         {
             'LLM モデル':
                 [
-                    "xai/grok-4",
-                    "cohere/command-a",
-                    "meta/llama-4-scout-17b-16e-instruct",
+                    "oci_openai/o3",
+                    "oci_xai/grok-4",
+                    "oci_cohere/command-a",
+                    "oci_meta/llama-4-scout-17b-16e-instruct",
                     "openai/gpt-4o",
                     "azure_openai/gpt-4o",
                 ],
             'LLM メッセージ': [
-                xai_grok_4_response,
-                command_a_response,
-                llama_4_scout_response,
+                oci_openai_o3_response,
+                oci_xai_grok_4_response,
+                oci_cohere_command_a_response,
+                oci_meta_llama_4_scout_response,
                 openai_gpt4o_response,
                 azure_openai_gpt4o_response,
             ],
             'Vision 回答': [
+                remove_base64_images_from_text(oci_openai_o3_image_response),
                 "",  # xai/grok-4 (Vision機能なし)
                 "",  # cohere/command-a (Vision機能なし)
-                remove_base64_images_from_text(llama_4_scout_image_response),
+                remove_base64_images_from_text(oci_meta_llama_4_scout_image_response),
                 remove_base64_images_from_text(openai_gpt4o_image_response),
                 remove_base64_images_from_text(azure_openai_gpt4o_image_response),
             ],
             '引用 Contexts': [
-                xai_grok_4_referenced_contexts,
-                command_a_referenced_contexts,
-                llama_4_scout_referenced_contexts,
+                oci_openai_o3_referenced_contexts,
+                oci_xai_grok_4_referenced_contexts,
+                oci_cohere_command_a_referenced_contexts,
+                oci_meta_llama_4_scout_referenced_contexts,
                 openai_gpt4o_referenced_contexts,
                 azure_openai_gpt4o_referenced_contexts,
             ],
             'LLM 評価結果': [
-                xai_grok_4_evaluation,
-                command_a_evaluation,
-                llama_4_scout_evaluation,
+                oci_openai_o3_evaluation,
+                oci_xai_grok_4_evaluation,
+                oci_cohere_command_a_evaluation,
+                oci_meta_llama_4_scout_evaluation,
                 openai_gpt4o_evaluation,
                 azure_openai_gpt4o_evaluation,
             ]

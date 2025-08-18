@@ -8,25 +8,28 @@
 import gradio as gr
 
 from utils.llm_tasks_util import (
-    xai_grok_4_task, command_a_task,
-    llama_4_scout_task, openai_gpt4o_task,
-    azure_openai_gpt4o_task
+    oci_openai_o3_task, oci_xai_grok_4_task,
+    oci_cohere_command_a_task, oci_meta_llama_4_scout_task,
+    openai_gpt4o_task, azure_openai_gpt4o_task
 )
 
 
 async def chat(
         system_text,
-        xai_grok_4_user_text,
-        command_a_user_text,
-        llama_4_scout_user_image,
-        llama_4_scout_user_text,
+        oci_openai_o3_user_image,
+        oci_openai_o3_user_text,
+        oci_xai_grok_4_user_text,
+        oci_cohere_command_a_user_text,
+        oci_meta_llama_4_scout_user_image,
+        oci_meta_llama_4_scout_user_text,
         openai_gpt4o_user_text,
         azure_openai_gpt4o_user_text,
-        xai_grok_4_checkbox,
-        command_a_checkbox,
-        llama_4_scout_checkbox,
-        openai_gpt4o_gen_checkbox,
-        azure_openai_gpt4o_gen_checkbox
+        oci_openai_o3_checkbox,
+        oci_xai_grok_4_checkbox,
+        oci_cohere_command_a_checkbox,
+        oci_meta_llama_4_scout_checkbox,
+        openai_gpt4o_checkbox,
+        azure_openai_gpt4o_checkbox
 ):
     """
     複数のLLMモデルを並行実行し、ストリーミング形式で結果を返すチャット処理関数
@@ -40,28 +43,32 @@ async def chat(
     Yields:
         tuple: 各モデルからの応答のタプル
     """
-    # 各LLMタスクのジェネレーターを初期化
-    xai_grok_4_gen = xai_grok_4_task(system_text, xai_grok_4_user_text, xai_grok_4_checkbox)
-    command_a_gen = command_a_task(system_text, command_a_user_text, command_a_checkbox)
-    llama_4_scout_gen = llama_4_scout_task(system_text, llama_4_scout_user_image,
-                                           llama_4_scout_user_text, llama_4_scout_checkbox)
-    openai_gpt4o_gen = openai_gpt4o_task(system_text, openai_gpt4o_user_text, openai_gpt4o_gen_checkbox)
+    # 各モデルのジェネレーターを初期化
+    oci_openai_o3_gen = oci_openai_o3_task(system_text, oci_openai_o3_user_image, oci_openai_o3_user_text,
+                                           oci_openai_o3_checkbox) if oci_openai_o3_checkbox else None
+    oci_xai_grok_4_gen = oci_xai_grok_4_task(system_text, oci_xai_grok_4_user_text,
+                                             oci_xai_grok_4_checkbox) if oci_xai_grok_4_checkbox else None
+    oci_cohere_command_a_gen = oci_cohere_command_a_task(system_text, oci_cohere_command_a_user_text,
+                                                         oci_cohere_command_a_checkbox) if oci_cohere_command_a_checkbox else None
+    oci_meta_llama_4_scout_gen = oci_meta_llama_4_scout_task(system_text, oci_meta_llama_4_scout_user_image,
+                                                             oci_meta_llama_4_scout_user_text,
+                                                             oci_meta_llama_4_scout_checkbox) if oci_meta_llama_4_scout_checkbox else None
+    openai_gpt4o_gen = openai_gpt4o_task(system_text, openai_gpt4o_user_text,
+                                         openai_gpt4o_checkbox) if openai_gpt4o_checkbox else None
     azure_openai_gpt4o_gen = azure_openai_gpt4o_task(system_text, azure_openai_gpt4o_user_text,
-                                                     azure_openai_gpt4o_gen_checkbox)
+                                                     azure_openai_gpt4o_checkbox) if azure_openai_gpt4o_checkbox else None
 
     # 応答状態とジェネレーター名の初期化
-    responses_status = ["", "", "", "", ""]
-    generator_names = ["XAI Grok-4", "Command-A", "Llama-4-Scout",
-                       "OpenAI GPT-4o", "Azure OpenAI GPT-4o"]
+    responses_status = ["", "", "", "", "", ""]
+    generator_names = ["OCI OpenAI o3", "XAI Grok-4", "Command-A",
+                       "Llama-4-Scout", "OpenAI GPT-4o", "Azure OpenAI GPT-4o"]
     iteration_count = 0
 
     while True:
         iteration_count += 1
-        responses = ["", "", "", "", ""]
-        generators = [xai_grok_4_gen, command_a_gen,
-                      llama_4_scout_gen,
-                      openai_gpt4o_gen, 
-                      azure_openai_gpt4o_gen]
+        responses = ["", "", "", "", "", ""]
+        generators = [oci_openai_o3_gen, oci_xai_grok_4_gen, oci_cohere_command_a_gen,
+                      oci_meta_llama_4_scout_gen, openai_gpt4o_gen, azure_openai_gpt4o_gen]
 
         active_generators = 0
         for i, gen in enumerate(generators):
@@ -90,7 +97,12 @@ async def chat(
             break
 
 
-async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox):
+async def chat_stream(
+        system_text,
+        query_image,
+        query_text,
+        llm_answer_checkbox
+):
     """
     チャットストリーミング処理関数
 
@@ -120,71 +132,83 @@ async def chat_stream(system_text, query_image, query_text, llm_answer_checkbox)
             "",
             "",
             "",
+            "",
             ""
         )
         return
 
     # 各モデル用のパラメータを設定
-    xai_grok_4_user_text = query_text
-    command_a_user_text = query_text
-    llama_4_scout_user_image = query_image
-    llama_4_scout_user_text = query_text
+    oci_openai_o3_user_image = query_image
+    oci_openai_o3_user_text = query_text
+    oci_xai_grok_4_user_text = query_text
+    oci_cohere_command_a_user_text = query_text
+    oci_meta_llama_4_scout_user_image = query_image
+    oci_meta_llama_4_scout_user_text = query_text
     openai_gpt4o_user_text = query_text
     azure_openai_gpt4o_user_text = query_text
 
     # 各モデルのチェックボックス状態を初期化
-    xai_grok_4_checkbox = False
-    command_a_checkbox = False
-    llama_4_scout_checkbox = False
+    oci_openai_o3_checkbox = False
+    oci_xai_grok_4_checkbox = False
+    oci_cohere_command_a_checkbox = False
+    oci_meta_llama_4_scout_checkbox = False
     openai_gpt4o_checkbox = False
     azure_openai_gpt4o_checkbox = False
 
     # 選択されたモデルに基づいてチェックボックス状態を設定
-    if "xai/grok-4" in llm_answer_checkbox:
-        xai_grok_4_checkbox = True
-    if "cohere/command-a" in llm_answer_checkbox:
-        command_a_checkbox = True
-    if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
-        llama_4_scout_checkbox = True
+    if "oci_openai/o3" in llm_answer_checkbox:
+        oci_openai_o3_checkbox = True
+    if "oci_xai/grok-4" in llm_answer_checkbox:
+        oci_xai_grok_4_checkbox = True
+    if "oci_cohere/command-a" in llm_answer_checkbox:
+        oci_cohere_command_a_checkbox = True
+    if "oci_meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox:
+        oci_meta_llama_4_scout_checkbox = True
     if "openai/gpt-4o" in llm_answer_checkbox:
         openai_gpt4o_checkbox = True
     if "azure_openai/gpt-4o" in llm_answer_checkbox:
         azure_openai_gpt4o_checkbox = True
 
     # 各モデルの応答を初期化
-    xai_grok_4_response = ""
-    command_a_response = ""
-    llama_4_scout_response = ""
+    oci_openai_o3_response = ""
+    oci_xai_grok_4_response = ""
+    oci_cohere_command_a_response = ""
+    oci_meta_llama_4_scout_response = ""
     openai_gpt4o_response = ""
     azure_openai_gpt4o_response = ""
 
     # chat関数を呼び出してストリーミング処理
-    async for xai_grok_4, command_a, llama_4_scout, gpt4o, azure_gpt4o in chat(
+    async for oci_openai_o3, oci_xai_grok_4, oci_cohere_command_a, oci_meta_llama_4_scout, gpt4o, azure_gpt4o in chat(
             system_text,
-            xai_grok_4_user_text,
-            command_a_user_text,
-            llama_4_scout_user_image,
-            llama_4_scout_user_text,
+            oci_openai_o3_user_image,
+            oci_openai_o3_user_text,
+            oci_xai_grok_4_user_text,
+            oci_cohere_command_a_user_text,
+            oci_meta_llama_4_scout_user_image,
+            oci_meta_llama_4_scout_user_text,
             openai_gpt4o_user_text,
             azure_openai_gpt4o_user_text,
-            xai_grok_4_checkbox,
-            command_a_checkbox,
-            llama_4_scout_checkbox,
+            oci_openai_o3_checkbox,
+            oci_xai_grok_4_checkbox,
+            oci_cohere_command_a_checkbox,
+            oci_meta_llama_4_scout_checkbox,
             openai_gpt4o_checkbox,
             azure_openai_gpt4o_checkbox,
     ):
         # 各モデルからの応答を累積
-        xai_grok_4_response += xai_grok_4
-        command_a_response += command_a
-        llama_4_scout_response += llama_4_scout
+        oci_openai_o3_response += oci_openai_o3
+        oci_xai_grok_4_response += oci_xai_grok_4
+        oci_cohere_command_a_response += oci_cohere_command_a
+        oci_meta_llama_4_scout_response += oci_meta_llama_4_scout
         openai_gpt4o_response += gpt4o
         azure_openai_gpt4o_response += azure_gpt4o
 
         # Gradio Markdownコンポーネントとして結果を返す
         yield (
-            gr.Markdown(value=xai_grok_4_response),
-            gr.Markdown(value=command_a_response),
-            gr.Markdown(value=llama_4_scout_response),
+            gr.Markdown(value=oci_openai_o3_response),
+            gr.Markdown(value=oci_xai_grok_4_response),
+            gr.Markdown(value=oci_cohere_command_a_response),
+            gr.Markdown(value=oci_meta_llama_4_scout_response),
             gr.Markdown(value=openai_gpt4o_response),
             gr.Markdown(value=azure_openai_gpt4o_response)
         )

@@ -620,6 +620,7 @@ class ChatOCIGenAI(BaseChatModel, OCIGenAIBase):
             "cohere": CohereProvider(),
             "meta": MetaProvider(),
             "xai": MetaProvider(),
+            "openai": MetaProvider(),
         }
 
     @property
