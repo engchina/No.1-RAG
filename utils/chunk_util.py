@@ -99,7 +99,9 @@ class RecursiveCharacterTextSplitter(TextSplitter):
         return final_chunks
 
     def split_text(self, text: str) -> List[str]:
-        if '<FIXED_DELIMITER>' in text:
+        if not text or not text.strip():
+            self._chunk_overlap = 0
+        if '<FIXED_DELIMITER>' in text or not text:
             self._chunk_overlap = 0
         chunks = self._split_text(text, self._separators)
         if self._chunk_overlap > 0:
