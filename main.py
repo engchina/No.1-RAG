@@ -2860,6 +2860,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
             tab_chat_document_azure_openai_gpt4o_answer_text,
         ],
         outputs=[
+            tab_chat_document_oci_openai_o3_answer_text,
             tab_chat_document_oci_xai_grok_4_answer_text,
             tab_chat_document_oci_cohere_command_a_answer_text,
             tab_chat_document_oci_meta_llama_4_scout_answer_text,
