@@ -24,6 +24,70 @@ from utils.langfuse_util import get_safe_stream_config
 from utils.image_util import encode_image
 
 
+async def oci_openai_gpt_5_task(system_text, query_image, query_text, oci_openai_gpt_5_checkbox):
+    """OCI OpenAI GPT-5モデルでのタスク処理"""
+    region = get_region()
+    if oci_openai_gpt_5_checkbox:
+        oci_openai_gpt_5 = ChatOCIGenAI(
+            model_id="openai.gpt-5",
+            provider="openai",
+            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+        )
+
+        # 画像がある場合とない場合でメッセージを分ける
+        if query_image is not None:
+            # 画像がある場合
+            base64_image = encode_image(query_image)
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=[
+                    {
+                        "type": "text",
+                        "text": query_text
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                    },
+                ])
+            ]
+        else:
+            # 画像がない場合
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=query_text)
+            ]
+
+        stream_config = get_safe_stream_config("openai.gpt-5")
+        start_time = time.time()
+
+        chunk_count = 0
+        total_content = ""
+        try:
+            async for chunk in oci_openai_gpt_5.astream(messages, config=stream_config):
+                chunk_count += 1
+                content = chunk.content if chunk.content else ""
+                total_content += content
+                yield content
+        except Exception as e:
+            logger.error(f"OCI OpenAI GPT-5 ストリーム処理中にエラーが発生しました: {e}")
+            print(f"ERROR: OCI OpenAI GPT-5 streaming failed after {chunk_count} chunks: {e}")
+            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
+
+        end_time = time.time()
+        inference_time = end_time - start_time
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
+        yield "TASK_DONE"
+        return
+    else:
+        yield "TASK_DONE"
+        return
+
+
 async def oci_openai_o3_task(system_text, query_image, query_text, oci_openai_o3_checkbox):
     """OCI OpenAI o3モデルでのタスク処理"""
     region = get_region()
@@ -82,8 +146,74 @@ async def oci_openai_o3_task(system_text, query_image, query_text, oci_openai_o3
         print(f"\n\n推論時間: {inference_time:.2f}秒")
         yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
+        return
     else:
         yield "TASK_DONE"
+        return
+
+
+async def oci_openai_gpt_4_1_task(system_text, query_image, query_text, oci_openai_gpt_4_1_checkbox):
+    """OCI OpenAI GPT-4.1モデルでのタスク処理"""
+    region = get_region()
+    if oci_openai_gpt_4_1_checkbox:
+        oci_openai_gpt_4_1 = ChatOCIGenAI(
+            model_id="openai.gpt-4.1",
+            provider="openai",
+            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+            compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+        )
+
+        # 画像がある場合とない場合でメッセージを分ける
+        if query_image is not None:
+            # 画像がある場合
+            base64_image = encode_image(query_image)
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=[
+                    {
+                        "type": "text",
+                        "text": query_text
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                    },
+                ])
+            ]
+        else:
+            # 画像がない場合
+            messages = [
+                SystemMessage(content=system_text),
+                HumanMessage(content=query_text)
+            ]
+
+        stream_config = get_safe_stream_config("openai.gpt-4.1")
+        start_time = time.time()
+
+        chunk_count = 0
+        total_content = ""
+        try:
+            async for chunk in oci_openai_gpt_4_1.astream(messages, config=stream_config):
+                chunk_count += 1
+                content = chunk.content if chunk.content else ""
+                total_content += content
+                yield content
+        except Exception as e:
+            logger.error(f"OCI OpenAI GPT-4.1 ストリーム処理中にエラーが発生しました: {e}")
+            print(f"ERROR: OCI OpenAI GPT-4.1 streaming failed after {chunk_count} chunks: {e}")
+            # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
+            yield f"\n\nエラーが発生しました: {e}\n\n"
+
+        end_time = time.time()
+        inference_time = end_time - start_time
+        print(f"\n\n推論時間: {inference_time:.2f}秒")
+        yield f"\n\n推論時間: {inference_time:.2f}秒"
+        yield "TASK_DONE"
+        return
+    else:
+        yield "TASK_DONE"
+        return
 
 
 async def oci_xai_grok_4_task(system_text, query_text, oci_xai_grok_4_checkbox):
@@ -130,8 +260,10 @@ async def oci_xai_grok_4_task(system_text, query_text, oci_xai_grok_4_checkbox):
         print(f"\n\n推論時間: {inference_time:.2f}秒")
         yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
+        return
     else:
         yield "TASK_DONE"
+        return
 
 
 async def oci_cohere_command_a_task(system_text, query_text, oci_cohere_command_a_checkbox):
@@ -179,8 +311,10 @@ async def oci_cohere_command_a_task(system_text, query_text, oci_cohere_command_
         print(f"\n\n推論時間: {inference_time:.2f}秒")
         yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
+        return
     else:
         yield "TASK_DONE"
+        return
 
 
 async def oci_meta_llama_4_scout_task(system_text, query_image, query_text, oci_meta_llama_4_scout_checkbox):
@@ -241,15 +375,17 @@ async def oci_meta_llama_4_scout_task(system_text, query_image, query_text, oci_
         print(f"\n\n推論時間: {inference_time:.2f}秒")
         yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
+        return
     else:
         yield "TASK_DONE"
+        return
 
 
-async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
+async def openai_gpt_4o_task(system_text, query_text, openai_gpt_4o_checkbox):
     """OpenAI GPT-4oモデルでのタスク処理"""
-    if openai_gpt4o_checkbox:
+    if openai_gpt_4o_checkbox:
         load_dotenv(find_dotenv())
-        openai_gpt4o = ChatOpenAI(
+        openai_gpt_4o = ChatOpenAI(
             model="gpt-4o",
             temperature=0,
             top_p=0.75,
@@ -272,7 +408,7 @@ async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
         chunk_count = 0
         total_content = ""
         try:
-            async for chunk in openai_gpt4o.astream(messages, config=stream_config):
+            async for chunk in openai_gpt_4o.astream(messages, config=stream_config):
                 chunk_count += 1
                 content = chunk.content if chunk.content else ""
                 total_content += content
@@ -288,15 +424,17 @@ async def openai_gpt4o_task(system_text, query_text, openai_gpt4o_checkbox):
         print(f"\n\n推論時間: {inference_time:.2f}秒")
         yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
+        return
     else:
         yield "TASK_DONE"
+        return
 
 
-async def azure_openai_gpt4o_task(system_text, query_text, azure_openai_gpt4o_checkbox):
+async def azure_openai_gpt_4o_task(system_text, query_text, azure_openai_gpt_4o_checkbox):
     """Azure OpenAI GPT-4oモデルでのタスク処理"""
-    if azure_openai_gpt4o_checkbox:
+    if azure_openai_gpt_4o_checkbox:
         load_dotenv(find_dotenv())
-        azure_openai_gpt4o = AzureChatOpenAI(
+        azure_openai_gpt_4o = AzureChatOpenAI(
             deployment_name="gpt-4o",
             temperature=0,
             top_p=0.75,
@@ -320,7 +458,7 @@ async def azure_openai_gpt4o_task(system_text, query_text, azure_openai_gpt4o_ch
         chunk_count = 0
         total_content = ""
         try:
-            async for chunk in azure_openai_gpt4o.astream(messages, config=stream_config):
+            async for chunk in azure_openai_gpt_4o.astream(messages, config=stream_config):
                 chunk_count += 1
                 content = chunk.content if chunk.content else ""
                 total_content += content
@@ -336,5 +474,7 @@ async def azure_openai_gpt4o_task(system_text, query_text, azure_openai_gpt4o_ch
         print(f"\n\n推論時間: {inference_time:.2f}秒")
         yield f"\n\n推論時間: {inference_time:.2f}秒"
         yield "TASK_DONE"
+        return
     else:
         yield "TASK_DONE"
+        return

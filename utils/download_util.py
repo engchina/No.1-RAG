@@ -21,22 +21,28 @@ def generate_download_file(
         doc_id_all_checkbox_input,
         doc_id_checkbox_group_input,
         standard_answer_text,
+        oci_openai_gpt_5_response,
         oci_openai_o3_response,
+        oci_openai_gpt_4_1_response,
         oci_xai_grok_4_response,
         oci_cohere_command_a_response,
         oci_meta_llama_4_scout_response,
-        openai_gpt4o_response,
-        azure_openai_gpt4o_response,
+        openai_gpt_4o_response,
+        azure_openai_gpt_4o_response,
+        oci_openai_gpt_5_evaluation,
         oci_openai_o3_evaluation,
+        oci_openai_gpt_4_1_evaluation,
         oci_xai_grok_4_evaluation,
         oci_cohere_command_a_evaluation,
         oci_meta_llama_4_scout_evaluation,
-        openai_gpt4o_evaluation,
-        azure_openai_gpt4o_evaluation,
+        openai_gpt_4o_evaluation,
+        azure_openai_gpt_4o_evaluation,
+        oci_openai_gpt_5_image_response,
         oci_openai_o3_image_response,
+        oci_openai_gpt_4_1_image_response,
         oci_meta_llama_4_scout_image_response,
-        openai_gpt4o_image_response,
-        azure_openai_gpt4o_image_response
+        openai_gpt_4o_image_response,
+        azure_openai_gpt_4o_image_response
 ):
     """
     検索結果とLLM応答からダウンロード用のExcelファイルを生成する
@@ -79,6 +85,20 @@ def generate_download_file(
 
     df2 = search_result
 
+    if "oci_openai/gpt-5" in llm_answer_checkbox_group:
+        oci_openai_gpt_5_response = oci_openai_gpt_5_response
+        oci_openai_gpt_5_referenced_contexts = ""
+        if include_citation:
+            oci_openai_gpt_5_response, oci_openai_gpt_5_referenced_contexts = extract_citation(oci_openai_gpt_5_response)
+        if llm_evaluation_checkbox:
+            oci_openai_gpt_5_evaluation = oci_openai_gpt_5_evaluation
+        else:
+            oci_openai_gpt_5_evaluation = ""
+    else:
+        oci_openai_gpt_5_response = ""
+        oci_openai_gpt_5_evaluation = ""
+        oci_openai_gpt_5_referenced_contexts = ""
+
     if "oci_openai/o3" in llm_answer_checkbox_group:
         oci_openai_o3_response = oci_openai_o3_response
         oci_openai_o3_referenced_contexts = ""
@@ -92,6 +112,21 @@ def generate_download_file(
         oci_openai_o3_response = ""
         oci_openai_o3_evaluation = ""
         oci_openai_o3_referenced_contexts = ""
+
+    if "oci_openai/gpt-4.1" in llm_answer_checkbox_group:
+        oci_openai_gpt_4_1_response = oci_openai_gpt_4_1_response
+        oci_openai_gpt_4_1_referenced_contexts = ""
+        if include_citation:
+            oci_openai_gpt_4_1_response, oci_openai_gpt_4_1_referenced_contexts = extract_citation(
+                oci_openai_gpt_4_1_response)
+        if llm_evaluation_checkbox:
+            oci_openai_gpt_4_1_evaluation = oci_openai_gpt_4_1_evaluation
+        else:
+            oci_openai_gpt_4_1_evaluation = ""
+    else:
+        oci_openai_gpt_4_1_response = ""
+        oci_openai_gpt_4_1_evaluation = ""
+        oci_openai_gpt_4_1_referenced_contexts = ""
 
     if "oci_xai/grok-4" in llm_answer_checkbox_group:
         oci_xai_grok_4_response = oci_xai_grok_4_response
@@ -138,39 +173,41 @@ def generate_download_file(
         oci_meta_llama_4_scout_referenced_contexts = ""
 
     if "openai/gpt-4o" in llm_answer_checkbox_group:
-        openai_gpt4o_response = openai_gpt4o_response
-        openai_gpt4o_referenced_contexts = ""
+        openai_gpt_4o_response = openai_gpt_4o_response
+        openai_gpt_4o_referenced_contexts = ""
         if include_citation:
-            openai_gpt4o_response, openai_gpt4o_referenced_contexts = extract_citation(openai_gpt4o_response)
+            openai_gpt_4o_response, openai_gpt_4o_referenced_contexts = extract_citation(openai_gpt_4o_response)
         if llm_evaluation_checkbox:
-            openai_gpt4o_evaluation = openai_gpt4o_evaluation
+            openai_gpt_4o_evaluation = openai_gpt_4o_evaluation
         else:
-            openai_gpt4o_evaluation = ""
+            openai_gpt_4o_evaluation = ""
     else:
-        openai_gpt4o_response = ""
-        openai_gpt4o_evaluation = ""
-        openai_gpt4o_referenced_contexts = ""
+        openai_gpt_4o_response = ""
+        openai_gpt_4o_evaluation = ""
+        openai_gpt_4o_referenced_contexts = ""
 
     if "azure_openai/gpt-4o" in llm_answer_checkbox_group:
-        azure_openai_gpt4o_response = azure_openai_gpt4o_response
-        azure_openai_gpt4o_referenced_contexts = ""
+        azure_openai_gpt_4o_response = azure_openai_gpt_4o_response
+        azure_openai_gpt_4o_referenced_contexts = ""
         if include_citation:
-            azure_openai_gpt4o_response, azure_openai_gpt4o_referenced_contexts = extract_citation(
-                azure_openai_gpt4o_response)
+            azure_openai_gpt_4o_response, azure_openai_gpt_4o_referenced_contexts = extract_citation(
+                azure_openai_gpt_4o_response)
         if llm_evaluation_checkbox:
-            azure_openai_gpt4o_evaluation = azure_openai_gpt4o_evaluation
+            azure_openai_gpt_4o_evaluation = azure_openai_gpt_4o_evaluation
         else:
-            azure_openai_gpt4o_evaluation = ""
+            azure_openai_gpt_4o_evaluation = ""
     else:
-        azure_openai_gpt4o_response = ""
-        azure_openai_gpt4o_evaluation = ""
-        azure_openai_gpt4o_referenced_contexts = ""
+        azure_openai_gpt_4o_response = ""
+        azure_openai_gpt_4o_evaluation = ""
+        azure_openai_gpt_4o_referenced_contexts = ""
 
     df3 = pd.DataFrame(
         {
             'LLM モデル':
                 [
+                    "oci_openai/gpt-5",
                     "oci_openai/o3",
+                    "oci_openai/gpt-4.1",
                     "oci_xai/grok-4",
                     "oci_cohere/command-a",
                     "oci_meta/llama-4-scout-17b-16e-instruct",
@@ -178,36 +215,44 @@ def generate_download_file(
                     "azure_openai/gpt-4o",
                 ],
             'LLM メッセージ': [
+                oci_openai_gpt_5_response,
                 oci_openai_o3_response,
+                oci_openai_gpt_4_1_response,
                 oci_xai_grok_4_response,
                 oci_cohere_command_a_response,
                 oci_meta_llama_4_scout_response,
-                openai_gpt4o_response,
-                azure_openai_gpt4o_response,
+                openai_gpt_4o_response,
+                azure_openai_gpt_4o_response,
             ],
             'Vision 回答': [
+                remove_base64_images_from_text(oci_openai_gpt_5_image_response),
                 remove_base64_images_from_text(oci_openai_o3_image_response),
+                remove_base64_images_from_text(oci_openai_gpt_4_1_image_response),
                 "",  # xai/grok-4 (Vision機能なし)
                 "",  # cohere/command-a (Vision機能なし)
                 remove_base64_images_from_text(oci_meta_llama_4_scout_image_response),
-                remove_base64_images_from_text(openai_gpt4o_image_response),
-                remove_base64_images_from_text(azure_openai_gpt4o_image_response),
+                remove_base64_images_from_text(openai_gpt_4o_image_response),
+                remove_base64_images_from_text(azure_openai_gpt_4o_image_response),
             ],
             '引用 Contexts': [
+                oci_openai_gpt_5_referenced_contexts,
                 oci_openai_o3_referenced_contexts,
+                oci_openai_gpt_4_1_referenced_contexts,
                 oci_xai_grok_4_referenced_contexts,
                 oci_cohere_command_a_referenced_contexts,
                 oci_meta_llama_4_scout_referenced_contexts,
-                openai_gpt4o_referenced_contexts,
-                azure_openai_gpt4o_referenced_contexts,
+                openai_gpt_4o_referenced_contexts,
+                azure_openai_gpt_4o_referenced_contexts,
             ],
             'LLM 評価結果': [
+                oci_openai_gpt_5_evaluation,
                 oci_openai_o3_evaluation,
+                oci_openai_gpt_4_1_evaluation,
                 oci_xai_grok_4_evaluation,
                 oci_cohere_command_a_evaluation,
                 oci_meta_llama_4_scout_evaluation,
-                openai_gpt4o_evaluation,
-                azure_openai_gpt4o_evaluation,
+                openai_gpt_4o_evaluation,
+                azure_openai_gpt_4o_evaluation,
             ]
         }
     )
