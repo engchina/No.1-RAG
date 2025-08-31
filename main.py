@@ -1102,9 +1102,9 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     with gr.Column():
                         tab_chat_with_llm_answer_checkbox_group = gr.CheckboxGroup(
                             [
-                                "oci_openai/gpt-5",
-                                "oci_openai/o3",
-                                "oci_openai/gpt-4.1",
+                                # "oci_openai/gpt-5",
+                                # "oci_openai/o3",
+                                # "oci_openai/gpt-4.1",
                                 "oci_xai/grok-4",
                                 "oci_cohere/command-a",
                                 "oci_meta/llama-4-scout-17b-16e-instruct",
@@ -1216,8 +1216,10 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         max_lines=15,
                         value=get_chat_system_message()
                     )
+                # with gr.Accordion(open=False,
+                #                   label="画像ファイル(オプション) - OCI OpenAI GPT-5、OCI OpenAI o3、OCI OpenAI GPT-4.1、OCI Llama-4-Scoutモデルを利用する場合に限り、この画像入力が適用されます。"):
                 with gr.Accordion(open=False,
-                                  label="画像ファイル(オプション) - OCI OpenAI GPT-5、OCI OpenAI o3、OCI OpenAI GPT-4.1、OCI Llama-4-Scoutモデルを利用する場合に限り、この画像入力が適用されます。"):
+                                  label="画像ファイル(オプション) - OCI Llama-4-Scoutモデルを利用する場合に限り、この画像入力が適用されます。"):
                     tab_chat_with_llm_query_image = gr.Image(
                         label="",
                         interactive=True,
@@ -1626,9 +1628,9 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     with gr.Column():
                         tab_chat_document_llm_answer_checkbox_group = gr.CheckboxGroup(
                             [
-                                "oci_openai/gpt-5",
-                                "oci_openai/o3",
-                                "oci_openai/gpt-4.1",
+                                # "oci_openai/gpt-5",
+                                # "oci_openai/o3",
+                                # "oci_openai/gpt-4.1",
                                 "oci_xai/grok-4",
                                 "oci_cohere/command-a",
                                 "oci_meta/llama-4-scout-17b-16e-instruct",
