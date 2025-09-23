@@ -176,6 +176,7 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
         for element in elements:
             # element.textを文字列に変換してLOBオブジェクトのTypeErrorを回避
             element.text = str(element.text).replace('\x0b', '\n')
+            element.text = str(element.text).replace('\x01', ' ')
         doc_data = " \n".join([str(element.text) for element in elements])
 
     unstructured_chunks = text_splitter.split_text(doc_data)

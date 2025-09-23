@@ -60,7 +60,15 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
             start_time = time.time()
 
             # モデルに応じてLLMインスタンスを作成
-            if model == "meta/llama-4-scout-17b-16e-instruct":
+            if model == "oci_openai/o3":
+                llm = ChatOCIGenAI(
+                    model_id="openai.o3",
+                    provider="openai",
+                    service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+                    compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+                )
+            elif model == "oci_meta/llama-4-scout-17b-16e-instruct":
                 llm = ChatOCIGenAI(
                     model_id="meta.llama-4-scout-17b-16e-instruct",
                     provider="meta",
@@ -135,7 +143,7 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
                 chunk_count += 1
                 if chunk.content:
                     has_content = True
-                    print(chunk.content, end="", flush=True)
+                    # print(chunk.content, end="", flush=True)
                     yield chunk.content
 
             # コンテンツが生成されなかった場合の処理
@@ -154,6 +162,7 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
             # 推論時間を追加
             yield f"\n\n推論時間: {inference_time:.2f}秒\n\n"
             yield "TASK_DONE"
+            return
 
         except Exception as e:
             print(f"モデル {model} でエラーが発生しました: {e}")
@@ -164,6 +173,7 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
             else:
                 yield f"\n\nエラーが発生しました: {error_details}\n\n"
             yield "TASK_DONE"
+            return
         finally:
             # LLMインスタンスのクリーンアップ
             if llm:
@@ -230,9 +240,12 @@ async def process_image_answers_streaming(
         single_image_processing,
         llm_answer_checkbox_group,
         query_text,
-        llama_4_scout_image_answer_text,
-        openai_gpt4o_image_answer_text,
-        azure_openai_gpt4o_image_answer_text,
+        oci_openai_gpt_5_image_answer_text,
+        oci_openai_o3_image_answer_text,
+        oci_openai_gpt_4_1_image_answer_text,
+        oci_meta_llama_4_scout_image_answer_text,
+        openai_gpt_4o_image_answer_text,
+        azure_openai_gpt_4o_image_answer_text,
         image_limit_k=5,
         custom_image_prompt=None,
 ):
@@ -258,9 +271,12 @@ async def process_image_answers_streaming(
         single_image_processing: 画像を1枚ずつ処理するかどうか
         llm_answer_checkbox_group: 選択されたLLMモデルのリスト
         query_text: クエリテキスト
-        llama_4_scout_image_answer_text: Llama 4 Scout のVision 回答テキスト
-        openai_gpt4o_image_answer_text: OpenAI GPT-4o のVision 回答テキスト
-        azure_openai_gpt4o_image_answer_text: Azure OpenAI GPT-4o のVision 回答テキスト
+        oci_openai_gpt_5_image_answer_text: OCI OpenAI GPT-5 のVision 回答テキスト
+        oci_openai_o3_image_answer_text: OCI OpenAI O3 のVision 回答テキスト
+        oci_openai_gpt_4_1_image_answer_text: OCI OpenAI GPT-4.1 のVision 回答テキスト
+        oci_meta_llama_4_scout_image_answer_text: Llama 4 Scout のVision 回答テキスト
+        openai_gpt_4o_image_answer_text: OpenAI GPT-4o のVision 回答テキスト
+        azure_openai_gpt_4o_image_answer_text: Azure OpenAI GPT-4o のVision 回答テキスト
         image_limit_k: 処理する画像の最大数（1-10）
         custom_image_prompt: カスタム画像プロンプトテンプレート
 
@@ -273,9 +289,12 @@ async def process_image_answers_streaming(
     if not check_database_pool_health(pool):
         print("データベース接続プールに問題があります")
         yield (
-            gr.Markdown(value=llama_4_scout_image_answer_text),
-            gr.Markdown(value=openai_gpt4o_image_answer_text),
-            gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
+            gr.Markdown(value=oci_openai_gpt_5_image_answer_text),
+            gr.Markdown(value=oci_openai_o3_image_answer_text),
+            gr.Markdown(value=oci_openai_gpt_4_1_image_answer_text),
+            gr.Markdown(value=oci_meta_llama_4_scout_image_answer_text),
+            gr.Markdown(value=openai_gpt_4o_image_answer_text),
+            gr.Markdown(value=azure_openai_gpt_4o_image_answer_text)
         )
         return
 
@@ -283,9 +302,12 @@ async def process_image_answers_streaming(
     if not use_image:
         print("Vision 回答がオフのため、base64_data取得をスキップします")
         yield (
-            gr.Markdown(value=llama_4_scout_image_answer_text),
-            gr.Markdown(value=openai_gpt4o_image_answer_text),
-            gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
+            gr.Markdown(value=oci_openai_gpt_5_image_answer_text),
+            gr.Markdown(value=oci_openai_o3_image_answer_text),
+            gr.Markdown(value=oci_openai_gpt_4_1_image_answer_text),
+            gr.Markdown(value=oci_meta_llama_4_scout_image_answer_text),
+            gr.Markdown(value=openai_gpt_4o_image_answer_text),
+            gr.Markdown(value=azure_openai_gpt_4o_image_answer_text)
         )
         return
 
@@ -293,15 +315,21 @@ async def process_image_answers_streaming(
     if search_result.empty or (len(search_result) > 0 and search_result.iloc[0]['CONTENT'] == ''):
         print("検索結果が空のため、base64_data取得をスキップします")
         yield (
-            gr.Markdown(value=llama_4_scout_image_answer_text),
-            gr.Markdown(value=openai_gpt4o_image_answer_text),
-            gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
+            gr.Markdown(value=oci_openai_gpt_5_image_answer_text),
+            gr.Markdown(value=oci_openai_o3_image_answer_text),
+            gr.Markdown(value=oci_openai_gpt_4_1_image_answer_text),
+            gr.Markdown(value=oci_meta_llama_4_scout_image_answer_text),
+            gr.Markdown(value=openai_gpt_4o_image_answer_text),
+            gr.Markdown(value=azure_openai_gpt_4o_image_answer_text)
         )
         return
 
     # 指定されたLLMモデルがチェックされているかを確認
     target_models = [
-        "meta/llama-4-scout-17b-16e-instruct",
+        "oci_openai/gpt-5",
+        "oci_openai/o3",
+        "oci_openai/gpt-4.1",
+        "oci_meta/llama-4-scout-17b-16e-instruct",
         "openai/gpt-4o",
         "azure_openai/gpt-4o"
     ]
@@ -311,11 +339,14 @@ async def process_image_answers_streaming(
 
     if not has_target_model:
         print(
-            "対象のLLMモデル（llama-4-scout, gpt-4o）がチェックされていないため、base64_data取得をスキップします")
+            "対象のLLMモデル（oci_openai/gpt-5, oci_openai/o3, oci_openai/gpt-4.1, oci_meta/llama-4-scout, gpt-4o）がチェックされていないため、base64_data取得をスキップします")
         yield (
-            gr.Markdown(value=llama_4_scout_image_answer_text),
-            gr.Markdown(value=openai_gpt4o_image_answer_text),
-            gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
+            gr.Markdown(value=oci_openai_gpt_5_image_answer_text),
+            gr.Markdown(value=oci_openai_o3_image_answer_text),
+            gr.Markdown(value=oci_openai_gpt_4_1_image_answer_text),
+            gr.Markdown(value=oci_meta_llama_4_scout_image_answer_text),
+            gr.Markdown(value=openai_gpt_4o_image_answer_text),
+            gr.Markdown(value=azure_openai_gpt_4o_image_answer_text)
         )
         return
 
@@ -338,9 +369,12 @@ async def process_image_answers_streaming(
         if not doc_embed_pairs:
             print("検索結果からdoc_idとembed_idを取得できませんでした")
             yield (
-                gr.Markdown(value=llama_4_scout_image_answer_text),
-                gr.Markdown(value=openai_gpt4o_image_answer_text),
-                gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
+                gr.Markdown(value=oci_openai_gpt_5_image_answer_text),
+                gr.Markdown(value=oci_openai_o3_image_answer_text),
+                gr.Markdown(value=oci_openai_gpt_4_1_image_answer_text),
+                gr.Markdown(value=oci_meta_llama_4_scout_image_answer_text),
+                gr.Markdown(value=openai_gpt_4o_image_answer_text),
+                gr.Markdown(value=azure_openai_gpt_4o_image_answer_text)
             )
             return
 
@@ -403,9 +437,12 @@ async def process_image_answers_streaming(
                     if not doc_img_pairs:
                         print("_image_embeddingテーブルからimg_idを取得できませんでした")
                         yield (
-                            gr.Markdown(value=llama_4_scout_image_answer_text),
-                            gr.Markdown(value=openai_gpt4o_image_answer_text),
-                            gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
+                            gr.Markdown(value=oci_openai_gpt_5_image_answer_text),
+                            gr.Markdown(value=oci_openai_o3_image_answer_text),
+                            gr.Markdown(value=oci_openai_gpt_4_1_image_answer_text),
+                            gr.Markdown(value=oci_meta_llama_4_scout_image_answer_text),
+                            gr.Markdown(value=openai_gpt_4o_image_answer_text),
+                            gr.Markdown(value=azure_openai_gpt_4o_image_answer_text)
                         )
                         return
 
@@ -423,9 +460,12 @@ async def process_image_answers_streaming(
                     if not img_where_conditions:
                         print("処理対象の画像がありません")
                         yield (
-                            gr.Markdown(value=llama_4_scout_image_answer_text),
-                            gr.Markdown(value=openai_gpt4o_image_answer_text),
-                            gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
+                            gr.Markdown(value=oci_openai_gpt_5_image_answer_text),
+                            gr.Markdown(value=oci_openai_o3_image_answer_text),
+                            gr.Markdown(value=oci_openai_gpt_4_1_image_answer_text),
+                            gr.Markdown(value=oci_meta_llama_4_scout_image_answer_text),
+                            gr.Markdown(value=openai_gpt_4o_image_answer_text),
+                            gr.Markdown(value=azure_openai_gpt_4o_image_answer_text)
                         )
                         return
 
@@ -477,9 +517,12 @@ async def process_image_answers_streaming(
                     print(f"取得したbase64_dataの数: {len(base64_data_list)} (search_result順序を保持)")
 
                     # 初期化：現在のVision 回答テキストを保持（累積用）
-                    accumulated_llama_4_scout_text = llama_4_scout_image_answer_text
-                    accumulated_openai_gpt4o_text = openai_gpt4o_image_answer_text
-                    accumulated_azure_openai_gpt4o_text = azure_openai_gpt4o_image_answer_text
+                    accumulated_oci_openai_gpt_5_text = oci_openai_gpt_5_image_answer_text
+                    accumulated_oci_openai_o3_text = oci_openai_o3_image_answer_text
+                    accumulated_oci_openai_gpt_4_1_text = oci_openai_gpt_4_1_image_answer_text
+                    accumulated_oci_meta_llama_4_scout_text = oci_meta_llama_4_scout_image_answer_text
+                    accumulated_openai_gpt_4o_text = openai_gpt_4o_image_answer_text
+                    accumulated_azure_openai_gpt_4o_text = azure_openai_gpt_4o_image_answer_text
 
                     # 処理方式を選択：1枚ずつ処理 vs 全画像まとめて処理 vs ファイル単位で処理
                     if base64_data_list:
@@ -495,9 +538,12 @@ async def process_image_answers_streaming(
                                 image_url = f"data:image/png;base64,{base64_data}"
 
                                 # 各モデルの現在の画像に対する回答を保持
-                                current_image_llama_4_scout = ""
-                                current_image_openai_gpt4o = ""
-                                current_image_azure_openai_gpt4o = ""
+                                current_image_oci_openai_gpt_5 = ""
+                                current_image_oci_openai_o3 = ""
+                                current_image_oci_openai_gpt_4_1 = ""
+                                current_image_oci_meta_llama_4_scout = ""
+                                current_image_openai_gpt_4o = ""
+                                current_image_azure_openai_gpt_4o = ""
 
                                 # 選択されたLLMモデルに対して処理を実行し、結果をストリーミングで取得
                                 async for llm_results in process_single_image_streaming(
@@ -511,31 +557,53 @@ async def process_image_answers_streaming(
                                         custom_image_prompt
                                 ):
                                     # 各LLMの結果を現在の画像の回答として更新
-                                    if "meta/llama-4-scout-17b-16e-instruct" in llm_results:
-                                        current_image_llama_4_scout = llm_results["meta/llama-4-scout-17b-16e-instruct"]
+                                    if "oci_openai/gpt-5" in llm_results:
+                                        current_image_oci_openai_gpt_5 = llm_results[
+                                            "oci_openai/gpt-5"]
+
+                                    if "oci_openai/o3" in llm_results:
+                                        accumulated_oci_openai_o3_text = llm_results[
+                                            "oci_openai/o3"]
+
+                                    if "oci_openai/gpt-4.1" in llm_results:
+                                        current_image_oci_openai_gpt_4_1 = llm_results[
+                                            "oci_openai/gpt-4.1"]
+
+                                    if "oci_meta/llama-4-scout-17b-16e-instruct" in llm_results:
+                                        current_image_oci_meta_llama_4_scout = llm_results[
+                                            "oci_meta/llama-4-scout-17b-16e-instruct"]
 
                                     if "openai/gpt-4o" in llm_results:
-                                        current_image_openai_gpt4o = llm_results["openai/gpt-4o"]
+                                        current_image_openai_gpt_4o = llm_results["openai/gpt-4o"]
 
                                     if "azure_openai/gpt-4o" in llm_results:
-                                        current_image_azure_openai_gpt4o = llm_results["azure_openai/gpt-4o"]
+                                        current_image_azure_openai_gpt_4o = llm_results["azure_openai/gpt-4o"]
 
                                     # 累積テキストと現在の画像の回答を結合して表示
-                                    current_llama_4_scout_text = accumulated_llama_4_scout_text + current_image_llama_4_scout
-                                    current_openai_gpt4o_text = accumulated_openai_gpt4o_text + current_image_openai_gpt4o
-                                    current_azure_openai_gpt4o_text = accumulated_azure_openai_gpt4o_text + current_image_azure_openai_gpt4o
+                                    current_oci_openai_gpt_5_text = accumulated_oci_openai_gpt_5_text + current_image_oci_openai_gpt_5
+                                    current_oci_openai_o3_text = accumulated_oci_openai_o3_text + current_image_oci_openai_o3
+                                    current_oci_openai_gpt_4_1_text = accumulated_oci_openai_gpt_4_1_text + current_image_oci_openai_gpt_4_1
+                                    current_oci_meta_llama_4_scout_text = accumulated_oci_meta_llama_4_scout_text + current_image_oci_meta_llama_4_scout
+                                    current_openai_gpt_4o_text = accumulated_openai_gpt_4o_text + current_image_openai_gpt_4o
+                                    current_azure_openai_gpt_4o_text = accumulated_azure_openai_gpt_4o_text + current_image_azure_openai_gpt_4o
 
                                     # 更新されたVision 回答結果をyield
                                     yield (
-                                        gr.Markdown(value=current_llama_4_scout_text),
-                                        gr.Markdown(value=current_openai_gpt4o_text),
-                                        gr.Markdown(value=current_azure_openai_gpt4o_text)
+                                        gr.Markdown(value=current_oci_openai_gpt_5_text),
+                                        gr.Markdown(value=current_oci_openai_o3_text),
+                                        gr.Markdown(value=current_oci_openai_gpt_4_1_text),
+                                        gr.Markdown(value=current_oci_meta_llama_4_scout_text),
+                                        gr.Markdown(value=current_openai_gpt_4o_text),
+                                        gr.Markdown(value=current_azure_openai_gpt_4o_text)
                                     )
 
                                 # 現在の画像の処理が完了したら、累積テキストに追加
-                                accumulated_llama_4_scout_text += current_image_llama_4_scout
-                                accumulated_openai_gpt4o_text += current_image_openai_gpt4o
-                                accumulated_azure_openai_gpt4o_text += current_image_azure_openai_gpt4o
+                                accumulated_oci_openai_gpt_5_text += current_image_oci_openai_gpt_5
+                                accumulated_oci_openai_o3_text += current_image_oci_openai_o3
+                                accumulated_oci_openai_gpt_4_1_text += current_image_oci_openai_gpt_4_1
+                                accumulated_oci_meta_llama_4_scout_text += current_image_oci_meta_llama_4_scout
+                                accumulated_openai_gpt_4o_text += current_image_openai_gpt_4o
+                                accumulated_azure_openai_gpt_4o_text += current_image_azure_openai_gpt_4o
                         elif single_image_processing == "全画像まとめて処理":
                             # 全画像まとめて処理モード
                             print(f"複数画像一括処理開始: {len(base64_data_list)}枚の画像を一括処理中...")
@@ -546,9 +614,12 @@ async def process_image_answers_streaming(
                             print(f"全画像をimg_idで昇順ソート完了: {len(sorted_base64_data_list)}枚")
 
                             # 各モデルの回答を保持
-                            current_llama_4_scout = ""
-                            current_openai_gpt4o = ""
-                            current_azure_openai_gpt4o = ""
+                            current_oci_openai_gpt_5 = ""
+                            current_oci_openai_o3 = ""
+                            current_oci_openai_gpt_4_1 = ""
+                            current_oci_meta_llama_4_scout = ""
+                            current_openai_gpt_4o = ""
+                            current_azure_openai_gpt_4o = ""
 
                             # 複数画像を一括処理
                             async for llm_results in process_multiple_images_streaming(
@@ -559,25 +630,41 @@ async def process_image_answers_streaming(
                                     custom_image_prompt
                             ):
                                 # 各LLMの結果を複数画像の回答として更新
-                                if "meta/llama-4-scout-17b-16e-instruct" in llm_results:
-                                    current_llama_4_scout = llm_results["meta/llama-4-scout-17b-16e-instruct"]
+                                if "oci_openai/gpt-5" in llm_results:
+                                    current_oci_openai_gpt_5 = llm_results["oci_openai/gpt-5"]
+
+                                if "oci_openai/o3" in llm_results:
+                                    current_oci_openai_o3 = llm_results["oci_openai/o3"]
+
+                                if "oci_openai/gpt-4.1" in llm_results:
+                                    current_oci_openai_gpt_4_1 = llm_results["oci_openai/gpt-4.1"]
+
+                                if "oci_meta/llama-4-scout-17b-16e-instruct" in llm_results:
+                                    current_oci_meta_llama_4_scout = llm_results[
+                                        "oci_meta/llama-4-scout-17b-16e-instruct"]
 
                                 if "openai/gpt-4o" in llm_results:
-                                    current_openai_gpt4o = llm_results["openai/gpt-4o"]
+                                    current_openai_gpt_4o = llm_results["openai/gpt-4o"]
 
                                 if "azure_openai/gpt-4o" in llm_results:
-                                    current_azure_openai_gpt4o = llm_results["azure_openai/gpt-4o"]
+                                    current_azure_openai_gpt_4o = llm_results["azure_openai/gpt-4o"]
 
                                 # 累積テキストと複数画像の回答を結合して表示
-                                current_llama_4_scout_text = accumulated_llama_4_scout_text + current_llama_4_scout
-                                current_openai_gpt4o_text = accumulated_openai_gpt4o_text + current_openai_gpt4o
-                                current_azure_openai_gpt4o_text = accumulated_azure_openai_gpt4o_text + current_azure_openai_gpt4o
+                                current_oci_openai_gpt_5_text = accumulated_oci_openai_gpt_5_text + current_oci_openai_gpt_5
+                                current_oci_openai_o3_text = accumulated_oci_openai_o3_text + current_oci_openai_o3
+                                current_oci_openai_gpt_4_1_text = accumulated_oci_openai_gpt_4_1_text + current_oci_openai_gpt_4_1
+                                current_oci_meta_llama_4_scout_text = accumulated_oci_meta_llama_4_scout_text + current_oci_meta_llama_4_scout
+                                current_openai_gpt_4o_text = accumulated_openai_gpt_4o_text + current_openai_gpt_4o
+                                current_azure_openai_gpt_4o_text = accumulated_azure_openai_gpt_4o_text + current_azure_openai_gpt_4o
 
                                 # 更新されたVision 回答結果をyield
                                 yield (
-                                    gr.Markdown(value=current_llama_4_scout_text),
-                                    gr.Markdown(value=current_openai_gpt4o_text),
-                                    gr.Markdown(value=current_azure_openai_gpt4o_text)
+                                    gr.Markdown(value=current_oci_openai_gpt_5_text),
+                                    gr.Markdown(value=current_oci_openai_o3_text),
+                                    gr.Markdown(value=current_oci_openai_gpt_4_1_text),
+                                    gr.Markdown(value=current_oci_meta_llama_4_scout_text),
+                                    gr.Markdown(value=current_openai_gpt_4o_text),
+                                    gr.Markdown(value=current_azure_openai_gpt_4o_text)
                                 )
                         elif single_image_processing == "ファイル単位で処理":
                             # ファイル単位で処理モード
@@ -603,9 +690,12 @@ async def process_image_answers_streaming(
                                     f"ファイル {file_index}/{len(file_groups)} (doc_id: {doc_id}) を処理中: {len(file_images)}枚の画像")
 
                                 # 各モデルの現在のファイルに対する回答を保持
-                                current_file_llama_4_scout = ""
-                                current_file_openai_gpt4o = ""
-                                current_file_azure_openai_gpt4o = ""
+                                current_file_oci_openai_gpt_5 = ""
+                                current_file_oci_openai_o3 = ""
+                                current_file_oci_openai_gpt_4_1 = ""
+                                current_file_oci_meta_llama_4_scout = ""
+                                current_file_openai_gpt_4o = ""
+                                current_file_azure_openai_gpt_4o = ""
 
                                 # 現在のファイルの画像を一括処理
                                 async for llm_results in process_multiple_images_streaming(
@@ -616,31 +706,50 @@ async def process_image_answers_streaming(
                                         custom_image_prompt
                                 ):
                                     # 各LLMの結果を現在のファイルの回答として更新
-                                    if "meta/llama-4-scout-17b-16e-instruct" in llm_results:
-                                        current_file_llama_4_scout = llm_results["meta/llama-4-scout-17b-16e-instruct"]
+                                    if "oci_openai/gpt-5" in llm_results:
+                                        current_file_oci_openai_gpt_5 = llm_results["oci_openai/gpt-5"]
+
+                                    if "oci_openai/o3" in llm_results:
+                                        current_file_oci_openai_o3 = llm_results["oci_openai/o3"]
+
+                                    if "oci_openai/gpt-4.1" in llm_results:
+                                        current_file_oci_openai_gpt_4_1 = llm_results["oci_openai/gpt-4.1"]
+
+                                    if "oci_meta/llama-4-scout-17b-16e-instruct" in llm_results:
+                                        current_file_oci_meta_llama_4_scout = llm_results[
+                                            "oci_meta/llama-4-scout-17b-16e-instruct"]
 
                                     if "openai/gpt-4o" in llm_results:
-                                        current_file_openai_gpt4o = llm_results["openai/gpt-4o"]
+                                        current_file_openai_gpt_4o = llm_results["openai/gpt-4o"]
 
                                     if "azure_openai/gpt-4o" in llm_results:
-                                        current_file_azure_openai_gpt4o = llm_results["azure_openai/gpt-4o"]
+                                        current_file_azure_openai_gpt_4o = llm_results["azure_openai/gpt-4o"]
 
                                     # 累積テキストと現在のファイルの回答を結合して表示
-                                    current_llama_4_scout_text = accumulated_llama_4_scout_text + current_file_llama_4_scout
-                                    current_openai_gpt4o_text = accumulated_openai_gpt4o_text + current_file_openai_gpt4o
-                                    current_azure_openai_gpt4o_text = accumulated_azure_openai_gpt4o_text + current_file_azure_openai_gpt4o
+                                    current_oci_openai_gpt_5_text = accumulated_oci_openai_gpt_5_text + current_file_oci_openai_gpt_5
+                                    current_oci_openai_o3_text = accumulated_oci_openai_o3_text + current_file_oci_openai_o3
+                                    current_oci_openai_gpt_4_1_text = accumulated_oci_openai_gpt_4_1_text + current_file_oci_openai_gpt_4_1
+                                    current_oci_meta_llama_4_scout_text = accumulated_oci_meta_llama_4_scout_text + current_file_oci_meta_llama_4_scout
+                                    current_openai_gpt_4o_text = accumulated_openai_gpt_4o_text + current_file_openai_gpt_4o
+                                    current_azure_openai_gpt_4o_text = accumulated_azure_openai_gpt_4o_text + current_file_azure_openai_gpt_4o
 
                                     # 更新されたVision 回答結果をyield
                                     yield (
-                                        gr.Markdown(value=current_llama_4_scout_text),
-                                        gr.Markdown(value=current_openai_gpt4o_text),
-                                        gr.Markdown(value=current_azure_openai_gpt4o_text)
+                                        gr.Markdown(value=current_oci_openai_gpt_5_text),
+                                        gr.Markdown(value=current_oci_openai_o3_text),
+                                        gr.Markdown(value=current_oci_openai_gpt_4_1_text),
+                                        gr.Markdown(value=current_oci_meta_llama_4_scout_text),
+                                        gr.Markdown(value=current_openai_gpt_4o_text),
+                                        gr.Markdown(value=current_azure_openai_gpt_4o_text)
                                     )
 
                                 # 現在のファイルの処理が完了したら、累積テキストに追加
-                                accumulated_llama_4_scout_text += current_file_llama_4_scout
-                                accumulated_openai_gpt4o_text += current_file_openai_gpt4o
-                                accumulated_azure_openai_gpt4o_text += current_file_azure_openai_gpt4o
+                                accumulated_oci_openai_gpt_5_text += current_file_oci_openai_gpt_5
+                                accumulated_oci_openai_o3_text += current_file_oci_openai_o3
+                                accumulated_oci_openai_gpt_4_1_text += current_file_oci_openai_gpt_4_1
+                                accumulated_oci_meta_llama_4_scout_text += current_file_oci_meta_llama_4_scout
+                                accumulated_openai_gpt_4o_text += current_file_openai_gpt_4o
+                                accumulated_azure_openai_gpt_4o_text += current_file_azure_openai_gpt_4o
 
                         elif single_image_processing == "ファイル単位で処理+最初・最後":
                             # ファイル単位で処理+最初・最後モード
@@ -714,9 +823,12 @@ async def process_image_answers_streaming(
                                     f"処理対象画像数: {len(all_images)}枚 (検索: {len(file_images)}枚 + 追加: {len(additional_images)}枚)")
 
                                 # 各モデルの現在のファイルに対する回答を保持
-                                current_file_llama_4_scout = ""
-                                current_file_openai_gpt4o = ""
-                                current_file_azure_openai_gpt4o = ""
+                                current_file_oci_openai_gpt_5 = ""
+                                current_file_oci_openai_o3 = ""
+                                current_file_oci_openai_gpt_4_1 = ""
+                                current_file_oci_meta_llama_4_scout = ""
+                                current_file_openai_gpt_4o = ""
+                                current_file_azure_openai_gpt_4o = ""
 
                                 # 現在のファイルの全画像を一括処理
                                 async for llm_results in process_multiple_images_streaming(
@@ -727,31 +839,50 @@ async def process_image_answers_streaming(
                                         custom_image_prompt
                                 ):
                                     # 各LLMの結果を現在のファイルの回答として更新
-                                    if "meta/llama-4-scout-17b-16e-instruct" in llm_results:
-                                        current_file_llama_4_scout = llm_results["meta/llama-4-scout-17b-16e-instruct"]
+                                    if "oci_openai/gpt-5" in llm_results:
+                                        current_file_oci_openai_gpt_5 = llm_results["oci_openai/gpt-5"]
+
+                                    if "oci_openai/o3" in llm_results:
+                                        current_file_oci_openai_o3 = llm_results["oci_openai/o3"]
+
+                                    if "oci_openai/gpt-4.1" in llm_results:
+                                        current_file_oci_openai_gpt_4_1 = llm_results["oci_openai/gpt-4.1"]
+
+                                    if "oci_meta/llama-4-scout-17b-16e-instruct" in llm_results:
+                                        current_file_oci_meta_llama_4_scout = llm_results[
+                                            "oci_meta/llama-4-scout-17b-16e-instruct"]
 
                                     if "openai/gpt-4o" in llm_results:
-                                        current_file_openai_gpt4o = llm_results["openai/gpt-4o"]
+                                        current_file_openai_gpt_4o = llm_results["openai/gpt-4o"]
 
                                     if "azure_openai/gpt-4o" in llm_results:
-                                        current_file_azure_openai_gpt4o = llm_results["azure_openai/gpt-4o"]
+                                        current_file_azure_openai_gpt_4o = llm_results["azure_openai/gpt-4o"]
 
                                     # 累積テキストと現在のファイルの回答を結合して表示
-                                    current_llama_4_scout_text = accumulated_llama_4_scout_text + current_file_llama_4_scout
-                                    current_openai_gpt4o_text = accumulated_openai_gpt4o_text + current_file_openai_gpt4o
-                                    current_azure_openai_gpt4o_text = accumulated_azure_openai_gpt4o_text + current_file_azure_openai_gpt4o
+                                    current_oci_openai_gpt_5_text = accumulated_oci_openai_gpt_5_text + current_file_oci_openai_gpt_5
+                                    current_oci_openai_o3_text = accumulated_oci_openai_o3_text + current_file_oci_openai_o3
+                                    current_oci_openai_gpt_4_1_text = accumulated_oci_openai_gpt_4_1_text + current_file_oci_openai_gpt_4_1
+                                    current_oci_meta_llama_4_scout_text = accumulated_oci_meta_llama_4_scout_text + current_file_oci_meta_llama_4_scout
+                                    current_openai_gpt_4o_text = accumulated_openai_gpt_4o_text + current_file_openai_gpt_4o
+                                    current_azure_openai_gpt_4o_text = accumulated_azure_openai_gpt_4o_text + current_file_azure_openai_gpt_4o
 
                                     # 更新されたVision 回答結果をyield
                                     yield (
-                                        gr.Markdown(value=current_llama_4_scout_text),
-                                        gr.Markdown(value=current_openai_gpt4o_text),
-                                        gr.Markdown(value=current_azure_openai_gpt4o_text)
+                                        gr.Markdown(value=current_oci_openai_gpt_5_text),
+                                        gr.Markdown(value=current_oci_openai_o3_text),
+                                        gr.Markdown(value=current_oci_openai_gpt_4_1_text),
+                                        gr.Markdown(value=current_oci_meta_llama_4_scout_text),
+                                        gr.Markdown(value=current_openai_gpt_4o_text),
+                                        gr.Markdown(value=current_azure_openai_gpt_4o_text)
                                     )
 
                                 # 現在のファイルの処理が完了したら、累積テキストに追加
-                                accumulated_llama_4_scout_text += current_file_llama_4_scout
-                                accumulated_openai_gpt4o_text += current_file_openai_gpt4o
-                                accumulated_azure_openai_gpt4o_text += current_file_azure_openai_gpt4o
+                                accumulated_oci_openai_gpt_5_text += current_file_oci_openai_gpt_5
+                                accumulated_oci_openai_o3_text += current_file_oci_openai_o3
+                                accumulated_oci_openai_gpt_4_1_text += current_file_oci_openai_gpt_4_1
+                                accumulated_oci_meta_llama_4_scout_text += current_file_oci_meta_llama_4_scout
+                                accumulated_openai_gpt_4o_text += current_file_openai_gpt_4o
+                                accumulated_azure_openai_gpt_4o_text += current_file_azure_openai_gpt_4o
                         else:
                             # ファイル単位で処理+最初・最後・前後画像モード
                             print(
@@ -834,7 +965,7 @@ async def process_image_answers_streaming(
                                                 if prev_result:
                                                     base64_data = prev_result[0].read() if hasattr(prev_result[0],
                                                                                                    'read') else \
-                                                    prev_result[0]
+                                                        prev_result[0]
                                                     img_id = int(prev_result[2]) if prev_result[2] is not None else None
                                                     if base64_data and img_id is not None and img_id not in searched_img_ids:
                                                         additional_images.append((base64_data, prev_result[1], img_id))
@@ -854,7 +985,7 @@ async def process_image_answers_streaming(
                                                 if next_result:
                                                     base64_data = next_result[0].read() if hasattr(next_result[0],
                                                                                                    'read') else \
-                                                    next_result[0]
+                                                        next_result[0]
                                                     # img_idはNUMBER型なので、直接使用するか安全に変換
                                                     img_id = next_result[2] if isinstance(next_result[2],
                                                                                           (int, float)) and next_result[
@@ -883,9 +1014,12 @@ async def process_image_answers_streaming(
                                     f"処理対象画像数: {len(all_images)}枚 (検索: {len(file_images)}枚 + 追加: {len(additional_images)}枚)")
 
                                 # 各モデルの現在のファイルに対する回答を保持
-                                current_file_llama_4_scout = ""
-                                current_file_openai_gpt4o = ""
-                                current_file_azure_openai_gpt4o = ""
+                                current_file_oci_openai_gpt_5 = ""
+                                current_file_oci_openai_o3 = ""
+                                current_file_oci_openai_gpt_4_1 = ""
+                                current_file_oci_meta_llama_4_scout = ""
+                                current_file_openai_gpt_4o = ""
+                                current_file_azure_openai_gpt_4o = ""
 
                                 # 現在のファイルの全画像を一括処理
                                 async for llm_results in process_multiple_images_streaming(
@@ -896,47 +1030,72 @@ async def process_image_answers_streaming(
                                         custom_image_prompt
                                 ):
                                     # 各LLMの結果を現在のファイルの回答として更新
-                                    if "meta/llama-4-scout-17b-16e-instruct" in llm_results:
-                                        current_file_llama_4_scout = llm_results["meta/llama-4-scout-17b-16e-instruct"]
+                                    if "oci_openai/gpt-5" in llm_results:
+                                        current_file_oci_openai_gpt_5 = llm_results["oci_openai/gpt-5"]
+
+                                    if "oci_openai/o3" in llm_results:
+                                        current_file_oci_openai_o3 = llm_results["oci_openai/o3"]
+
+                                    if "oci_openai/gpt-4.1" in llm_results:
+                                        current_file_oci_openai_gpt_4_1 = llm_results["oci_openai/gpt-4.1"]
+
+                                    if "oci_meta/llama-4-scout-17b-16e-instruct" in llm_results:
+                                        current_file_oci_meta_llama_4_scout = llm_results[
+                                            "oci_meta/llama-4-scout-17b-16e-instruct"]
 
                                     if "openai/gpt-4o" in llm_results:
-                                        current_file_openai_gpt4o = llm_results["openai/gpt-4o"]
+                                        current_file_openai_gpt_4o = llm_results["openai/gpt-4o"]
 
                                     if "azure_openai/gpt-4o" in llm_results:
-                                        current_file_azure_openai_gpt4o = llm_results["azure_openai/gpt-4o"]
+                                        current_file_azure_openai_gpt_4o = llm_results["azure_openai/gpt-4o"]
 
                                     # 累積テキストと現在のファイルの回答を結合して表示
-                                    current_llama_4_scout_text = accumulated_llama_4_scout_text + current_file_llama_4_scout
-                                    current_openai_gpt4o_text = accumulated_openai_gpt4o_text + current_file_openai_gpt4o
-                                    current_azure_openai_gpt4o_text = accumulated_azure_openai_gpt4o_text + current_file_azure_openai_gpt4o
+                                    current_oci_openai_gpt_5_text = accumulated_oci_openai_gpt_5_text + current_file_oci_openai_gpt_5
+                                    current_oci_openai_o3_text = accumulated_oci_openai_o3_text + current_file_oci_openai_o3
+                                    current_oci_openai_gpt_4_1_text = accumulated_oci_openai_gpt_4_1_text + current_file_oci_openai_gpt_4_1
+                                    current_oci_meta_llama_4_scout_text = accumulated_oci_meta_llama_4_scout_text + current_file_oci_meta_llama_4_scout
+                                    current_openai_gpt_4o_text = accumulated_openai_gpt_4o_text + current_file_openai_gpt_4o
+                                    current_azure_openai_gpt_4o_text = accumulated_azure_openai_gpt_4o_text + current_file_azure_openai_gpt_4o
 
                                     # 更新されたVision 回答結果をyield
                                     yield (
-                                        gr.Markdown(value=current_llama_4_scout_text),
-                                        gr.Markdown(value=current_openai_gpt4o_text),
-                                        gr.Markdown(value=current_azure_openai_gpt4o_text)
+                                        gr.Markdown(value=current_oci_openai_gpt_5_text),
+                                        gr.Markdown(value=current_oci_openai_o3_text),
+                                        gr.Markdown(value=current_oci_openai_gpt_4_1_text),
+                                        gr.Markdown(value=current_oci_meta_llama_4_scout_text),
+                                        gr.Markdown(value=current_openai_gpt_4o_text),
+                                        gr.Markdown(value=current_azure_openai_gpt_4o_text)
                                     )
 
                                 # 現在のファイルの処理が完了したら、累積テキストに追加
-                                accumulated_llama_4_scout_text += current_file_llama_4_scout
-                                accumulated_openai_gpt4o_text += current_file_openai_gpt4o
-                                accumulated_azure_openai_gpt4o_text += current_file_azure_openai_gpt4o
+                                accumulated_oci_openai_gpt_5_text += current_file_oci_openai_gpt_5
+                                accumulated_oci_openai_o3_text += current_file_oci_openai_o3
+                                accumulated_oci_openai_gpt_4_1_text += current_file_oci_openai_gpt_4_1
+                                accumulated_oci_meta_llama_4_scout_text += current_file_oci_meta_llama_4_scout
+                                accumulated_openai_gpt_4o_text += current_file_openai_gpt_4o
+                                accumulated_azure_openai_gpt_4o_text += current_file_azure_openai_gpt_4o
         except Exception as db_e:
             print(f"データベース操作中にエラーが発生しました: {db_e}")
             # データベースエラー時も現在の状態をyield
             yield (
-                gr.Markdown(value=llama_4_scout_image_answer_text),
-                gr.Markdown(value=openai_gpt4o_image_answer_text),
-                gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
+                gr.Markdown(value=current_oci_openai_gpt_5_text),
+                gr.Markdown(value=current_oci_openai_o3_text),
+                gr.Markdown(value=current_oci_openai_gpt_4_1_text),
+                gr.Markdown(value=oci_meta_llama_4_scout_image_answer_text),
+                gr.Markdown(value=openai_gpt_4o_image_answer_text),
+                gr.Markdown(value=azure_openai_gpt_4o_image_answer_text)
             )
             return
     except Exception as e:
         print(f"base64_data取得中にエラーが発生しました: {e}")
         # エラー時も現在の状態をyield
         yield (
-            gr.Markdown(value=llama_4_scout_image_answer_text),
-            gr.Markdown(value=openai_gpt4o_image_answer_text),
-            gr.Markdown(value=azure_openai_gpt4o_image_answer_text)
+            gr.Markdown(value=current_oci_openai_gpt_5_text),
+            gr.Markdown(value=current_oci_openai_o3_text),
+            gr.Markdown(value=current_oci_openai_gpt_4_1_text),
+            gr.Markdown(value=oci_meta_llama_4_scout_image_answer_text),
+            gr.Markdown(value=openai_gpt_4o_image_answer_text),
+            gr.Markdown(value=azure_openai_gpt_4o_image_answer_text)
         )
     finally:
         # 画像処理完了後の軽量なリソースクリーンアップ
@@ -987,7 +1146,31 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
 
             print(f"\n=== 複数画像 ({len(image_urls)}枚) - {model} での処理 ===")
 
-            if model == "meta/llama-4-scout-17b-16e-instruct":
+            if model == "oci_openai/gpt-5":
+                llm = ChatOCIGenAI(
+                    model_id="openai.gpt-5",
+                    provider="openai",
+                    service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+                    compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+                )        
+            elif model == "oci_openai/o3":
+                llm = ChatOCIGenAI(
+                    model_id="openai.o3",
+                    provider="openai",
+                    service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+                    compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+                )
+            elif model == "oci_openai/gpt_4_1":
+                llm = ChatOCIGenAI(
+                    model_id="openai.gpt-4.1",
+                    provider="openai",
+                    service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+                    compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
+                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+                )                
+            elif model == "oci_meta/llama-4-scout-17b-16e-instruct":
                 llm = ChatOCIGenAI(
                     model_id="meta.llama-4-scout-17b-16e-instruct",
                     provider="meta",
@@ -1086,6 +1269,7 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
             # 推論時間を追加
             yield f"\n\n推論時間: {inference_time:.2f}秒\n\n"
             yield "TASK_DONE"
+            return
 
         except Exception as e:
             print(f"エラーが発生しました ({model}): {e}")
@@ -1097,26 +1281,33 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
                 error_text = f"\n\nエラーが発生しました: {error_details}\n\n"
             yield error_text
             yield "TASK_DONE"
+            return
         finally:
             # リソースクリーンアップ：LLMクライアントの接続を適切に閉じる
             await cleanup_llm_client_async(llm)
             llm = None  # 参照をクリア
 
     # 各モデルのジェネレーターを作成
-    llama_4_scout_gen = create_model_task("meta/llama-4-scout-17b-16e-instruct")
-    openai_gpt4o_gen = create_model_task("openai/gpt-4o")
-    azure_openai_gpt4o_gen = create_model_task("azure_openai/gpt-4o")
+    oci_openai_gpt_5_gen = create_model_task("oci_openai/gpt-5")
+    oci_openai_o3_gen = create_model_task("oci_openai/o3")
+    oci_openai_gpt_4_1_gen = create_model_task("oci_openai/gpt-4.1")
+    oci_meta_llama_4_scout_gen = create_model_task("oci_meta/llama-4-scout-17b-16e-instruct")
+    openai_gpt_4o_gen = create_model_task("openai/gpt-4o")
+    azure_openai_gpt_4o_gen = create_model_task("azure_openai/gpt-4o")
 
     # 各モデルの応答を蓄積
-    llama_4_scout_response = ""
-    openai_gpt4o_response = ""
-    azure_openai_gpt4o_response = ""
+    oci_openai_gpt_5_response = ""
+    oci_openai_o3_response = ""
+    oci_openai_gpt_4_1_response = ""
+    oci_meta_llama_4_scout_response = ""
+    openai_gpt_4o_response = ""
+    azure_openai_gpt_4o_response = ""
 
     # 各モデルの状態を追跡
-    responses_status = ["", "", ""]
+    responses_status = ["", "", "", ""]
 
-    # タイムアウト設定（最大5分）
-    timeout_seconds = 300
+    # タイムアウト設定（最大2分）
+    timeout_seconds = 120
     start_time = time.time()
 
     try:
@@ -1126,8 +1317,8 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
                 print(f"複数画像処理がタイムアウトしました（{timeout_seconds}秒）")
                 break
 
-            responses = ["", "", ""]
-            generators = [llama_4_scout_gen, openai_gpt4o_gen, azure_openai_gpt4o_gen]
+            responses = ["", "", "", ""]
+            generators = [oci_openai_gpt_5_gen, oci_openai_o3_gen, oci_openai_gpt_4_1_gen, oci_meta_llama_4_scout_gen, openai_gpt_4o_gen, azure_openai_gpt_4o_gen]
 
             for i, gen in enumerate(generators):
                 if responses_status[i] == "TASK_DONE":
@@ -1135,7 +1326,7 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
 
                 try:
                     # タイムアウト付きでanextを実行
-                    response = await asyncio.wait_for(anext(gen), timeout=120.0)
+                    response = await asyncio.wait_for(anext(gen), timeout=60.0)
                     if response:
                         if response == "TASK_DONE":
                             responses_status[i] = response
@@ -1145,21 +1336,29 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
                     responses_status[i] = "TASK_DONE"
                 except asyncio.TimeoutError:
                     print(f"モデル {i} の処理がタイムアウトしました")
+                    responses[i] = (f"モデルの処理がタイムアウトしました")
                     responses_status[i] = "TASK_DONE"
                 except Exception as e:
                     print(f"モデル {i} の処理中にエラーが発生しました: {e}")
+                    responses[i] = (f"モデルの処理中にエラーが発生しました: {e}")
                     responses_status[i] = "TASK_DONE"
 
             # 応答を蓄積
-            llama_4_scout_response += responses[0]
-            openai_gpt4o_response += responses[1]
-            azure_openai_gpt4o_response += responses[2]
+            oci_openai_gpt_5_response += responses[0]
+            oci_openai_o3_response += responses[0]
+            oci_openai_gpt_4_1_response += responses[0]
+            oci_meta_llama_4_scout_response += responses[1]
+            openai_gpt_4o_response += responses[2]
+            azure_openai_gpt_4o_response += responses[3]
 
             # 現在の状態をyield
             yield {
-                "meta/llama-4-scout-17b-16e-instruct": llama_4_scout_response,
-                "openai/gpt-4o": openai_gpt4o_response,
-                "azure_openai/gpt-4o": azure_openai_gpt4o_response
+                "oci_openai/gpt-5": oci_openai_gpt_5_response,
+                "oci_openai/o3": oci_openai_o3_response,
+                "oci_openai/gpt-4.1": oci_openai_gpt_4_1_response,
+                "oci_meta/llama-4-scout-17b-16e-instruct": oci_meta_llama_4_scout_response,
+                "openai/gpt-4o": openai_gpt_4o_response,
+                "azure_openai/gpt-4o": azure_openai_gpt_4o_response
             }
 
             # すべてのタスクが完了したかチェック
@@ -1169,9 +1368,9 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
 
     finally:
         # 最終的なリソースクリーンアップ：すべてのジェネレーターを適切に閉じる
-        generators = [llama_4_scout_gen, openai_gpt4o_gen, azure_openai_gpt4o_gen]
-        generator_names = ["llama_4_scout", "openai_gpt4o",
-                           "azure_openai_gpt4o"]
+        generators = [oci_openai_gpt_5_gen, oci_openai_o3_gen, oci_openai_gpt_4_1_gen, oci_meta_llama_4_scout_gen, openai_gpt_4o_gen, azure_openai_gpt_4o_gen]
+        generator_names = ["oci_openai_gpt_5", "oci_openai_o3", "oci_openai_gpt_4_1", "oci_meta_llama_4_scout", "openai_gpt_4o",
+                           "azure_openai_gpt_4o"]
 
         for i, gen in enumerate(generators):
             try:

@@ -94,9 +94,9 @@ def load_document(file_path, server_directory, document_metadata,
                              extract_image_block_types=["Table"],
                              extract_image_block_to_payload=False,
                              skip_infer_table_types=["pdf", "jpg", "png", "heic", "doc", "docx"])
-        for el in elements:
-            print(f"{el=}")
-        original_contents = " \n".join(el.text.replace('\x0b', '\n') for el in elements)
+        # for el in elements:
+        #     print(f"{el=}")
+        original_contents = " \n".join(el.text.replace('\x0b', '\n').replace('\x01', ' ') for el in elements)
         print(f"{original_contents=}")
 
     # メタデータの設定

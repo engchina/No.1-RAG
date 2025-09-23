@@ -74,6 +74,12 @@ def reset_eval_by_human_result():
         gr.Textbox(value=""),
         gr.Radio(value="good"),
         gr.Textbox(value=""),
+        gr.Radio(value="good"),
+        gr.Textbox(value=""),
+        gr.Radio(value="good"),
+        gr.Textbox(value=""),
+        gr.Radio(value="good"),
+        gr.Textbox(value=""),
     )
 
 
@@ -87,11 +93,14 @@ async def eval_by_ragas(
         use_image,
         system_text,
         standard_answer_text,
-        xai_grok_4_response,
-        command_a_response,
-        llama_4_scout_response,
-        openai_gpt4o_response,
-        azure_openai_gpt4o_response,
+        oci_openai_gpt_5_checkbox,
+        oci_openai_o3_response,
+        oci_openai_gpt_4_1_response,
+        oci_xai_grok_4_response,
+        oci_cohere_command_a_response,
+        oci_meta_llama_4_scout_response,
+        openai_gpt_4o_response,
+        azure_openai_gpt_4o_response,
 ):
     """
     RAGAS評価を実行する関数
@@ -115,11 +124,14 @@ async def eval_by_ragas(
     if use_image:
         print("Vision回答がオンのため、LLM評価をスキップします")
         yield (
-            gr.Markdown(value=""),  # xai_grok_4_evaluation
-            gr.Markdown(value=""),  # command_a_evaluation
-            gr.Markdown(value=""),  # llama_4_scout_evaluation
-            gr.Markdown(value=""),  # openai_gpt4o_evaluation
-            gr.Markdown(value=""),  # azure_openai_gpt4o_evaluation
+            gr.Markdown(value=""),  # oci_openai_gpt_5_evaluation
+            gr.Markdown(value=""),  # oci_openai_o3_evaluation
+            gr.Markdown(value=""),  # oci_openai_gpt_4_1_response
+            gr.Markdown(value=""),  # oci_xai_grok_4_evaluation
+            gr.Markdown(value=""),  # oci_cohere_command_a_evaluation
+            gr.Markdown(value=""),  # oci_meta_llama_4_scout_evaluation
+            gr.Markdown(value=""),  # openai_gpt_4o_evaluation
+            gr.Markdown(value=""),  # azure_openai_gpt_4o_evaluation
         )
         return
 
@@ -143,11 +155,14 @@ async def eval_by_ragas(
 
     if has_error:
         yield (
-            gr.Markdown(value=""),
-            gr.Markdown(value=""),
-            gr.Markdown(value=""),
-            gr.Markdown(value=""),
-            gr.Markdown(value=""),
+            gr.Markdown(value=""), # oci_openai_gpt_5_evaluation
+            gr.Markdown(value=""), # oci_openai_o3_evaluation
+            gr.Markdown(value=""), # oci_openai_gpt_4_1_response
+            gr.Markdown(value=""), # oci_xai_grok_4_evaluation
+            gr.Markdown(value=""), # oci_cohere_command_a_evaluation
+            gr.Markdown(value=""), # oci_meta_llama_4_scout_evaluation
+            gr.Markdown(value=""), # openai_gpt_4o_evaluation
+            gr.Markdown(value=""), # azure_openai_gpt_4o_evaluation
         )
         return
 
@@ -170,120 +185,180 @@ async def eval_by_ragas(
     print(f"{llm_evaluation_checkbox=}")
     if not llm_evaluation_checkbox:
         yield (
-            gr.Markdown(value=""),
-            gr.Markdown(value=""),
-            gr.Markdown(value=""),
-            gr.Markdown(value=""),
-            gr.Markdown(value=""),
+            gr.Markdown(value=""), # oci_openai_gpt_5_evaluation
+            gr.Markdown(value=""), # oci_openai_o3_evaluation
+            gr.Markdown(value=""), # oci_openai_gpt_4_1_response
+            gr.Markdown(value=""), # oci_xai_grok_4_evaluation
+            gr.Markdown(value=""), # oci_cohere_command_a_evaluation
+            gr.Markdown(value=""), # oci_meta_llama_4_scout_evaluation
+            gr.Markdown(value=""), # openai_gpt_4o_evaluation
+            gr.Markdown(value=""), # azure_openai_gpt_4o_evaluation
         )
         return
 
     # 各モデルのチェックボックス状態を初期化
-    xai_grok_4_checkbox = False
-    command_a_checkbox = False
-    llama_4_scout_checkbox = False
-    openai_gpt4o_checkbox = False
-    azure_openai_gpt4o_checkbox = False
+    oci_openai_gpt_5_checkbox = False
+    oci_openai_o3_checkbox = False
+    oci_openai_gpt_4_1_checkbox = False
+    oci_xai_grok_4_checkbox = False
+    oci_cohere_command_a_checkbox = False
+    oci_meta_llama_4_scout_checkbox = False
+    openai_gpt_4o_checkbox = False
+    azure_openai_gpt_4o_checkbox = False
 
     # 選択されたモデルに基づいてチェックボックス状態を設定
-    if "xai/grok-4" in llm_answer_checkbox_group:
-        xai_grok_4_checkbox = True
-    if "cohere/command-a" in llm_answer_checkbox_group:
-        command_a_checkbox = True
-    if "meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox_group:
-        llama_4_scout_checkbox = True
+    if "oci_openai/gpt-5" in llm_answer_checkbox_group:
+        oci_openai_gpt_5_checkbox = True
+    if "oci_openai/o3" in llm_answer_checkbox_group:
+        oci_openai_o3_checkbox = True
+    if "oci_openai/gpt-4.1" in llm_answer_checkbox_group:
+        oci_openai_gpt_4_1_checkbox = True
+    if "oci_xai/grok-4" in llm_answer_checkbox_group:
+        oci_xai_grok_4_checkbox = True
+    if "oci_cohere/command-a" in llm_answer_checkbox_group:
+        oci_cohere_command_a_checkbox = True
+    if "oci_meta/llama-4-scout-17b-16e-instruct" in llm_answer_checkbox_group:
+        oci_meta_llama_4_scout_checkbox = True
     if "openai/gpt-4o" in llm_answer_checkbox_group:
-        openai_gpt4o_checkbox = True
+        openai_gpt_4o_checkbox = True
     if "azure_openai/gpt-4o" in llm_answer_checkbox_group:
-        azure_openai_gpt4o_checkbox = True
+        azure_openai_gpt_4o_checkbox = True
 
     # 各回答から推論時間の行を削除
-    xai_grok_4_response = remove_last_line(xai_grok_4_response)
-    command_a_response = remove_last_line(command_a_response)
-    llama_4_scout_response = remove_last_line(llama_4_scout_response)
-    openai_gpt4o_response = remove_last_line(openai_gpt4o_response)
-    azure_openai_gpt4o_response = remove_last_line(azure_openai_gpt4o_response)
+    oci_openai_gpt_5_response = remove_last_line(oci_openai_gpt_5_response)
+    oci_openai_o3_response = remove_last_line(oci_openai_o3_response)
+    oci_openai_gpt_4_1_response = remove_last_line(oci_openai_gpt_4_1_response)
+    oci_xai_grok_4_response = remove_last_line(oci_xai_grok_4_response)
+    oci_cohere_command_a_response = remove_last_line(oci_cohere_command_a_response)
+    oci_meta_llama_4_scout_response = remove_last_line(oci_meta_llama_4_scout_response)
+    openai_gpt_4o_response = remove_last_line(openai_gpt_4o_response)
+    azure_openai_gpt_4o_response = remove_last_line(azure_openai_gpt_4o_response)
 
     # 各モデル用の評価プロンプトを構築
-    xai_grok_4_user_text = f"""
+    oci_openai_gpt_5_user_text = f"""
 -標準回答-
  {standard_answer_text}
 
 -与えられた回答-
- {xai_grok_4_response}
+ {oci_openai_gpt_5_response}
 
 -出力-\n　"""
 
-    command_a_user_text = f"""
+    oci_openai_o3_user_text = f"""
 -標準回答-
  {standard_answer_text}
 
 -与えられた回答-
- {command_a_response}
+ {oci_openai_o3_response}
 
 -出力-\n　"""
 
-    llama_4_scout_user_text = f"""
+    oci_openai_gpt_4_1_user_text = f"""
+-標準回答-
+ {standard_answer_text}
+
+-与えられた回答-
+ {oci_openai_gpt_4_1_response}
+
+-出力-\n　"""
+
+    oci_xai_grok_4_user_text = f"""
+-標準回答-
+ {standard_answer_text}
+
+-与えられた回答-
+ {oci_xai_grok_4_response}
+
+-出力-\n　"""
+
+    oci_cohere_command_a_user_text = f"""
+-標準回答-
+ {standard_answer_text}
+
+-与えられた回答-
+ {oci_cohere_command_a_response}
+
+-出力-\n　"""
+
+    oci_meta_llama_4_scout_user_text = f"""
 -標準回答-
 {standard_answer_text}
 
 -与えられた回答-
-{llama_4_scout_response}
+{oci_meta_llama_4_scout_response}
 
 -出力-\n　"""
 
-    openai_gpt4o_user_text = f"""
+    openai_gpt_4o_user_text = f"""
 -標準回答-
 {standard_answer_text}
 
 -与えられた回答-
-{openai_gpt4o_response}
+{openai_gpt_4o_response}
 
 -出力-\n　"""
 
-    azure_openai_gpt4o_user_text = f"""
+    azure_openai_gpt_4o_user_text = f"""
 -標準回答-
 {standard_answer_text}
 
 -与えられた回答-
-{azure_openai_gpt4o_response}
+{azure_openai_gpt_4o_response}
 
 -出力-\n　"""
 
     # 評価応答を初期化
-    eval_xai_grok_4_response = ""
-    eval_command_a_response = ""
-    eval_llama_4_scout_response = ""
-    eval_openai_gpt4o_response = ""
-    eval_azure_openai_gpt4o_response = ""
+    eval_oci_openai_gpt_5_response = ""
+    eval_oci_openai_o3_response = ""
+    eval_oci_openai_gpt_4_1_response = ""
+    eval_oci_xai_grok_4_response = ""
+    eval_oci_cohere_command_a_response = ""
+    eval_oci_meta_llama_4_scout_response = ""
+    eval_openai_gpt_4o_response = ""
+    eval_azure_openai_gpt_4o_response = ""
 
     # chat関数を呼び出して評価を実行
-    async for xai_grok_4, command_a, llama_4_scout, gpt4o, azure_gpt4o in chat(
+    async for oci_openai_gpt_5, oci_openai_o3, oci_openai_gpt_4_1, oci_xai_grok_4, oci_cohere_command_a, oci_meta_llama_4_scout, gpt_4o, azure_gpt_4o in chat(
             system_text,
-            xai_grok_4_user_text,
-            command_a_user_text,
             None,
-            llama_4_scout_user_text,
-            openai_gpt4o_user_text,
-            azure_openai_gpt4o_user_text,
-            xai_grok_4_checkbox,
-            command_a_checkbox,
-            llama_4_scout_checkbox,
-            openai_gpt4o_checkbox,
-            azure_openai_gpt4o_checkbox,
+            oci_openai_gpt_5_user_text,
+            None,
+            oci_openai_o3_user_text,
+            None,
+            oci_openai_gpt_4_1_user_text,
+            oci_xai_grok_4_user_text,
+            oci_cohere_command_a_user_text,
+            None,
+            oci_meta_llama_4_scout_user_text,
+            openai_gpt_4o_user_text,
+            azure_openai_gpt_4o_user_text,
+            oci_openai_gpt_5_checkbox,
+            oci_openai_o3_checkbox,
+            oci_openai_gpt_4_1_checkbox,
+            oci_xai_grok_4_checkbox,
+            oci_cohere_command_a_checkbox,
+            oci_meta_llama_4_scout_checkbox,
+            openai_gpt_4o_checkbox,
+            azure_openai_gpt_4o_checkbox,
     ):
         # 評価結果を累積
-        eval_xai_grok_4_response += xai_grok_4
-        eval_command_a_response += command_a
-        eval_llama_4_scout_response += llama_4_scout
-        eval_openai_gpt4o_response += gpt4o
-        eval_azure_openai_gpt4o_response += azure_gpt4o
+        eval_oci_openai_gpt_5_response += oci_openai_gpt_5
+        eval_oci_openai_o3_response += oci_openai_o3
+        eval_oci_openai_gpt_4_1_response += oci_openai_gpt_4_1
+        eval_oci_xai_grok_4_response += oci_xai_grok_4
+        eval_oci_cohere_command_a_response += oci_cohere_command_a
+        eval_oci_meta_llama_4_scout_response += oci_meta_llama_4_scout
+        eval_openai_gpt_4o_response += gpt_4o
+        eval_azure_openai_gpt_4o_response += azure_gpt_4o
 
         # Gradio Markdownコンポーネントとして結果を返す
         yield (
-            gr.Markdown(value=eval_xai_grok_4_response),
-            gr.Markdown(value=eval_command_a_response),
-            gr.Markdown(value=eval_llama_4_scout_response),
-            gr.Markdown(value=eval_openai_gpt4o_response),
-            gr.Markdown(value=eval_azure_openai_gpt4o_response),
+            gr.Markdown(value=eval_oci_openai_gpt_5_response),
+            gr.Markdown(value=eval_oci_openai_o3_response),
+            gr.Markdown(value=eval_oci_openai_gpt_4_1_response),
+            gr.Markdown(value=eval_oci_xai_grok_4_response),
+            gr.Markdown(value=eval_oci_cohere_command_a_response),
+            gr.Markdown(value=eval_oci_meta_llama_4_scout_response),
+            gr.Markdown(value=eval_openai_gpt_4o_response),
+            gr.Markdown(value=eval_azure_openai_gpt_4o_response),
         )
