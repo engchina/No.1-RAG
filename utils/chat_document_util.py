@@ -65,7 +65,9 @@ async def chat_document(
             gr.Markdown(value=""),
             gr.Markdown(value=""),
             gr.Markdown(value=""),
-            gr.Markdown(value="")
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
+            gr.Markdown(value=""),
         )
         return
 

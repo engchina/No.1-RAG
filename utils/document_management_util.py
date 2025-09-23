@@ -96,6 +96,7 @@ def delete_document(pool, default_collection_name: str, server_directory, doc_id
         return (
             gr.Textbox(value=""),
             gr.Radio(),
+            gr.CheckboxGroup(),
             gr.CheckboxGroup()
         )
 
@@ -139,7 +140,7 @@ WHERE doc_id = :doc_id """
         gr.Textbox(value=output_sql),
         gr.Radio(doc_list),
         gr.CheckboxGroup(choices=doc_list, value=[]),
-        gr.CheckboxGroup(choices=doc_list)
+        gr.CheckboxGroup(choices=doc_list, value=[])
     )
 
 
