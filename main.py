@@ -1273,7 +1273,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             tab_convert_excel_to_text_button = gr.Button(
                                 value="ExcelをTextへ変換",
                                 variant="primary")
-                with gr.TabItem(label="Xml2Text") as tab_convert_xml_to_text_document:
+                with gr.TabItem(label="Xml2Text", visible=False) as tab_convert_xml_to_text_document:
                     with gr.Row():
                         with gr.Column():
                             tab_convert_document_convert_xml_to_text_file_text = gr.File(
@@ -1359,7 +1359,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             tab_convert_xml_to_text_button = gr.Button(
                                 value="XmlをTextへ変換",
                                 variant="primary")
-                with gr.TabItem(label="Json2Text") as tab_convert_json_to_text_document:
+                with gr.TabItem(label="Json2Text", visible=False) as tab_convert_json_to_text_document:
                     with gr.Row():
                         with gr.Column():
                             tab_convert_document_convert_json_to_text_file_text = gr.File(
@@ -2830,7 +2830,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         outputs=[
             tab_delete_document_delete_sql,
             tab_split_document_doc_id_radio,
-            tab_delete_document_doc_ids_checkbox_group
+            tab_delete_document_doc_ids_checkbox_group,
+            tab_chat_document_doc_id_checkbox_group,
         ]
     )
 
