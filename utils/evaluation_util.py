@@ -93,7 +93,7 @@ async def eval_by_ragas(
         use_image,
         system_text,
         standard_answer_text,
-        oci_openai_gpt_5_checkbox,
+        oci_openai_gpt_5_response,
         oci_openai_o3_response,
         oci_openai_gpt_4_1_response,
         oci_xai_grok_4_response,
