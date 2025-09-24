@@ -781,7 +781,7 @@ def generate_eval_result_file():
                                 f.user_comment,
                                 TO_CHAR(r.created_date, 'YYYY-MM-DD HH24:MI:SS') AS created_date
                          FROM RAG_QA_RESULT r
-                                  JOIN
+                                  LEFT JOIN
                               RAG_QA_FEEDBACK f
                               ON
                                   r.query_id = f.query_id \

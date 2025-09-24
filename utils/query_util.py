@@ -185,7 +185,7 @@ def insert_query_result(
                     ]
                 )
 
-            if "xai/grok-4" in llm_answer_checkbox_group:
+            if "oci_xai/grok-4" in llm_answer_checkbox_group:
                 oci_xai_grok_4_response = oci_xai_grok_4_response
                 if llm_evaluation_checkbox:
                     oci_xai_grok_4_evaluation = oci_xai_grok_4_evaluation
@@ -216,7 +216,7 @@ def insert_query_result(
                     ]
                 )
 
-            if "cohere/command-a" in llm_answer_checkbox_group:
+            if "oci_cohere/command-a" in llm_answer_checkbox_group:
                 oci_cohere_command_a_response = oci_cohere_command_a_response
                 if llm_evaluation_checkbox:
                     oci_cohere_command_a_evaluation = oci_cohere_command_a_evaluation
