@@ -2,6 +2,12 @@
 
 ## Deploy
 
+- v1.1.6(Pre-Release): 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
+  - modify: load .txt file by TextLoader
+
+  Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.1.6/v1.1.6.zip)
+
+
 - v1.1.5(Pre-Release): 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
   - fix: ORA-64451: failed to escape special character 0x1
 
@@ -15,8 +21,6 @@
   - remove model: meta.llama-3-2-90b-vision
   - remove model: openai/gpt-4o
   - remove model: azure_openai/gpt-4o
-
- 
 
 - v1.1.1: 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
   - update: oracle instance client 
