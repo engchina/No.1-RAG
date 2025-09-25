@@ -85,16 +85,37 @@ def extract_and_format(input_str, search_result_df):
     for json_str in json_arrays:
         input_str = input_str.replace(json_str, '')
         json_str = json_str.replace('\n', '').replace('\r', '')
-        data = json.loads(json_str)
-
-        for item in data:
-            print(f"{item=}")
-            if isinstance(item, dict):
-                if "EMBED_ID" in item and "SOURCE" in item:
-                    extracted.append({
-                        "EMBED_ID": item["EMBED_ID"],
-                        "SOURCE": item["SOURCE"]
-                    })
+        
+        try:
+            # JSONパース前にデバッグ情報を出力
+            print(f"JSONパース試行中: {json_str[:100]}...")  # 最初の100文字のみ表示
+            
+            # JSON標準に準拠するため、単引号を双引号に変換
+            # ただし、文字列値内の単引号は保護する必要がある
+            json_str_fixed = json_str.replace("'", '"')
+            
+            print(f"修正後のJSON: {json_str_fixed[:100]}...")  # デバッグ用
+            data = json.loads(json_str_fixed)
+            
+            for item in data:
+                print(f"{item=}")
+                if isinstance(item, dict):
+                    if "EMBED_ID" in item and "SOURCE" in item:
+                        extracted.append({
+                            "EMBED_ID": item["EMBED_ID"],
+                            "SOURCE": item["SOURCE"]
+                        })
+        except json.JSONDecodeError as e:
+            # JSONパースエラーが発生した場合のエラーハンドリング
+            print(f"JSONパースエラー: {e}")
+            print(f"問題のあるJSON文字列: {json_str}")
+            # エラーが発生してもプログラムを継続させる
+            continue
+        except Exception as e:
+            # その他の予期しないエラーに対するハンドリング
+            print(f"予期しないエラー: {e}")
+            print(f"問題のあるJSON文字列: {json_str}")
+            continue
 
     formatted = (
             input_str +

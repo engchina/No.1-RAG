@@ -54,6 +54,6 @@ runcmd:
   - netfilter-persistent save
   - echo "Downloading and running init script..."
   - cd /u01/aipoc
-  - git clone -b v1.1.6 https://github.com/engchina/No.1-RAG.git; cd No.1-RAG
+  - git clone -b v1.1.7 https://github.com/engchina/No.1-RAG.git; cd No.1-RAG
   - chmod +x init_script.sh
   - nohup bash init_script.sh >> /var/log/cloud-init-custom.log 2>&1 &
