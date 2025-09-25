@@ -126,9 +126,9 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
         chunk_overlap=chunks_overlap
     )
 
-    # .mdファイルの場合、データベースからコンテンツを取得
     doc_data = ""
-    if server_path.lower().endswith('.md'):
+    # .mdと.txtファイルの場合
+    if server_path.lower().endswith(('.md', '.txt')):
         loader = TextLoader(server_path)
         documents = loader.load()
         doc_data = "\n".join(doc.page_content for doc in documents)

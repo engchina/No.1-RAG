@@ -62,8 +62,8 @@ def embed_save_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
     server_path = get_server_path_func(doc_id)
     chunks_overlap = int(float(chunks_max_size) * (float(chunks_overlap_size) / 100))
 
-    # .mdファイルの場合、コンテンツを取得して画像ブロックを処理
-    if server_path.lower().endswith('.md'):
+    # .mdと.txtファイルの場合
+    if server_path.lower().endswith(('.md', '.txt')):
         loader = TextLoader(server_path)
         documents = loader.load()
         doc_data = "\n".join(doc.page_content for doc in documents)

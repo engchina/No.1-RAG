@@ -79,8 +79,8 @@ def load_document(file_path, server_directory, document_metadata,
 
     # ドキュメント内容の処理
     collection_cmeta = {}
-    if file_extension == ".md":
-        # Markdownファイルの処理
+    # .mdと.txtファイルの場合
+    if file_extension.lower() in [".md", ".txt"]:
         loader = TextLoader(server_path)
         documents = loader.load()
         original_contents = "".join(doc.page_content for doc in documents)
