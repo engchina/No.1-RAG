@@ -1411,7 +1411,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 with gr.Row():
                     with gr.Column():
                         tab_load_document_file_text = gr.File(
-                            label="ファイル*",
+                            label="ファイル*（.txt もしくは .md 形式のファイルを使用する際は、UTF-8エンコーディングをご使用ください。）",
                             file_types=[
                                 ".txt", ".csv", ".doc", ".docx", ".epub", ".image",
                                 ".md", ".msg", ".odt", ".org", ".pdf", ".ppt",
