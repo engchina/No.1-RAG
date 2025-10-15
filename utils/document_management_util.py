@@ -179,6 +179,8 @@ def search_document(
     Returns:
         tuple: 検索結果を含むGradioコンポーネントのタプル
     """
+    if int(extend_first_chunk_size_input) != 0:
+        extend_first_chunk_size_input = int(extend_first_chunk_size_input) + 10000
     # Vision 回答がオンの場合、特定のパラメータ値を強制使用
     if use_image:
         answer_by_one_checkbox_input = False
