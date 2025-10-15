@@ -775,7 +775,7 @@ ORDER BY
             print(f"{extend_first_chunk_size_input=}")
             if extend_first_chunk_size_input > 0 and len(docs_dataframe) > 0:
                 filtered_doc_ids = "'" + "','".join(
-                    [source.split(':')[0] for source in docs_dataframe['SOURCE'].tolist()]) + "'"
+                    list(set([source.split(':')[0] for source in docs_dataframe['SOURCE'].tolist()]))) + "'"
                 print(f"{filtered_doc_ids=}")
                 # 画像を使って回答の設定に応じて適切なテーブルを選択
                 if use_image:
