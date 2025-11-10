@@ -5,6 +5,7 @@
 Markdown形式とunstructured形式の両方のドキュメント処理をサポートしています。
 """
 
+import chardet
 import json
 import os
 import shutil
@@ -81,10 +82,66 @@ def load_document(file_path, server_directory, document_metadata,
     collection_cmeta = {}
     # .mdと.txtファイルの場合
     if file_extension.lower() in [".md", ".txt"]:
-        loader = TextLoader(server_path)
-        documents = loader.load()
-        original_contents = "".join(doc.page_content for doc in documents)
-        pages_count = len(documents)
+        with open(server_path, "rb") as f:
+            raw_data = f.read(4096)
+            result = chardet.detect(raw_data)
+            detected_encoding = result["encoding"]
+
+        # 検出されたエンコーディングを検証し、失敗した場合はフォールバック
+        encoding = None
+
+        # まず検出されたエンコーディングを試す（置信度が0.5以上の場合）
+        if detected_encoding and result["confidence"] >= 0.5:
+            try:
+                with open(server_path, 'r', encoding=detected_encoding) as test_file:
+                    test_file.read(1000)  # 最初の1000文字を読んで検証
+                encoding = detected_encoding
+                print(f"Validated detected encoding: {encoding}")
+            except (UnicodeDecodeError, UnicodeError, LookupError):
+                print(f"Detected encoding {detected_encoding} failed validation, trying fallbacks...")
+
+        # 検出されたエンコーディングが使えない場合、フォールバックを試す
+        if encoding is None:
+            # 中国語、日本語、一般的なエンコーディングを含む包括的なリスト
+            fallback_encodings = [
+                'utf-8', 'utf-8-sig',  # UTF-8系（最も一般的）
+                'gbk', 'gb18030', 'gb2312',  # 中国語エンコーディング
+                'cp932', 'shift_jis', 'euc-jp', 'iso-2022-jp',  # 日本語エンコーディング
+                'latin1', 'cp1252',  # 西欧系
+                'big5'  # 繁体字中国語
+            ]
+
+            for test_encoding in fallback_encodings:
+                try:
+                    with open(server_path, 'r', encoding=test_encoding) as test_file:
+                        test_file.read(1000)
+                    encoding = test_encoding
+                    print(f"Fallback encoding detected: {encoding}")
+                    break
+                except (UnicodeDecodeError, UnicodeError, LookupError):
+                    continue
+
+            if encoding is None:
+                encoding = 'utf-8'
+                print(f"All encodings failed, using default: {encoding} with error handling")
+
+        try:
+            loader = TextLoader(server_path, encoding=encoding)
+            documents = loader.load()
+            original_contents = "".join(doc.page_content for doc in documents)
+            pages_count = len(documents)
+        except UnicodeDecodeError:
+            # エラーが発生した場合は、unstructured使用
+            # https://docs.unstructured.io/open-source/core-functionality/overview
+            pages_count = 1
+            elements = partition(filename=server_path, strategy='fast',
+                                languages=["jpn", "eng", "chi_sim"],
+                                extract_image_block_types=["Table"],
+                                extract_image_block_to_payload=False,
+                                skip_infer_table_types=["pdf", "jpg", "png", "heic", "doc", "docx"])
+            # for el in elements:
+            #     print(f"{el=}")
+            original_contents = " \n".join(el.text.replace('\x0b', '\n').replace('\x01', ' ') for el in elements)
     else:
         # その他のファイル形式の処理（unstructured使用）
         # https://docs.unstructured.io/open-source/core-functionality/overview
@@ -97,7 +154,7 @@ def load_document(file_path, server_directory, document_metadata,
         # for el in elements:
         #     print(f"{el=}")
         original_contents = " \n".join(el.text.replace('\x0b', '\n').replace('\x01', ' ') for el in elements)
-        print(f"{original_contents=}")
+    print(f"{original_contents=}")
 
     # メタデータの設定
     collection_cmeta['file_name'] = file_name

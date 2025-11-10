@@ -1273,11 +1273,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             tab_convert_excel_to_text_button = gr.Button(
                                 value="ExcelをTextへ変換",
                                 variant="primary")
-                with gr.TabItem(label="Xml2Text", visible=False) as tab_convert_xml_to_text_document:
+                with gr.TabItem(label="Xml2Text", visible=True) as tab_convert_xml_to_text_document:
                     with gr.Row():
                         with gr.Column():
                             tab_convert_document_convert_xml_to_text_file_text = gr.File(
-                                label="変換前のファイル*",
+                                label="変換前のファイル*（読み取りエラーが発生した場合は、UTF-8エンコーディングをご使用ください。）",
                                 file_types=[
                                     ".xml",
                                 ],
@@ -1285,34 +1285,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 interactive=True,
                             )
                     with gr.Accordion(label="タグ設定", open=True):
-                        with gr.Row():
-                            with gr.Column(scale=1):
-                                # グローバルタグ
-                                tab_convert_document_convert_xml_global_tag_text = gr.Textbox(
-                                    label="グローバルタグ",
-                                    lines=1,
-                                    interactive=True,
-                                    placeholder="tag1,tag2,tag3",
-                                    info="主タグと同じ親要素内から検索するタグ名をカンマ区切りで指定します。主タグの親要素内から指定されたタグを検索し、テキスト内容と属性を抽出します。"
-                                )
-                            with gr.Column(scale=1):
-                                # 固定タグ
-                                tab_convert_document_convert_xml_fixed_tag_text = gr.Textbox(
-                                    label="固定タグ",
-                                    lines=1,
-                                    interactive=True,
-                                    placeholder="key1=value1,key2=value2,...",
-                                    info="変換時に固定的に使用されるタグ名を指定します。"
-                                )
-                            with gr.Column(scale=1):
-                                # 置換タグ
-                                tab_convert_document_convert_xml_replace_tag_text = gr.Textbox(
-                                    label="置換タグ",
-                                    lines=1,
-                                    interactive=True,
-                                    placeholder="old_tag1=new_tag1,old_tag2=new_tag2,...",
-                                    info="既存のタグを別のタグに置換する際の設定を指定します。"
-                                )
                         with gr.Row():
                             with gr.Column(scale=1):
                                 # 前置きタグ
@@ -1333,22 +1305,51 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                     info="メインコンテンツを囲むタグ名を指定します。必須項目です。"
                                 )
                             with gr.Column(scale=1):
-                                # 後付けタグ
-                                tab_convert_document_convert_xml_suffix_tag_text = gr.Textbox(
-                                    label="後付けタグ",
-                                    lines=1,
-                                    interactive=True,
-                                    placeholder="suffix1,suffix2,...",
-                                    info="コンテンツの後に追加されるタグを指定します。"
-                                )
-                        with gr.Row():
-                            with gr.Column(scale=1):
                                 # マージするかどうかのチェックボックス
                                 tab_convert_document_convert_xml_merge_checkbox = gr.Checkbox(
                                     label="マージする",
                                     value=True,
                                     interactive=True,
                                     info="複数のタグをマージして処理します。同じタグ名の要素を統合する際に使用します。"
+                                )
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                # グローバルタグ
+                                tab_convert_document_convert_xml_global_tag_text = gr.Textbox(
+                                    label="グローバルタグ",
+                                    lines=1,
+                                    interactive=True,
+                                    placeholder="tag1,tag2,...",
+                                    info="主タグと同じ親要素内から検索するタグ名をカンマ区切りで指定します。主タグの親要素内から指定されたタグを検索し、テキスト内容と属性を抽出します。"
+                                )
+                            with gr.Column(scale=1):
+                                # 固定タグ
+                                tab_convert_document_convert_xml_fixed_tag_text = gr.Textbox(
+                                    label="固定タグ",
+                                    lines=1,
+                                    interactive=True,
+                                    placeholder="key1=value1,key2=value2,...",
+                                    info="変換時に固定的に使用されるタグ名を指定します。"
+                                )
+                            with gr.Column(scale=1):
+                                # 置換タグ
+                                tab_convert_document_convert_xml_replace_tag_text = gr.Textbox(
+                                    label="置換タグ",
+                                    lines=1,
+                                    interactive=True,
+                                    placeholder="old_tag1=new_tag1,old_tag2=new_tag2,...",
+                                    info="既存のタグを別のタグに置換する際の設定を指定します。"
+                                )
+                        with gr.Row(visible=False):
+                            with gr.Column(scale=1):
+                                # 後付けタグ
+                                tab_convert_document_convert_xml_suffix_tag_text = gr.Textbox(
+                                    label="後付けタグ",
+                                    lines=1,
+                                    interactive=True,
+                                    placeholder="suffix1,suffix2,...",
+                                    info="コンテンツの後に追加されるタグを指定します。",
+                                    visible=False,
                                 )
                             with gr.Column(scale=1):
                                 gr.Markdown("&nbsp;")
@@ -1359,11 +1360,11 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             tab_convert_xml_to_text_button = gr.Button(
                                 value="XmlをTextへ変換",
                                 variant="primary")
-                with gr.TabItem(label="Json2Text", visible=False) as tab_convert_json_to_text_document:
+                with gr.TabItem(label="Json2Text", visible=True) as tab_convert_json_to_text_document:
                     with gr.Row():
                         with gr.Column():
                             tab_convert_document_convert_json_to_text_file_text = gr.File(
-                                label="変換前のファイル*",
+                                label="変換前のファイル*（読み取りエラーが発生した場合は、UTF-8エンコーディングをご使用ください。）",
                                 file_types=[
                                     ".json",
                                 ],
@@ -1411,7 +1412,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 with gr.Row():
                     with gr.Column():
                         tab_load_document_file_text = gr.File(
-                            label="ファイル*（.txt もしくは .md 形式のファイルを使用する際は、UTF-8エンコーディングをご使用ください。）",
+                            label="ファイル*（.txt または .md ファイルで読み取りエラーが発生した場合は、UTF-8エンコーディングをご使用ください。）",
                             file_types=[
                                 ".txt", ".csv", ".doc", ".docx", ".epub", ".image",
                                 ".md", ".msg", ".odt", ".org", ".pdf", ".ppt",

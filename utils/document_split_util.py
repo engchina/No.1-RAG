@@ -5,6 +5,7 @@
 unstructured形式のドキュメント処理とembedding生成に特化しています。
 """
 
+import chardet
 import re
 from typing import List, Dict, Any, Tuple
 
@@ -129,9 +130,92 @@ def split_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
     doc_data = ""
     # .mdと.txtファイルの場合
     if server_path.lower().endswith(('.md', '.txt')):
-        loader = TextLoader(server_path)
-        documents = loader.load()
-        doc_data = "\n".join(doc.page_content for doc in documents)
+        with open(server_path, "rb") as f:
+            raw_data = f.read(4096)
+            result = chardet.detect(raw_data)
+            detected_encoding = result["encoding"]
+
+        # 検出されたエンコーディングを検証し、失敗した場合はフォールバック
+        encoding = None
+
+        # まず検出されたエンコーディングを試す（置信度が0.5以上の場合）
+        if detected_encoding and result["confidence"] >= 0.5:
+            try:
+                with open(server_path, 'r', encoding=detected_encoding) as test_file:
+                    test_file.read(1000)  # 最初の1000文字を読んで検証
+                encoding = detected_encoding
+                print(f"Validated detected encoding: {encoding}")
+            except (UnicodeDecodeError, UnicodeError, LookupError):
+                print(f"Detected encoding {detected_encoding} failed validation, trying fallbacks...")
+
+        # 検出されたエンコーディングが使えない場合、フォールバックを試す
+        if encoding is None:
+            # 中国語、日本語、一般的なエンコーディングを含む包括的なリスト
+            fallback_encodings = [
+                'utf-8', 'utf-8-sig',  # UTF-8系（最も一般的）
+                'gbk', 'gb18030', 'gb2312',  # 中国語エンコーディング
+                'cp932', 'shift_jis', 'euc-jp', 'iso-2022-jp',  # 日本語エンコーディング
+                'latin1', 'cp1252',  # 西欧系
+                'big5'  # 繁体字中国語
+            ]
+
+            for test_encoding in fallback_encodings:
+                try:
+                    with open(server_path, 'r', encoding=test_encoding) as test_file:
+                        test_file.read(1000)
+                    encoding = test_encoding
+                    print(f"Fallback encoding detected: {encoding}")
+                    break
+                except (UnicodeDecodeError, UnicodeError, LookupError):
+                    continue
+
+            if encoding is None:
+                encoding = 'utf-8'
+                print(f"All encodings failed, using default: {encoding} with error handling")
+
+        try:
+            loader = TextLoader(server_path, encoding=encoding)
+            documents = loader.load()
+            doc_data = "\n".join(doc.page_content for doc in documents)
+        except UnicodeDecodeError:
+            # エラーが発生した場合は、unstructured使用
+            elements = partition(filename=server_path, strategy='fast',
+                                languages=["jpn", "eng", "chi_sim"],
+                                extract_image_block_types=["Table"],
+                                extract_image_block_to_payload=False,
+                                skip_infer_table_types=["pdf", "jpg", "png", "heic", "doc", "docx"])
+
+            # テーブルデータの処理（Claudeを使用）
+            page_table_documents = {}
+            prev_page_number = 0
+            table_idx = 1
+
+            for el in elements:
+                page_number = el.metadata.page_number
+                if prev_page_number != page_number:
+                    prev_page_number = page_number
+                    table_idx = 1
+                if el.category == "Table":
+                    table_id = f"page_{page_number}_table_{table_idx}"
+                    print(f"{table_id=}")
+                    print(f"{page_table_documents=}")
+                    if page_table_documents:
+                        page_table_document = get_dict_value(page_table_documents, table_id)
+                        print(f"{page_table_document=}")
+                        if page_table_document:
+                            page_content = get_dict_value(page_table_document, "page_content")
+                            table_to_markdown = get_dict_value(page_table_document, "table_to_markdown")
+                            if page_content and table_to_markdown:
+                                print(f"Before: {el.text=}")
+                                el.text = page_content + "\n" + table_to_markdown + "\n"
+                                print(f"After: {el.text=}")
+                    table_idx += 1
+
+            for element in elements:
+                # element.textを文字列に変換してLOBオブジェクトのTypeErrorを回避
+                element.text = str(element.text).replace('\x0b', '\n')
+                element.text = str(element.text).replace('\x01', ' ')
+            doc_data = " \n".join([str(element.text) for element in elements])
 
         # 画像ブロックが含まれている場合はOCRコンテンツを抽出
         if re.search(r'<!-- image_begin -->.*?<!-- image_end -->', doc_data, re.DOTALL):

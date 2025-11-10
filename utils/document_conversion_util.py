@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import chardet
 import shutil
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -679,8 +680,53 @@ def convert_json_to_text_document(file_path):
     output_file_path = file_path.name + '.txt'
 
     try:
-        # JSONファイルを読み込み
-        with open(file_path.name, 'r', encoding='utf-8') as f:
+        # 入力ファイルのエンコーディングを推定
+        with open(file_path.name, 'rb') as f:
+            raw_data = f.read(4096)
+            result = chardet.detect(raw_data)
+            print(f"{result=}")
+            detected_encoding = result.get("encoding")
+
+        # 検出されたエンコーディングを検証し、失敗した場合はフォールバック
+        encoding = None
+        
+        # まず検出されたエンコーディングを試す（置信度が0.5以上の場合）
+        if detected_encoding and result.get("confidence", 0.0) >= 0.5:
+            try:
+                with open(file_path.name, 'r', encoding=detected_encoding) as test_file:
+                    test_file.read(1000)  # 最初の1000文字を読んで検証
+                encoding = detected_encoding
+                print(f"Validated detected encoding: {encoding}")
+            except (UnicodeDecodeError, UnicodeError, LookupError):
+                print(f"Detected encoding {detected_encoding} failed validation, trying fallbacks...")
+
+        # 検出されたエンコーディングが使えない場合、フォールバックを試す
+        if encoding is None:
+            # 中国語、日本語、一般的なエンコーディングを含む包括的なリスト
+            fallback_encodings = [
+                'utf-8', 'utf-8-sig',  # UTF-8系（最も一般的）
+                'gbk', 'gb18030', 'gb2312',  # 中国語エンコーディング
+                'cp932', 'shift_jis', 'euc-jp', 'iso-2022-jp',  # 日本語エンコーディング
+                'latin1', 'cp1252',  # 西欧系
+                'big5'  # 繁体字中国語
+            ]
+
+            for test_encoding in fallback_encodings:
+                try:
+                    with open(file_path.name, 'r', encoding=test_encoding) as test_file:
+                        test_file.read(1000)
+                    encoding = test_encoding
+                    print(f"Fallback encoding detected: {encoding}")
+                    break
+                except (UnicodeDecodeError, UnicodeError, LookupError):
+                    continue
+
+            if encoding is None:
+                encoding = 'utf-8'
+                print(f"All encodings failed, using default: {encoding}")
+
+        # JSONファイルを読み込み（検証済みエンコーディングを使用）
+        with open(file_path.name, 'r', encoding=encoding) as f:
             json_data = json.load(f)
 
         # JSONデータが配列であることを確認
