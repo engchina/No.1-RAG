@@ -1049,7 +1049,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 with gr.Row():
                     with gr.Column():
                         tab_create_openai_cred_button = gr.Button(value="設定/再設定", variant="primary")
-            with gr.TabItem(label="Azure OpenAIの設定(オプション)") as tab_create_azure_openai_cred:
+            with gr.TabItem(label="Azure OpenAIの設定(オプション)", visible=False) as tab_create_azure_openai_cred:
                 with gr.Row():
                     with gr.Column():
                         tab_create_azure_openai_cred_api_key_text = gr.Textbox(
@@ -1109,7 +1109,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 "oci_cohere/command-a",
                                 "oci_meta/llama-4-scout-17b-16e-instruct",
                                 "openai/gpt-4o",
-                                "azure_openai/gpt-4o"
+                                # "azure_openai/gpt-4o",
                             ],
                             label="LLM モデル*",
                             value=[]
@@ -1636,7 +1636,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 "oci_cohere/command-a",
                                 "oci_meta/llama-4-scout-17b-16e-instruct",
                                 "openai/gpt-4o",
-                                "azure_openai/gpt-4o"
+                                # "azure_openai/gpt-4o",
                             ],
                             label="LLM モデル",
                             value=[]
