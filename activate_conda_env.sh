@@ -1,6 +1,6 @@
 #!/bin/bash
 # Source conda.sh to ensure conda command is available
-source ~/miniconda3/etc/profile.d/conda.sh
+source /u01/aipoc/miniconda/etc/profile.d/conda.sh
 
 # Activate the desired conda environment
 conda activate no.1-rag

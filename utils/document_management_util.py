@@ -46,7 +46,7 @@ FROM
     {default_collection_name}_collection
 ORDER BY name """)
                 return [(f"{row[0]}", row[1]) for row in cursor.fetchall()]
-            except DatabaseError as de:
+            except DatabaseError:
                 return []
 
 
@@ -414,7 +414,7 @@ def search_document(
     """ if partition_by_k_slider_input > 0 else """
     FETCH FIRST :top_k ROWS ONLY
     """
-    select_sql = f"""
+    select_sql = """
 ),
 selected_embed_id_doc_ids AS
 (
@@ -456,14 +456,14 @@ aggregated_results AS
     GROUP BY 
         de.doc_id, name, de.embed_id, de.embed_data """
 
-    select_sql += """
+    select_sql += f"""
     ORDER BY
         vector_distance
 )"""
 
     # use_image が true の場合、相邻 embed_id のデータ合併を行わない
     if use_image:
-        select_sql += """
+        select_sql += f"""
                       SELECT ar.name,
                              ar.embed_id,
                              ar.embed_data AS combined_embed_data,
@@ -473,7 +473,7 @@ aggregated_results AS
                       ORDER BY ar.vector_distance """
     else:
         # use_image が false の場合、従来の相邻 embed_id データ合併ロジックを使用
-        select_sql += """
+        select_sql += f"""
 ,
 ranked_data AS
 (

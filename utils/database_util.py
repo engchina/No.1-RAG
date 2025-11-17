@@ -138,7 +138,7 @@ PARAMETERS ('LEXER world_lexer sync (every "freq=minutely; interval=1")')"""
     create_embedding_table_sql = f"""CREATE TABLE IF NOT EXISTS {default_collection_name}_embedding (
         doc_id VARCHAR2(200),
         embed_id NUMBER,
-        embed_data VARCHAR2(4000),
+        embed_data VARCHAR2(8000),
         embed_vector VECTOR({embedding_dim}, FLOAT32),
         cmetadata CLOB
     )"""
@@ -154,7 +154,7 @@ PARAMETERS ('LEXER world_lexer sync (every "freq=minutely; interval=1")')"""
     create_image_embedding_table_sql = f"""CREATE TABLE IF NOT EXISTS {default_collection_name}_image_embedding (
         doc_id VARCHAR2(200),
         embed_id NUMBER,
-        embed_data VARCHAR2(4000),
+        embed_data VARCHAR2(8000),
         embed_vector VECTOR({embedding_dim}, FLOAT32),
         cmetadata CLOB,
         img_id NUMBER
