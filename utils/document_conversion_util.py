@@ -639,15 +639,31 @@ def convert_excel_to_text_document(file_path):
         return gr.File(value=None), gr.File()
 
     output_file_path = file_path.name + '.txt'
-    df = pd.read_excel(file_path.name)
+    ext = Path(file_path.name).suffix.lower()
+    try:
+        if ext == '.csv':
+            try:
+                df = pd.read_csv(file_path.name, encoding='utf-8')
+            except UnicodeDecodeError:
+                df = pd.read_csv(file_path.name, encoding='cp932')
+        elif ext in ('.xls', '.xlsx'):
+            engine = 'openpyxl' if ext == '.xlsx' else None
+            df = pd.read_excel(file_path.name, engine=engine) if engine else pd.read_excel(file_path.name)
+        else:
+            gr.Warning("CSVまたはExcelファイルのみ対応しています")
+            return gr.File(value=None), gr.File()
+    except Exception as e:
+        gr.Warning(f"ファイル読込みに失敗しました: {str(e)}")
+        return gr.File(value=None), gr.File()
     data = df.to_dict('records')
     with open(output_file_path, 'w', encoding='utf-8') as f:
         for row in data:
-            # 各行を処理してTimestampを文字列に変換
             processed_row = {}
             for key, value in row.items():
-                if isinstance(value, pd.Timestamp):
-                    processed_row[key] = str(value)
+                if pd.isna(value):
+                    processed_row[key] = None
+                elif isinstance(value, pd.Timestamp):
+                    processed_row[key] = value.isoformat()
                 else:
                     processed_row[key] = value
             json_line = json.dumps(processed_row, ensure_ascii=False)

@@ -46,7 +46,7 @@ FROM
     {default_collection_name}_collection
 ORDER BY name """)
                 return [(f"{row[0]}", row[1]) for row in cursor.fetchall()]
-            except DatabaseError as de:
+            except DatabaseError:
                 return []
 
 
@@ -179,6 +179,8 @@ def search_document(
     Returns:
         tuple: 検索結果を含むGradioコンポーネントのタプル
     """
+    if int(extend_first_chunk_size_input) != 0:
+        extend_first_chunk_size_input = int(extend_first_chunk_size_input) + 10000
     # Vision 回答がオンの場合、特定のパラメータ値を強制使用
     if use_image:
         answer_by_one_checkbox_input = False
@@ -412,7 +414,7 @@ def search_document(
     """ if partition_by_k_slider_input > 0 else """
     FETCH FIRST :top_k ROWS ONLY
     """
-    select_sql = f"""
+    select_sql = """
 ),
 selected_embed_id_doc_ids AS
 (
@@ -454,14 +456,14 @@ aggregated_results AS
     GROUP BY 
         de.doc_id, name, de.embed_id, de.embed_data """
 
-    select_sql += """
+    select_sql += f"""
     ORDER BY
         vector_distance
 )"""
 
     # use_image が true の場合、相邻 embed_id のデータ合併を行わない
     if use_image:
-        select_sql += """
+        select_sql += f"""
                       SELECT ar.name,
                              ar.embed_id,
                              ar.embed_data AS combined_embed_data,
@@ -471,7 +473,7 @@ aggregated_results AS
                       ORDER BY ar.vector_distance """
     else:
         # use_image が false の場合、従来の相邻 embed_id データ合併ロジックを使用
-        select_sql += """
+        select_sql += f"""
 ,
 ranked_data AS
 (
@@ -773,7 +775,7 @@ ORDER BY
             print(f"{extend_first_chunk_size_input=}")
             if extend_first_chunk_size_input > 0 and len(docs_dataframe) > 0:
                 filtered_doc_ids = "'" + "','".join(
-                    [source.split(':')[0] for source in docs_dataframe['SOURCE'].tolist()]) + "'"
+                    list(set([source.split(':')[0] for source in docs_dataframe['SOURCE'].tolist()]))) + "'"
                 print(f"{filtered_doc_ids=}")
                 # 画像を使って回答の設定に応じて適切なテーブルを選択
                 if use_image:

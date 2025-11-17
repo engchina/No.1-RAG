@@ -223,7 +223,7 @@ def _create_table(client: Connection, collection_name: str, embedding_dim: int) 
     embedding_cols_dict = {
         "doc_id": "VARCHAR2(200)",
         "embed_id": "NUMBER",
-        "embed_data": "VARCHAR2(2000)",
+        "embed_data": "VARCHAR2(8000)",
         "embed_vector": f"vector({embedding_dim}, FLOAT32)",
         "cmetadata": "CLOB"
     }
