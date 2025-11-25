@@ -107,6 +107,20 @@ def create_oci_cred(user_ocid, tenancy_ocid, fingerprint, private_key_file, regi
                 print(f"DatabaseError={de}")
 
             try:
+                acl_genai_sql = f"""
+    BEGIN
+      DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE(
+        host => 'inference.generativeai.{region}.oci.oraclecloud.com',
+        ace  => xs$ace_type(privilege_list => xs$name_list('http'),
+                            principal_name => 'admin',
+                            principal_type => xs_acl.ptype_db));
+    END;
+                """
+                cursor.execute(acl_genai_sql)
+            except DatabaseError as de:
+                print(f"DatabaseError={de}")
+
+            try:
                 drop_oci_cred_sql = "BEGIN dbms_vector.drop_credential('OCI_CRED'); END;"
                 cursor.execute(drop_oci_cred_sql)
             except DatabaseError as de:
@@ -139,6 +153,15 @@ def create_oci_cred(user_ocid, tenancy_ocid, fingerprint, private_key_file, regi
         ace => xs$ace_type(privilege_list => xs$name_list('connect'),
                            principal_name => 'admin',
                            principal_type => xs_acl.ptype_db));
+    END;
+
+    -- Append OCI GenAI Host ACE
+    BEGIN
+      DBMS_NETWORK_ACL_ADMIN.APPEND_HOST_ACE(
+        host => 'inference.generativeai.{region}.oci.oraclecloud.com',
+        ace  => xs$ace_type(privilege_list => xs$name_list('http'),
+                            principal_name => 'admin',
+                            principal_type => xs_acl.ptype_db));
     END;
 
     -- Drop Existing OCI Credential
