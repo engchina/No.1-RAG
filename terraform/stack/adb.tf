@@ -1,13 +1,4 @@
-resource "random_string" "autonomous_data_warehouse_admin_password" {
-  length      = 16
-  min_numeric = 1
-  min_lower   = 1
-  min_upper   = 1
-  min_special = 1
-}
-
 resource "oci_database_autonomous_database" "generated_database_autonomous_database" {
-#   admin_password                       = random_string.autonomous_data_warehouse_admin_password.result
   admin_password                       = var.adb_password
   autonomous_maintenance_schedule_type = "REGULAR"
   backup_retention_period_in_days      = "1"
@@ -17,7 +8,7 @@ resource "oci_database_autonomous_database" "generated_database_autonomous_datab
   compute_model                        = "ECPU"
   data_storage_size_in_tbs             = "1"
   db_name                              = var.adb_name
-  db_version                                     = "23ai"
+  db_version                                     = "26ai"
   db_workload                                    = "DW"
   display_name                                   = var.adb_name
   is_auto_scaling_enabled                        = "false"
@@ -31,12 +22,19 @@ resource "oci_database_autonomous_database" "generated_database_autonomous_datab
 
 resource "oci_database_autonomous_database_wallet" "generated_autonomous_data_warehouse_wallet" {
   autonomous_database_id = oci_database_autonomous_database.generated_database_autonomous_database.id
-#   password               = random_string.autonomous_data_warehouse_admin_password.result
-  password               = var.adb_password
+  password               = var.db_password
   base64_encode_content  = "true"
+  generate_type          = "SINGLE"
 }
 
-resource "local_file" "generated_autonomous_data_warehouse_wallet_file" {
+# ウォレットZIPをローカルに保存（base64デコードしてバイナリで書き込み）
+resource "local_file" "wallet_zip" {
   content_base64 = oci_database_autonomous_database_wallet.generated_autonomous_data_warehouse_wallet.content
-  filename       = "${path.module}/wallet.zip"
+  filename       = "${path.module}/wallet_full.zip"
+}
+
+# 外部データソースでウォレットから個別ファイルを抽出（外部スクリプト使用）
+data "external" "wallet_files" {
+  depends_on = [local_file.wallet_zip]
+  program    = ["bash", "${path.module}/extract_wallet.sh"]
 }

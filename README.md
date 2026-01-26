@@ -2,17 +2,19 @@
 
 ## Deploy
 
+- v1.2.4(Pre-Release): 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
+  - fix: wallet.zip over 32k
+
+  Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.2.4/v1.2.4.zip)
 
 
 
 - v1.2.3(Pre-Release): 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
   - fix: add an ACL to allow access to OCI Generative AI 
 
-  Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.2.3/v1.2.3.zip)
 
 - v1.2.2(Pre-Release): 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
   - support: shift-jis csv on excel2text 
-
  
 
 - v1.2.1(Pre-Release): 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
