@@ -1,5 +1,8 @@
 resource "oci_core_instance" "generated_oci_core_instance" {
-  depends_on = [oci_database_autonomous_database.generated_database_autonomous_database]
+  depends_on = [
+    oci_database_autonomous_database.generated_database_autonomous_database,
+    data.external.wallet_files
+  ]
   availability_config {
     is_live_migration_preferred = "false"
     recovery_action             = "STOP_INSTANCE"
