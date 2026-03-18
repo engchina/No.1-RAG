@@ -1740,8 +1740,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 minimum=0,
                                 maximum=50, step=2,
                                 interactive=True,
-                                value=2,
-                                info="Default value: 2。DISTANCE計算対象外。検索されたチャンクを拡張する数を指定。0: 拡張しない。 2: 2個で前後それぞれ1個を拡張。4: 4個で前後それぞれ2個を拡張。... n: n個で前後それぞれn/2個を拡張。"
+                                value=0,
+                                info="Default value: 0。DISTANCE計算対象外。検索されたチャンクを拡張する数を指定。0: 拡張しない。 2: 2個で前後それぞれ1個を拡張。4: 4個で前後それぞれ2個を拡張。... n: n個で前後それぞれn/2個を拡張。"
                             )
                     with gr.Row():
                         with gr.Column():
