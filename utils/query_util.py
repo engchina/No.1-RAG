@@ -185,7 +185,7 @@ def insert_query_result(
                     ]
                 )
 
-            if "oci_xai/grok-4" in llm_answer_checkbox_group:
+            if "oci_xai/grok-4.20" in llm_answer_checkbox_group:
                 oci_xai_grok_4_response = oci_xai_grok_4_response
                 if llm_evaluation_checkbox:
                     oci_xai_grok_4_evaluation = oci_xai_grok_4_evaluation
@@ -209,7 +209,7 @@ def insert_query_result(
                     insert_sql,
                     [
                         query_id,
-                        "oci_xai/grok-4",
+                        "oci_xai/grok-4.20",
                         oci_xai_grok_4_response,
                         "",  # Vision機能なし
                         oci_xai_grok_4_evaluation

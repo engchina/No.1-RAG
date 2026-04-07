@@ -128,7 +128,7 @@ def generate_download_file(
         oci_openai_gpt_4_1_evaluation = ""
         oci_openai_gpt_4_1_referenced_contexts = ""
 
-    if "oci_xai/grok-4" in llm_answer_checkbox_group:
+    if "oci_xai/grok-4.20" in llm_answer_checkbox_group:
         oci_xai_grok_4_response = oci_xai_grok_4_response
         oci_xai_grok_4_referenced_contexts = ""
         if include_citation:
@@ -208,7 +208,7 @@ def generate_download_file(
                     "oci_openai/gpt-5",
                     "oci_openai/o3",
                     "oci_openai/gpt-4.1",
-                    "oci_xai/grok-4",
+                    "oci_xai/grok-4.20",
                     "oci_cohere/command-a",
                     "oci_meta/llama-4-scout-17b-16e-instruct",
                     "openai/gpt-4o",

@@ -181,7 +181,7 @@ async def chat_stream(
         oci_openai_o3_checkbox = True
     if "oci_openai/gpt-4.1" in llm_answer_checkbox:
         oci_openai_gpt_4_1_checkbox = True
-    if "oci_xai/grok-4" in llm_answer_checkbox:
+    if "oci_xai/grok-4.20" in llm_answer_checkbox:
         oci_xai_grok_4_checkbox = True
     if "oci_cohere/command-a" in llm_answer_checkbox:
         oci_cohere_command_a_checkbox = True

@@ -221,7 +221,7 @@ async def oci_xai_grok_4_task(system_text, query_text, oci_xai_grok_4_checkbox):
     region = get_region()
     if oci_xai_grok_4_checkbox:
         oci_xai_grok_4 = ChatOCIGenAI(
-            model_id="xai.grok-4",
+            model_id="xai.grok-4.20-non-reasoning",
             provider="xai",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
@@ -240,7 +240,7 @@ async def oci_xai_grok_4_task(system_text, query_text, oci_xai_grok_4_checkbox):
         start_time = time.time()
 
         # 安全なlangfuse設定を取得
-        stream_config = get_safe_stream_config("xai.grok-4")
+        stream_config = get_safe_stream_config("xai.grok-4.20-non-reasoning")
 
         chunk_count = 0
         total_content = ""
