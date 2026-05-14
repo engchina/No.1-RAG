@@ -71,7 +71,7 @@ async def chat(
 
     # 応答状態とジェネレーター名の初期化
     responses_status = ["", "", "", "", "", "", "", ""]
-    generator_names = ["OCI OpenAI GPT-5", "OCI OpenAI o3", "OCI OpenAI GPT-4.1", "OCI XAI Grok-4", "OCI Cohere Command-A",
+    generator_names = ["OCI OpenAI GPT-5", "OCI OpenAI o3", "OCI OpenAI GPT-4.1", "OCI XAI Grok-4.3", "OCI Cohere Command-A",
                        "OCI Meta Llama-4-Scout", "OpenAI GPT-4o", "Azure OpenAI GPT-4o"]
     iteration_count = 0
 
@@ -181,7 +181,7 @@ async def chat_stream(
         oci_openai_o3_checkbox = True
     if "oci_openai/gpt-4.1" in llm_answer_checkbox:
         oci_openai_gpt_4_1_checkbox = True
-    if "oci_xai/grok-4.20" in llm_answer_checkbox:
+    if "oci_xai/grok-4.3" in llm_answer_checkbox:
         oci_xai_grok_4_checkbox = True
     if "oci_cohere/command-a" in llm_answer_checkbox:
         oci_cohere_command_a_checkbox = True

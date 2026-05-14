@@ -217,11 +217,11 @@ async def oci_openai_gpt_4_1_task(system_text, query_image, query_text, oci_open
 
 
 async def oci_xai_grok_4_task(system_text, query_text, oci_xai_grok_4_checkbox):
-    """XAI Grok-4モデルでのタスク処理"""
+    """XAI Grok-4.3モデルでのタスク処理"""
     region = get_region()
     if oci_xai_grok_4_checkbox:
         oci_xai_grok_4 = ChatOCIGenAI(
-            model_id="xai.grok-4.20-non-reasoning",
+            model_id="xai.grok-4.3",
             provider="xai",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
@@ -240,7 +240,7 @@ async def oci_xai_grok_4_task(system_text, query_text, oci_xai_grok_4_checkbox):
         start_time = time.time()
 
         # 安全なlangfuse設定を取得
-        stream_config = get_safe_stream_config("xai.grok-4.20-non-reasoning")
+        stream_config = get_safe_stream_config("xai.grok-4.3")
 
         chunk_count = 0
         total_content = ""
@@ -251,7 +251,7 @@ async def oci_xai_grok_4_task(system_text, query_text, oci_xai_grok_4_checkbox):
                 total_content += content
                 yield content
         except Exception as e:
-            logger.error(f"XAI grok-4 ストリーム処理中にエラーが発生しました: {e}")
+            logger.error(f"XAI grok-4.3 ストリーム処理中にエラーが発生しました: {e}")
             # エラーが発生してもストリーム処理を継続するため、エラーメッセージをyield
             yield f"\n\nエラーが発生しました: {e}\n\n"
 

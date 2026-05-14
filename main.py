@@ -131,7 +131,7 @@ def set_chat_llm_answer(llm_answer_checkbox):
         oci_openai_o3_answer_visible = True
     if "oci_openai/gpt-4.1" in llm_answer_checkbox:
         oci_openai_gpt_4_1_answer_visible = True
-    if "oci_xai/grok-4.20" in llm_answer_checkbox:
+    if "oci_xai/grok-4.3" in llm_answer_checkbox:
         oci_xai_grok_4_answer_visible = True
     if "oci_cohere/command-a" in llm_answer_checkbox:
         oci_cohere_command_a_answer_visible = True
@@ -388,7 +388,7 @@ def generate_query(query_text, generate_query_radio):
     region = get_region()
     # if region == "us-chicago-1":
     #     chat_llm = ChatOCIGenAI(
-    #         model_id="xai.grok-4.20-non-reasoning",
+    #         model_id="xai.grok-4.3",
     #         provider="xai",
     #         service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
     #         compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
@@ -1105,7 +1105,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 # "oci_openai/gpt-5",
                                 # "oci_openai/o3",
                                 # "oci_openai/gpt-4.1",
-                                "oci_xai/grok-4.20",
+                                "oci_xai/grok-4.3",
                                 "oci_cohere/command-a",
                                 "oci_meta/llama-4-scout-17b-16e-instruct",
                                 "openai/gpt-4o",
@@ -1148,7 +1148,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         max_height=300
                     )
                 with gr.Accordion(
-                        label="OCI XAI Grok-4 メッセージ",
+                        label="OCI XAI Grok-4.3 メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_with_llm_oci_xai_grok_4_accordion:
@@ -1632,7 +1632,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 # "oci_openai/gpt-5",
                                 # "oci_openai/o3",
                                 # "oci_openai/gpt-4.1",
-                                "oci_xai/grok-4.20",
+                                "oci_xai/grok-4.3",
                                 "oci_cohere/command-a",
                                 "oci_meta/llama-4-scout-17b-16e-instruct",
                                 "openai/gpt-4o",
@@ -2184,7 +2184,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                             max_height=300
                         )
                 with gr.Accordion(
-                        label="OCI XAI Grok-4 メッセージ",
+                        label="OCI XAI Grok-4.3 メッセージ",
                         visible=False,
                         open=True
                 ) as tab_chat_document_llm_oci_xai_grok_4_accordion:
@@ -3290,7 +3290,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         eval_by_human,
         inputs=[
             query_id_state,
-            gr.State(value="oci_xai/grok-4.20"),
+            gr.State(value="oci_xai/grok-4.3"),
             tab_chat_document_oci_xai_grok_4_answer_human_eval_feedback_radio,
             tab_chat_document_oci_xai_grok_4_answer_human_eval_feedback_text,
         ],
