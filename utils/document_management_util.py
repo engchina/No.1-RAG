@@ -746,7 +746,7 @@ ORDER BY
                 )
 
             # ToDo: In case of error
-            if 'cohere/rerank' in reranker_model_radio_input:
+            if 'oci_cohere/rerank' in reranker_model_radio_input:
                 unranked = []
                 for doc in unranked_docs:
                     unranked.append(doc[2])

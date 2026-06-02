@@ -2,6 +2,11 @@
 
 ## Deploy
 
+- v1.3.0(Pre-Release): 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
+  - update: Rerank を oci_cohere/rerank-v4.0-fast へ変更し、デフォルトで有効化
+
+  Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.3.0/v1.3.0.zip)
+
 - v1.2.9(Pre-Release): 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
   - update: Rerank を OCI Generative AI の cohere.rerank-v4.0-fast へ変更
 

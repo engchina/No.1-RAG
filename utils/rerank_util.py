@@ -14,8 +14,8 @@ from utils.common_util import get_region
 
 
 OCI_RERANK_MODEL_ALIASES = {
-    "cohere/rerank-v4.0-fast": "cohere.rerank-v4.0-fast",
-    "cohere/rerank-v4.0-flash": "cohere.rerank-v4.0-fast",
+    "oci_cohere/rerank-v4.0-fast": "cohere.rerank-v4.0-fast",
+    "oci_cohere/rerank-v4.0-flash": "cohere.rerank-v4.0-fast",
     "cohere.rerank-v4.0-fast": "cohere.rerank-v4.0-fast",
 }
 
@@ -26,8 +26,8 @@ def _to_oci_rerank_model_id(rerank_model: str) -> str:
     """
     if rerank_model in OCI_RERANK_MODEL_ALIASES:
         return OCI_RERANK_MODEL_ALIASES[rerank_model]
-    if rerank_model.startswith("cohere/rerank-v4.0-"):
-        return rerank_model.replace("/", ".")
+    if rerank_model.startswith("oci_cohere/rerank-v4.0-"):
+        return rerank_model.replace("oci_cohere/", "cohere.")
     if rerank_model.startswith("cohere.rerank-v4.0-"):
         return rerank_model
     raise ValueError(f"Unsupported OCI rerank model: {rerank_model}")

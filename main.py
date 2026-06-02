@@ -1664,9 +1664,9 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         tab_chat_document_reranker_model_radio = gr.Radio(
                             [
                                 "None",
-                                "cohere/rerank-v4.0-fast",
+                                "oci_cohere/rerank-v4.0-fast",
                             ],
-                            label="Rerank モデル*", value="None")
+                            label="Rerank モデル*", value="oci_cohere/rerank-v4.0-fast")
                     with gr.Column(scale=1):
                         gr.Markdown("&nbsp;")
                 with gr.Row():
