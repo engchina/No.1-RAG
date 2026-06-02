@@ -1,17 +1,36 @@
 """
-OCI Generative AI および Cohere Rerank ユーティリティモジュール
+OCI Generative AI Rerank ユーティリティモジュール
 
-このモジュールは、Oracle Cloud Infrastructure (OCI) の Generative AI サービスと
-Cohere API を使用してドキュメントの再ランキングを行うための関数を提供します。
+このモジュールは、Oracle Cloud Infrastructure (OCI) の Generative AI サービスを
+使用してドキュメントの再ランキングを行うための関数を提供します。
 """
 
 import os
 from typing import List
 
-import cohere
 import oci
 
 from utils.common_util import get_region
+
+
+OCI_RERANK_MODEL_ALIASES = {
+    "cohere/rerank-v4.0-fast": "cohere.rerank-v4.0-fast",
+    "cohere/rerank-v4.0-flash": "cohere.rerank-v4.0-fast",
+    "cohere.rerank-v4.0-fast": "cohere.rerank-v4.0-fast",
+}
+
+
+def _to_oci_rerank_model_id(rerank_model: str) -> str:
+    """
+    UI 表示名を OCI Generative AI の model_id に変換する
+    """
+    if rerank_model in OCI_RERANK_MODEL_ALIASES:
+        return OCI_RERANK_MODEL_ALIASES[rerank_model]
+    if rerank_model.startswith("cohere/rerank-v4.0-"):
+        return rerank_model.replace("/", ".")
+    if rerank_model.startswith("cohere.rerank-v4.0-"):
+        return rerank_model
+    raise ValueError(f"Unsupported OCI rerank model: {rerank_model}")
 
 
 def rerank_documents_response(input_text, inputs: List[str], rerank_model):
@@ -33,63 +52,39 @@ def rerank_documents_response(input_text, inputs: List[str], rerank_model):
     """
     all_document_ranks = []
     batch_size = 200
+    oci_rerank_model_id = _to_oci_rerank_model_id(rerank_model)
 
-    if rerank_model in ["cohere/rerank-multilingual-v3.1", "cohere/rerank-english-v3.1"]:
-        # OCI Generative AI を使用した再ランキング
-        rerank_model = rerank_model.replace("/", ".")
-        config = oci.config.from_file('/root/.oci/config', "DEFAULT")
-        region = get_region()
-        rerank_generative_ai_inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(
-            config=config,
-            service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
-            retry_strategy=oci.retry.NoneRetryStrategy(),
-            timeout=(10, 240))
+    config = oci.config.from_file('/root/.oci/config', "DEFAULT")
+    region = get_region()
+    rerank_generative_ai_inference_client = oci.generative_ai_inference.GenerativeAiInferenceClient(
+        config=config,
+        service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
+        retry_strategy=oci.retry.NoneRetryStrategy(),
+        timeout=(10, 240))
 
-        for i in range(0, len(inputs), batch_size):
-            batch = inputs[i:i + batch_size]
+    for i in range(0, len(inputs), batch_size):
+        batch = inputs[i:i + batch_size]
 
-            rerank_text_detail = oci.generative_ai_inference.models.RerankTextDetails()
-            rerank_text_detail.input = input_text
-            rerank_text_detail.documents = batch
-            rerank_text_detail.serving_mode = oci.generative_ai_inference.models.OnDemandServingMode(
-                serving_type="ON_DEMAND",
-                model_id=rerank_model
-            )
-            rerank_text_detail.compartment_id = os.environ["OCI_COMPARTMENT_OCID"]
-            rerank_response = rerank_generative_ai_inference_client.rerank_text(rerank_text_detail)
-            print(f"Processed batch {i // batch_size + 1} of {(len(inputs) - 1) // batch_size + 1}")
-            adjusted_results = []
-            for rank in rerank_response.data.document_ranks:
-                adjusted_result = {
-                    "document": rank.document,
-                    "index": i + rank.index,
-                    "relevance_score": rank.relevance_score
-                }
-                adjusted_results.append(adjusted_result)
-            all_document_ranks.extend(adjusted_results)
-    else:
-        # Cohere API を使用した再ランキング
-        print(f"{os.environ['COHERE_API_KEY']=}")
-        cohere_reranker = rerank_model.split('/')[1]
-        cohere_client = cohere.Client(api_key=os.environ["COHERE_API_KEY"])
-        for i in range(0, len(inputs), batch_size):
-            batch = inputs[i:i + batch_size]
-
-            rerank_response = cohere_client.rerank(
-                query=input_text,
-                documents=batch,
-                top_n=len(batch),
-                model=cohere_reranker
-            )
-            print(f"{rerank_response=}")
-            adjusted_results = []
-            for rank in rerank_response.results:
-                adjusted_result = {
-                    "document": rank.document,
-                    "index": i + rank.index,
-                    "relevance_score": rank.relevance_score
-                }
-                adjusted_results.append(adjusted_result)
-            all_document_ranks.extend(adjusted_results)
+        rerank_text_detail = oci.generative_ai_inference.models.RerankTextDetails()
+        rerank_text_detail.input = input_text
+        rerank_text_detail.documents = batch
+        rerank_text_detail.top_n = len(batch)
+        rerank_text_detail.is_echo = True
+        rerank_text_detail.serving_mode = oci.generative_ai_inference.models.OnDemandServingMode(
+            serving_type="ON_DEMAND",
+            model_id=oci_rerank_model_id
+        )
+        rerank_text_detail.compartment_id = os.environ["OCI_COMPARTMENT_OCID"]
+        rerank_response = rerank_generative_ai_inference_client.rerank_text(rerank_text_detail)
+        print(f"Processed batch {i // batch_size + 1} of {(len(inputs) - 1) // batch_size + 1}")
+        adjusted_results = []
+        for rank in rerank_response.data.document_ranks:
+            adjusted_result = {
+                "document": rank.document,
+                "index": i + rank.index,
+                "relevance_score": rank.relevance_score
+            }
+            adjusted_results.append(adjusted_result)
+        all_document_ranks.extend(adjusted_results)
 
     return all_document_ranks

@@ -1,7 +1,7 @@
 """
 認証ユーティリティモジュール
 
-このモジュールは、OCI、Cohere、OpenAI、Azure OpenAI、Langfuseなどの
+このモジュールは、OCI、OpenAI、Azure OpenAI、Langfuseなどの
 各種サービスの認証情報を設定するための関数を提供します。
 """
 
@@ -177,31 +177,6 @@ def create_oci_cred(user_ocid, tenancy_ocid, fingerprint, private_key_file, regi
     """
     gr.Info("OCI API Keyの設定が完了しました")
     return gr.Accordion(), gr.Textbox(value=create_oci_cred_sql.strip())
-
-
-def create_cohere_cred(cohere_cred_api_key):
-    """
-    Cohere認証情報を設定する
-
-    Args:
-        cohere_cred_api_key: Cohere API Key
-
-    Returns:
-        Textbox: 設定されたAPI Keyを含むTextbox
-    """
-    has_error = False
-    if not cohere_cred_api_key:
-        has_error = True
-        gr.Warning("Cohere API Keyを入力してください")
-    if has_error:
-        return gr.Textbox()
-    cohere_cred_api_key = cohere_cred_api_key.strip()
-    env_path = find_dotenv()
-    os.environ["COHERE_API_KEY"] = cohere_cred_api_key
-    set_key(env_path, "COHERE_API_KEY", cohere_cred_api_key, quote_mode="never")
-    load_dotenv(env_path)
-    gr.Info("Cohere API Keyの設定が完了しました")
-    return gr.Textbox(value=cohere_cred_api_key)
 
 
 def create_openai_cred(openai_cred_base_url, openai_cred_api_key):

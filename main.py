@@ -16,7 +16,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from my_langchain_community.chat_models import ChatOCIGenAI
 from utils.auth_util import (
     do_auth,
-    create_oci_cred as create_oci_cred_util, create_cohere_cred, create_openai_cred,
+    create_oci_cred as create_oci_cred_util, create_openai_cred,
     create_azure_openai_cred, create_langfuse_cred, test_oci_cred as test_oci_cred_util
 )
 from utils.chat_document_util import chat_document as chat_document_util, append_citation as append_citation_util
@@ -1020,18 +1020,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                 with gr.Row():
                     with gr.Column():
                         tab_create_table_button = gr.Button(value="作成/再作成", variant="primary")
-            with gr.TabItem(label="Cohereの設定(オプション)") as tab_create_cohere_cred:
-                with gr.Row():
-                    with gr.Column():
-                        tab_create_cohere_cred_api_key_text = gr.Textbox(
-                            label="API Key*",
-                            type="password",
-                            lines=1,
-                            interactive=True
-                        )
-                with gr.Row():
-                    with gr.Column():
-                        tab_create_cohere_cred_button = gr.Button(value="設定/再設定", variant="primary")
             with gr.TabItem(label="OpenAIの設定(オプション)") as tab_create_openai_cred:
                 with gr.Row():
                     with gr.Column():
@@ -1676,10 +1664,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         tab_chat_document_reranker_model_radio = gr.Radio(
                             [
                                 "None",
-                                # "cohere/rerank-multilingual-v3.1",
-                                # "cohere/rerank-english-v3.1",
-                                "cohere/rerank-multilingual-v3.0",
-                                "cohere/rerank-english-v3.0",
+                                "cohere/rerank-v4.0-fast",
                             ],
                             label="Rerank モデル*", value="None")
                     with gr.Column(scale=1):
@@ -1699,10 +1684,10 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         tab_chat_document_reranker_threshold_slider = gr.Slider(
                             label="Rerank Score 閾値*",
                             minimum=0.0,
-                            info="Default value: 0.0045。Rerank Scoreが閾値以上のデータのみを抽出する。",
+                            info="Default value: 0.4。Rerank Scoreが閾値以上のデータのみを抽出する。",
                             maximum=0.99,
-                            step=0.0005,
-                            value=0.0045,
+                            step=0.01,
+                            value=0.4,
                             interactive=True
                         )
                 with gr.Accordion("Advanced Settings", open=False):
@@ -2532,16 +2517,6 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         ],
         outputs=[
             tab_create_oci_cred_test_vector_text
-        ]
-    )
-
-    tab_create_cohere_cred_button.click(
-        create_cohere_cred,
-        inputs=[
-            tab_create_cohere_cred_api_key_text
-        ],
-        outputs=[
-            tab_create_cohere_cred_api_key_text
         ]
     )
 
