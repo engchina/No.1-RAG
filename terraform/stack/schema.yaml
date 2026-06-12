@@ -27,6 +27,8 @@ variableGroups:
       - license_model
       - instance_display_name
       - vcn_ai_vcn_id
+      - adb_use_private_subnet
+      - adb_subnet_id
       - subnet_ai_subnet_id
       - ssh_authorized_keys
 
@@ -93,12 +95,33 @@ variables:
     dependsOn:
       compartmentId: ${compartment_ocid}
 
+  adb_use_private_subnet:
+    type: boolean
+    required: true
+    visible: true
+    title: "Use Private Subnet for ADB"
+    description: "Enable to attach Autonomous Database to a private subnet. Disable to use no subnet."
+    default: false
+
+  adb_subnet_id:
+    type: oci:core:subnet:id
+    required: true
+    visible:
+      eq:
+        - adb_use_private_subnet
+        - true
+    title: "ADB Subnet"
+    description: "Select private subnet for Autonomous Database"
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vcnId: ${vcn_ai_vcn_id}
+
   subnet_ai_subnet_id:
     type: oci:core:subnet:id
     required: true
     visible: true
-    title: "Subnet"
-    description: "Select existing subnet"
+    title: "Compute subnet"
+    description: "Select an existing subnet for the Compute instance. Use a public subnet unless you customize the stack to run the instance without a public IP."
     dependsOn:
       compartmentId: ${compartment_ocid}
       vcnId: ${vcn_ai_vcn_id}
