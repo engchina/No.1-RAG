@@ -1,6 +1,11 @@
 output "autonomous_data_warehouse_admin_password" {
-#   value = random_string.autonomous_data_warehouse_admin_password.result
-    value = var.adb_password
+  #   value = random_string.autonomous_data_warehouse_admin_password.result
+  value = var.adb_password
+}
+
+output "autonomous_data_warehouse_ocid" {
+  description = "Autonomous Database OCID"
+  value       = oci_database_autonomous_database.generated_database_autonomous_database.id
 }
 
 output "autonomous_data_warehouse_high_connection_string" {

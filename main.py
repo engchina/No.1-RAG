@@ -3,7 +3,10 @@ import logging
 import os
 import platform
 import re
-from typing import List, Tuple
+import socket
+import threading
+from pathlib import Path
+from typing import List, Optional, Tuple
 
 import gradio as gr
 import oracledb
@@ -14,6 +17,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from my_langchain_community.chat_models import ChatOCIGenAI
+from utils.adb_util import build_adb_tab
 from utils.auth_util import (
     do_auth,
     create_oci_cred as create_oci_cred_util, create_openai_cred,
@@ -72,16 +76,131 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 if platform.system() == 'Linux':
-    oracledb.init_oracle_client(lib_dir=os.environ["ORACLE_CLIENT_LIB_DIR"])
+    os.environ.pop("TNS_ADMIN", None)
+    lib_dir = os.environ.get("ORACLE_CLIENT_LIB_DIR", "/u01/aipoc/instantclient_23_26")
+    config_dir = str(Path(lib_dir) / "network" / "admin")
+    Path(config_dir).mkdir(parents=True, exist_ok=True)
+    logger.info(f"Initializing Oracle client lib_dir={lib_dir}, config_dir={config_dir}")
+    oracledb.init_oracle_client(lib_dir=lib_dir, config_dir=config_dir)
 
-# データベース接続プールを初期化（ブロッキングを避けるため接続数を増加）
-pool = oracledb.create_pool(
-    dsn=os.environ["ORACLE_23AI_CONNECTION_STRING"],
-    min=5,
+
+class LazyPool:
+    """Create the Oracle pool only when database work is actually requested."""
+
+    def __init__(self, **kwargs):
+        self._pool = None
+        self._kwargs = kwargs
+        self._lock = threading.RLock()
+
+    def _ensure(self):
+        with self._lock:
+            if self._pool is None:
+                dsn = self._kwargs.get("dsn")
+                if not dsn or not str(dsn).strip():
+                    logger.warning("DSN is empty; skip creating DB connection pool")
+                    raise RuntimeError("ORACLE_23AI_CONNECTION_STRING is not set")
+                if str(os.environ.get("DB_CONNECT_PRECHECK_ENABLED", "false")).lower() in ("1", "true", "yes"):
+                    try:
+                        self._precheck_connectivity()
+                    except socket.gaierror as e:
+                        logger.warning(f"DB connectivity precheck name resolution failed: {e}")
+                    except Exception as e:
+                        logger.warning(f"DB connectivity precheck failed: {e}")
+                logger.info("Creating DB connection pool")
+                self._pool = oracledb.create_pool(**self._kwargs)
+
+    def _precheck_connectivity(self):
+        dsn = str(self._kwargs.get("dsn") or "")
+        host = None
+        port = None
+        try:
+            after = dsn.split("@", 1)[1] if "@" in dsn else dsn
+            hp = after.split("/")[0]
+            parts = hp.split(":")
+            host = parts[0] if parts else None
+            if len(parts) > 1:
+                port = int(parts[1])
+        except Exception as e:
+            logger.error(f"_precheck_connectivity dsn parse error: {e}")
+        timeout = float(os.environ.get("DB_CONNECT_PRECHECK_TIMEOUT", "3") or "3")
+        if host:
+            with socket.create_connection((host, port or 1521), timeout=timeout):
+                pass
+
+    def acquire(self):
+        self._ensure()
+        try:
+            conn = self._pool.acquire()
+            try:
+                conn.ping()
+            except Exception as e:
+                logger.error(f"conn.ping failed, resetting pool: {e}")
+                try:
+                    conn.close()
+                except Exception as close_error:
+                    logger.error(f"conn.close error: {close_error}")
+                self.reset()
+                conn = self._pool.acquire()
+                conn.ping()
+            return conn
+        except Exception as e:
+            logger.error(f"acquire failed, resetting pool: {e}")
+            self.reset()
+            conn = self._pool.acquire()
+            conn.ping()
+            return conn
+
+    def close(self):
+        with self._lock:
+            if self._pool is not None:
+                try:
+                    self._pool.close()
+                finally:
+                    self._pool = None
+
+    def reset(self):
+        with self._lock:
+            if self._pool is not None:
+                try:
+                    self._pool.close()
+                except Exception as e:
+                    logger.error(f"pool.close error: {e}")
+            self._pool = None
+            logger.info("Recreating DB connection pool")
+            self._pool = oracledb.create_pool(**self._kwargs)
+
+    def warmup(self, sessions: int = 1, test_query: Optional[str] = "SELECT 1 FROM DUAL"):
+        self._ensure()
+        for _ in range(max(1, int(sessions or 1))):
+            with self.acquire() as conn:
+                if test_query:
+                    with conn.cursor() as cursor:
+                        cursor.execute(test_query)
+                        _ = cursor.fetchmany(size=1)
+
+    def healthy(self) -> bool:
+        try:
+            with self.acquire() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT 1 FROM DUAL")
+                    _ = cursor.fetchmany(size=1)
+            return True
+        except Exception as e:
+            logger.error(f"healthy check failed: {e}")
+            return False
+
+    def __getattr__(self, name):
+        self._ensure()
+        return getattr(self._pool, name)
+
+
+pool = LazyPool(
+    dsn=os.environ.get("ORACLE_23AI_CONNECTION_STRING", ""),
+    min=0,
     max=20,
     increment=2,
-    timeout=30,  # 接続タイムアウト30秒
-    getmode=oracledb.POOL_GETMODE_WAIT  # 利用可能な接続を待機
+    timeout=30,
+    getmode=oracledb.POOL_GETMODE_WAIT,
 )
 
 
@@ -1006,6 +1125,8 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     with gr.Row():
                         with gr.Column():
                             tab_create_oci_cred_test_button = gr.Button(value="テスト", variant="primary")
+            with gr.TabItem(label="Autonomous Database") as tab_adb:
+                build_adb_tab(pool)
             with gr.TabItem(label="テーブルの作成*") as tab_create_table:
                 with gr.Accordion(label="使用されたSQL", open=False) as tab_create_table_sql_accordion:
                     tab_create_table_sql_text = gr.Textbox(
@@ -1525,7 +1646,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     with gr.Column():
                         # doc_id_text = gr.Textbox(label="Doc ID*", lines=1)
                         tab_split_document_doc_id_radio = gr.Radio(
-                            choices=get_doc_list(),
+                            choices=[],
                             label="ドキュメント*",
                         )
 
@@ -1604,7 +1725,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                     with gr.Column():
                         # doc_id_text = gr.Textbox(label="Doc ID*", lines=1)
                         tab_delete_document_doc_ids_checkbox_group = gr.CheckboxGroup(
-                            choices=get_doc_list(),
+                            choices=[],
                             label="ドキュメント*",
                             type="value",
                             value=[],
@@ -1888,7 +2009,7 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                         with gr.Column():
                             # doc_id_text = gr.Textbox(label="Doc ID*", lines=1)
                             tab_chat_document_doc_id_checkbox_group = gr.CheckboxGroup(
-                                choices=get_doc_list(),
+                                choices=[],
                                 label="ドキュメント*",
                                 show_label=False,
                                 interactive=False,

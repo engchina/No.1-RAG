@@ -20,7 +20,7 @@ rm -f wallet_extracted/README >/dev/null 2>&1 || true
 rm -f wallet_extracted/keystore.jks >/dev/null 2>&1 || true
 rm -f wallet_extracted/truststore.jks >/dev/null 2>&1 || true
 rm -f wallet_extracted/ojdbc.properties >/dev/null 2>&1 || true
-rm -f wallet_extracted/ewallet.pem >/dev/null 2>&1 || true
+rm -f wallet_extracted/ewallet.p12 >/dev/null 2>&1 || true
 
 # 小さいZIPを作成
 cd wallet_extracted

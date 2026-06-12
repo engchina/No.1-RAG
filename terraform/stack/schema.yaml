@@ -142,6 +142,12 @@ variables:
 
 outputs:
 
+  autonomous_data_warehouse_ocid:
+    title: "Autonomous Data Warehouse OCID"
+    displayText: "Autonomous Data Warehouse OCID"
+    type: copyableString
+    visible: true
+
   autonomous_data_warehouse_high_connection_string:
     title: "Autonomous Data Warehouse High Connection String"
     displayText: "Autonomous Data Warehouse High Connection String"
@@ -159,4 +165,3 @@ outputs:
     displayText: "Application URL"
     type: copyableString
     visible: true
-
