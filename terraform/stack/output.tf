@@ -1,6 +1,7 @@
 output "autonomous_data_warehouse_admin_password" {
   #   value = random_string.autonomous_data_warehouse_admin_password.result
-  value = var.adb_password
+  value     = var.adb_password
+  sensitive = true
 }
 
 output "autonomous_data_warehouse_ocid" {

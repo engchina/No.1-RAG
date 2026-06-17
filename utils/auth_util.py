@@ -1,7 +1,7 @@
 """
 認証ユーティリティモジュール
 
-このモジュールは、OCI、OpenAI、Azure OpenAI、Langfuseなどの
+このモジュールは、OCI、OpenAI-Compatible、Langfuseなどの
 各種サービスの認証情報を設定するための関数を提供します。
 """
 
@@ -13,7 +13,7 @@ from pathlib import Path
 
 import gradio as gr
 import oracledb
-from dotenv import find_dotenv, set_key, load_dotenv
+from dotenv import find_dotenv, load_dotenv, set_key, unset_key
 from oracledb import DatabaseError
 
 from .common_util import get_region
@@ -179,76 +179,55 @@ def create_oci_cred(user_ocid, tenancy_ocid, fingerprint, private_key_file, regi
     return gr.Accordion(), gr.Textbox(value=create_oci_cred_sql.strip())
 
 
-def create_openai_cred(openai_cred_base_url, openai_cred_api_key):
+def create_openai_cred(openai_cred_base_url, openai_cred_api_key, openai_cred_model, openai_cred_project):
     """
-    OpenAI認証情報を設定する
+    OpenAI-Compatible認証情報を設定する
 
     Args:
-        openai_cred_base_url: OpenAI Base URL
-        openai_cred_api_key: OpenAI API Key
+        openai_cred_base_url: OpenAI-Compatible Base URL
+        openai_cred_api_key: OpenAI-Compatible API Key
+        openai_cred_model: OpenAI-Compatible Model
+        openai_cred_project: OpenAI-Compatible Project
 
     Returns:
-        tuple: (Base URL Textbox, API Key Textbox) のタプル
+        tuple: (Base URL Textbox, API Key Textbox, Model Textbox, Project Textbox) のタプル
     """
     has_error = False
     if not openai_cred_base_url:
         has_error = True
-        gr.Warning("OpenAI Base URLを入力してください")
+        gr.Warning("OpenAI-Compatible Base URLを入力してください")
     if not openai_cred_api_key:
         has_error = True
-        gr.Warning("OpenAI API Keyを入力してください")
+        gr.Warning("OpenAI-Compatible API Keyを入力してください")
+    if not openai_cred_model:
+        has_error = True
+        gr.Warning("OpenAI-Compatible Modelを入力してください")
     if has_error:
-        return gr.Textbox(), gr.Textbox()
+        return gr.Textbox(), gr.Textbox(), gr.Textbox(), gr.Textbox()
     openai_cred_base_url = openai_cred_base_url.strip()
     openai_cred_api_key = openai_cred_api_key.strip()
+    openai_cred_model = openai_cred_model.strip()
+    openai_cred_project = (openai_cred_project or "").strip()
     env_path = find_dotenv()
     os.environ["OPENAI_BASE_URL"] = openai_cred_base_url
     os.environ["OPENAI_API_KEY"] = openai_cred_api_key
+    os.environ["OPENAI_MODEL"] = openai_cred_model
     set_key(env_path, "OPENAI_BASE_URL", openai_cred_base_url, quote_mode="never")
     set_key(env_path, "OPENAI_API_KEY", openai_cred_api_key, quote_mode="never")
+    set_key(env_path, "OPENAI_MODEL", openai_cred_model, quote_mode="never")
+    if openai_cred_project:
+        os.environ["OPENAI_PROJECT"] = openai_cred_project
+        set_key(env_path, "OPENAI_PROJECT", openai_cred_project, quote_mode="never")
+    else:
+        os.environ.pop("OPENAI_PROJECT", None)
+        unset_key(env_path, "OPENAI_PROJECT")
     load_dotenv(env_path)
-    gr.Info("OpenAI API Keyの設定が完了しました")
+    gr.Info("OpenAI-Compatibleの設定が完了しました")
     return (
         gr.Textbox(value=openai_cred_base_url),
-        gr.Textbox(value=openai_cred_api_key)
-    )
-
-
-def create_azure_openai_cred(
-        azure_openai_cred_api_key,
-        azure_openai_cred_endpoint_gpt_4o,
-):
-    """
-    Azure OpenAI認証情報を設定する
-
-    Args:
-        azure_openai_cred_api_key: Azure OpenAI API Key
-        azure_openai_cred_endpoint_gpt_4o: GPT-4o エンドポイント
-
-    Returns:
-        tuple: (API Key Textbox, GPT-4o Endpoint Textbox) のタプル
-    """
-    has_error = False
-    if not azure_openai_cred_api_key:
-        has_error = True
-        gr.Warning("Azure OpenAI API Keyを入力してください")
-    if not azure_openai_cred_endpoint_gpt_4o:
-        has_error = True
-        gr.Warning("Azure OpenAI GPT-4O Endpointを入力してください")
-    if has_error:
-        return gr.Textbox(), gr.Textbox(), gr.Textbox()
-    azure_openai_cred_api_key = azure_openai_cred_api_key.strip()
-    azure_openai_cred_endpoint_gpt_4o = azure_openai_cred_endpoint_gpt_4o.strip()
-    env_path = find_dotenv()
-    os.environ["AZURE_OPENAI_API_KEY"] = azure_openai_cred_api_key
-    os.environ["AZURE_OPENAI_ENDPOINT_GPT_4O"] = azure_openai_cred_endpoint_gpt_4o
-    set_key(env_path, "AZURE_OPENAI_API_KEY", azure_openai_cred_api_key, quote_mode="never")
-    set_key(env_path, "AZURE_OPENAI_ENDPOINT_GPT_4O", azure_openai_cred_endpoint_gpt_4o, quote_mode="never")
-    load_dotenv(env_path)
-    gr.Info("Azure OpenAI API Keyの設定が完了しました")
-    return (
-        gr.Textbox(value=azure_openai_cred_api_key),
-        gr.Textbox(value=azure_openai_cred_endpoint_gpt_4o)
+        gr.Textbox(value=openai_cred_api_key),
+        gr.Textbox(value=openai_cred_model),
+        gr.Textbox(value=openai_cred_project)
     )
 
 

@@ -11,10 +11,8 @@ variableGroups:
   - title: Hidden
     visible: false
     variables:
-      - instance_boot_volume_size
-      - instance_boot_volume_vpus
-      - instance_flex_shape_memory
-      - instance_flex_shape_ocpus
+      - adb_compute_model
+      - adb_use_private_subnet
 
   - title: Required Configuration
     visible: true
@@ -22,13 +20,43 @@ variableGroups:
       - region
       - compartment_ocid
       - availability_domain
-      - adb_name
-      - adb_password
-      - license_model
-      - instance_display_name
       - vcn_ai_vcn_id
-      - adb_use_private_subnet
+
+  - title: Autonomous Database
+    visible: true
+    variables:
+      - adb_display_name
+      - adb_name
+      - adb_workload
+      - adb_db_version
+      - adb_compute_count
+      - adb_is_auto_scaling_enabled
+      - adb_data_storage_size_in_tbs
+      - adb_is_auto_scaling_for_storage_enabled
+      - adb_is_elastic_pool_enabled
+      - adb_resource_pool_size
+      - adb_resource_pool_storage_size_in_tbs
+      - license_model
+      - adb_backup_retention_period_in_days
+      - adb_password
+      - adb_network_access_type
       - adb_subnet_id
+      - adb_acl_notation_type
+      - adb_acl_vcn_id
+      - adb_acl_subnet_id
+      - adb_acl_cidr_blocks
+      - adb_is_mtls_connection_required
+
+  - title: Compute
+    visible: true
+    variables:
+      - instance_display_name
+      - instance_image_source_id
+      - instance_shape
+      - instance_flex_shape_ocpus
+      - instance_flex_shape_memory
+      - instance_boot_volume_size
+      - instance_boot_volume_vpus
       - subnet_ai_subnet_id
       - ssh_authorized_keys
 
@@ -54,11 +82,134 @@ variables:
       region: ${region}
       compartmentId: ${compartment_ocid}
 
+  vcn_ai_vcn_id:
+    type: oci:core:vcn:id
+    required: true
+    visible: true
+    title: "VCN"
+    description: "Select existing virtual cloud network"
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+
+  adb_display_name:
+    type: string
+    required: false
+    visible: true
+    title: "ADB display name"
+    description: "Leave blank to use the database name."
+
   adb_name:
     type: string
     required: true
     visible: true
     title: "Database name"
+
+  adb_workload:
+    type: enum
+    required: true
+    visible: true
+    title: "Workload type"
+    enum:
+      - "OLTP"
+      - "DW"
+      - "AJD"
+      - "APEX"
+      - "LH"
+    default: "DW"
+
+  adb_db_version:
+    type: enum
+    required: true
+    visible: true
+    title: "Database version"
+    enum:
+      - "19c"
+      - "23ai"
+      - "26ai"
+    default: "26ai"
+
+  adb_compute_model:
+    type: enum
+    required: true
+    visible: false
+    title: "Compute model"
+    enum:
+      - "ECPU"
+      - "OCPU"
+    default: "ECPU"
+
+  adb_compute_count:
+    type: number
+    required: true
+    visible: true
+    title: "ECPU count"
+    description: "Set 16 to match the sample sheet."
+    default: 2
+
+  adb_is_auto_scaling_enabled:
+    type: boolean
+    required: true
+    visible: true
+    title: "CPU auto scaling"
+    default: false
+
+  adb_data_storage_size_in_tbs:
+    type: number
+    required: true
+    visible: true
+    title: "Storage (TB)"
+    default: 1
+
+  adb_is_auto_scaling_for_storage_enabled:
+    type: boolean
+    required: true
+    visible: true
+    title: "Storage auto scaling"
+    default: false
+
+  adb_is_elastic_pool_enabled:
+    type: boolean
+    required: true
+    visible: true
+    title: "Enable elastic pool"
+    default: false
+
+  adb_resource_pool_size:
+    type: number
+    required: true
+    visible:
+      eq:
+        - adb_is_elastic_pool_enabled
+        - true
+    title: "Elastic pool size"
+    default: 0
+
+  adb_resource_pool_storage_size_in_tbs:
+    type: number
+    required: true
+    visible:
+      eq:
+        - adb_is_elastic_pool_enabled
+        - true
+    title: "Elastic pool storage (TB)"
+    default: 0
+
+  license_model:
+    type: enum
+    required: true
+    visible: true
+    title: "License type"
+    enum:
+      - "BRING_YOUR_OWN_LICENSE"
+      - "LICENSE_INCLUDED"
+    default: "LICENSE_INCLUDED"
+
+  adb_backup_retention_period_in_days:
+    type: number
+    required: true
+    visible: true
+    title: "Automatic backup retention period (days)"
+    default: 1
 
   adb_password:
     type: password
@@ -70,37 +221,23 @@ variables:
     confirmation: true
     pattern: "^(?!.*admin)(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?!.*[\"]).{12,30}$"
 
-  license_model:
+  adb_network_access_type:
     type: enum
     required: true
     visible: true
-    title: "Choose license"
+    title: "Network access"
     enum:
-      - "BRING_YOUR_OWN_LICENSE"
-      - "LICENSE_INCLUDED"
-    default: "LICENSE_INCLUDED"
-
-  instance_display_name:
-    type: string
-    required: true
-    visible: true
-    title: "Compute instance name"
-
-  vcn_ai_vcn_id:
-    type: oci:core:vcn:id
-    required: true
-    visible: true
-    title: "VCN"
-    description: "Select existing virtual cloud network"
-    dependsOn:
-      compartmentId: ${compartment_ocid}
+      - "PUBLIC_ENDPOINT"
+      - "SECURE_ACCESS_FROM_ALLOWED_IPS_AND_VCNS"
+      - "PRIVATE_ENDPOINT_ONLY"
+    default: "PRIVATE_ENDPOINT_ONLY"
 
   adb_use_private_subnet:
     type: boolean
     required: true
-    visible: true
+    visible: false
     title: "Use Private Subnet for ADB"
-    description: "Enable to attach Autonomous Database to a private subnet. Disable to use no subnet."
+    description: "Compatibility switch for older tfvars. Prefer adb_network_access_type."
     default: false
 
   adb_subnet_id:
@@ -108,30 +245,73 @@ variables:
     required: true
     visible:
       eq:
-        - adb_use_private_subnet
-        - true
-    title: "ADB Subnet"
-    description: "Select private subnet for Autonomous Database"
+        - adb_network_access_type
+        - "PRIVATE_ENDPOINT_ONLY"
+    title: "ADB private endpoint subnet"
+    description: "Select the subnet for Autonomous Database private endpoint access."
     dependsOn:
       compartmentId: ${compartment_ocid}
       vcnId: ${vcn_ai_vcn_id}
 
-  subnet_ai_subnet_id:
+  adb_acl_notation_type:
+    type: enum
+    required: true
+    visible:
+      eq:
+        - adb_network_access_type
+        - "SECURE_ACCESS_FROM_ALLOWED_IPS_AND_VCNS"
+    title: "IP notation type"
+    enum:
+      - "VCN"
+      - "CIDR_BLOCK"
+    default: "VCN"
+
+  adb_acl_vcn_id:
+    type: oci:core:vcn:id
+    required: true
+    visible:
+      eq:
+        - adb_network_access_type
+        - "SECURE_ACCESS_FROM_ALLOWED_IPS_AND_VCNS"
+    title: "Allowed VCN"
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+
+  adb_acl_subnet_id:
     type: oci:core:subnet:id
-    required: true
-    visible: true
-    title: "Compute subnet"
-    description: "Select an existing subnet for the Compute instance. Use a public subnet unless you customize the stack to run the instance without a public IP."
+    required: false
+    visible:
+      eq:
+        - adb_network_access_type
+        - "SECURE_ACCESS_FROM_ALLOWED_IPS_AND_VCNS"
+    title: "Allowed subnet"
+    description: "Optional. When selected, the subnet CIDR is added as VCN;CIDR in the ADB access list."
     dependsOn:
       compartmentId: ${compartment_ocid}
-      vcnId: ${vcn_ai_vcn_id}
+      vcnId: ${adb_acl_vcn_id}
 
-  ssh_authorized_keys:
-    type: oci:core:ssh:publickey
-    title: "Add SSH keys"
-    description: "Upload a public key that you already have."
+  adb_acl_cidr_blocks:
+    type: string
+    required: false
+    visible:
+      eq:
+        - adb_acl_notation_type
+        - "CIDR_BLOCK"
+    title: "Allowed CIDR blocks"
+    description: "Comma-separated CIDR blocks for ADB secure access."
+
+  adb_is_mtls_connection_required:
+    type: boolean
     required: true
     visible: true
+    title: "Require mutual TLS (mTLS)"
+    default: true
+
+  instance_display_name:
+    type: string
+    required: true
+    visible: true
+    title: "Compute instance name"
 
   instance_image_source_id:
     type: enum
@@ -154,14 +334,52 @@ variables:
       - "VM.Standard.E5.Flex"
     default: "VM.Standard.E5.Flex"
 
-  instance_boot_volume_size:
-    visible: false
-  instance_boot_volume_vpus:
-    visible: false
-  instance_flex_shape_memory:
-    visible: false
   instance_flex_shape_ocpus:
-    visible: false
+    type: number
+    required: true
+    visible: true
+    title: "Compute OCPUs"
+    default: 2
+
+  instance_flex_shape_memory:
+    type: number
+    required: true
+    visible: true
+    title: "Compute memory (GB)"
+    default: 16
+
+  instance_boot_volume_size:
+    type: number
+    required: true
+    visible: true
+    title: "Boot volume size (GB)"
+    description: "Minimum 50 GB. Maximum 32768 GB."
+    default: 100
+
+  instance_boot_volume_vpus:
+    type: number
+    required: true
+    visible: true
+    title: "Boot volume VPUs/GB"
+    description: "Use 10 for Balanced, 20 for Higher Performance, or 30-120 for Ultra High Performance."
+    default: 10
+
+  subnet_ai_subnet_id:
+    type: oci:core:subnet:id
+    required: true
+    visible: true
+    title: "Compute subnet"
+    description: "Select an existing subnet for the Compute instance. Use a public subnet unless you customize the stack to run the instance without a public IP."
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vcnId: ${vcn_ai_vcn_id}
+
+  ssh_authorized_keys:
+    type: oci:core:ssh:publickey
+    title: "Add SSH keys"
+    description: "Upload a public key that you already have."
+    required: true
+    visible: true
 
 outputs:
 
