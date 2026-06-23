@@ -141,7 +141,7 @@ def _download_and_extract_wallet(
         wallet_zip_path = Path("/tmp/no1-rag-wallet.zip")
         with wallet_zip_path.open("wb") as f:
             for chunk in wallet_response.data.raw.stream(
-                1024 * 1024, decode_content=False
+                1024 * 1024, decode_content=True
             ):
                 f.write(chunk)
 
