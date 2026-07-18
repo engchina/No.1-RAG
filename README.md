@@ -2,6 +2,11 @@
 
 ## Deploy
 
+- v1.3.4(Release): 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
+  - update: アプリケーションポートを設定できるように（デフォルト：8080）
+
+  Click [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?region=ap-osaka-1&zipUrl=https://github.com/engchina/No.1-RAG/releases/download/v1.3.4/v1.3.4.zip)
+
 - v1.3.3(Pre-Release): 東京/大阪/シカゴリージョンのみをサポートしています。（デフォルト：大阪リージョン）
   - update: Compute Shapeを選択できるように
 
@@ -124,6 +129,17 @@
   - support modify rag prompt through ui
 
 ## Local Development Setup (No need for deploy to OCI)
+
+### Application port
+
+- OCI Resource Manager の `Application port` でポートを指定できます。デフォルトは `8080` です。
+- デプロイ環境では `APPLICATION_PORT`、`/u01/aipoc/props/application_port.txt`、`8080` の順でポートを決定します。
+- `3000`、`5432`、`7932` は他の No.1-RAG サービスが使用するため指定できません。
+- ローカルでポートを変更する場合は、次のように `--port` を指定します。
+
+```bash
+python main.py --host 0.0.0.0 --port 8080
+```
 
 ```
 conda create -n no.1-rag python=3.11 -y

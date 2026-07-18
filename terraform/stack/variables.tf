@@ -207,6 +207,22 @@ variable "instance_display_name" {
   default = "AIPOC_INSTANCE"
 }
 
+variable "application_port" {
+  description = "TCP port exposed by the No.1-RAG application"
+  type        = number
+  default     = 8080
+
+  validation {
+    condition = (
+      var.application_port == floor(var.application_port) &&
+      var.application_port >= 1 &&
+      var.application_port <= 65535 &&
+      !contains([3000, 5432, 7932], var.application_port)
+    )
+    error_message = "application_port must be an integer between 1 and 65535, excluding reserved ports 3000, 5432, and 7932."
+  }
+}
+
 variable "instance_shape" {
   default = "VM.Standard.E4.Flex"
 }

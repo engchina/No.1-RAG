@@ -9,6 +9,7 @@ data "template_file" "cloud_init_file" {
     adb_ocid                                           = oci_database_autonomous_database.generated_database_autonomous_database.id
     adb_password                                       = var.adb_password
     adb_dsn                                            = "${lower(var.adb_name)}_high"
+    application_port                                   = tostring(var.application_port)
   }
 }
 

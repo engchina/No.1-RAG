@@ -57,6 +57,9 @@ write_files:
   - path: "/u01/aipoc/props/adb_ocid.txt"
     permissions: "0644"
     content: ${adb_ocid}
+  - path: "/u01/aipoc/props/application_port.txt"
+    permissions: "0644"
+    content: "${application_port}"
   - path: "/u01/aipoc/props/wallet.zip"
     permissions: "0644"
     encoding: base64
@@ -64,12 +67,12 @@ write_files:
       ${oci_database_autonomous_database_wallet_content}
 runcmd:
   - echo "Running aipoc init..."
-  - iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8080 -j ACCEPT
+  - iptables -I INPUT 6 -m state --state NEW -p tcp --dport ${application_port} -j ACCEPT
   - iptables -I INPUT 7 -m state --state NEW -p tcp --dport 3000 -j ACCEPT
   - netfilter-persistent save
   - echo "Downloading and running init script..."
   - cd /u01/aipoc
-  - git clone -b main https://github.com/engchina/No.1-RAG.git
+  - git clone --branch v1.3.4 --single-branch https://github.com/engchina/No.1-RAG.git
   - cd No.1-RAG
   - chmod +x init_script.sh
   - nohup bash init_script.sh >> /var/log/cloud-init-custom.log 2>&1 &

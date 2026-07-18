@@ -51,6 +51,7 @@ variableGroups:
     visible: true
     variables:
       - instance_display_name
+      - application_port
       - instance_image_source_id
       - instance_shape
       - instance_flex_shape_ocpus
@@ -312,6 +313,14 @@ variables:
     required: true
     visible: true
     title: "Compute instance name"
+
+  application_port:
+    type: number
+    required: true
+    visible: true
+    title: "Application port"
+    description: "TCP port for No.1-RAG. Ports 3000, 5432, and 7932 are reserved by other services."
+    default: 8080
 
   instance_image_source_id:
     type: enum
