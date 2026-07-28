@@ -36,7 +36,7 @@ def get_openai_compatible_client_kwargs():
     client_kwargs = {
         "model": get_openai_compatible_model(load_env=False),
         "temperature": 0,
-        "top_p": 0.75,
+        "top_p": 1.0,
         "seed": 42,
         "max_tokens": None,
         "timeout": None,

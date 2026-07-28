@@ -51,6 +51,8 @@ LANGGPT_RAG_PROMPT_TEMPLATE = """
 3. Handle chronological processing when date information is available (prioritize latest information)
 4. Maintain strict formatting of citation information
 5. You always respond to the user in the Japanese language.
+6. If the context does not explicitly contain the answer, do not infer it from general knowledge. Respond exactly with: "提供されたコンテキストには記載がありません（対象外）"
+7. For procedural questions, cover the complete relevant procedure from the same evidence block, including execution commands, subsequent verification/show commands, and explicit confirmation conditions. Do not stop after the first example command.
 
 ## Workflow
 1. Context Analysis Phase
@@ -61,8 +63,9 @@ LANGGPT_RAG_PROMPT_TEMPLATE = """
 3. Answer Generation Phase
    - Direct citation of matched data
    - Structured output of citation information
+   - For procedures, preserve the execution-to-verification sequence from the evidence block
 4. Error Handling
-   - No match → Standard error message
+   - No explicit match → "提供されたコンテキストには記載がありません（対象外）"
    - Contradictory data → List factual relationships
 
 ## Initialization

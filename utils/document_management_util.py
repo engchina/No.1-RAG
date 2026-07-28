@@ -10,6 +10,7 @@
 - ドキュメント削除 (delete_document)
 """
 
+import logging
 import os
 import time
 from itertools import combinations
@@ -22,6 +23,29 @@ from oracledb import DatabaseError
 
 from utils.common_util import get_region
 from utils.rerank_util import rerank_documents_response
+
+logger = logging.getLogger(__name__)
+
+
+def _get_text_search_terms(query_text: str) -> list[str]:
+    """Tokenize a query, falling back to vector-only search if Ginza is down."""
+    try:
+        response = requests.post(
+            os.environ["GINZA_API_ENDPOINT"],
+            json={"query_text": query_text, "language": "ja"},
+            timeout=5,
+        )
+        response.raise_for_status()
+        terms = response.json()
+        if not isinstance(terms, list):
+            raise ValueError("Ginza response must be a list")
+        return [str(term) for term in terms if str(term).strip()]
+    except (requests.RequestException, ValueError, KeyError) as error:
+        logger.warning(
+            "Ginza text search is unavailable; falling back to vector-only search: %s",
+            error,
+        )
+        return []
 
 
 def get_doc_list(pool, default_collection_name: str) -> List[Tuple[str, str]]:
@@ -456,14 +480,14 @@ aggregated_results AS
     GROUP BY 
         de.doc_id, name, de.embed_id, de.embed_data """
 
-    select_sql += f"""
+    select_sql += """
     ORDER BY
         vector_distance
 )"""
 
     # use_image が true の場合、相邻 embed_id のデータ合併を行わない
     if use_image:
-        select_sql += f"""
+        select_sql += """
                       SELECT ar.name,
                              ar.embed_id,
                              ar.embed_data AS combined_embed_data,
@@ -473,7 +497,7 @@ aggregated_results AS
                       ORDER BY ar.vector_distance """
     else:
         # use_image が false の場合、従来の相邻 embed_id データ合併ロジックを使用
-        select_sql += f"""
+        select_sql += """
 ,
 ranked_data AS
 (
@@ -548,11 +572,17 @@ ORDER BY
         query_texts.append(":sub_query3")
     print(f"{query_texts=}")
 
+    complete_sql = with_sql + """
+    UNION
+    """.join(
+        f"({base_sql.replace(':query_text', one_query_text)})"
+        for one_query_text in query_texts
+    ) + select_sql
+    use_full_text_search = False
     search_texts = []
     if text_search_checkbox_input:
         # Generate the combined SQL based on available query texts
-        search_texts = requests.post(os.environ["GINZA_API_ENDPOINT"],
-                                     json={'query_text': query_text_input, 'language': 'ja'}).json()
+        search_texts = _get_text_search_terms(query_text_input)
         search_text = ""
         if search_texts and len(search_texts) > 0:
             search_texts = cut_lists(search_texts, text_search_k_slider_input)
@@ -644,6 +674,7 @@ ORDER BY
                             + full_text_search_sql + """
         ) """
                             + select_sql)
+            use_full_text_search = True
     else:
         print(f"{query_texts=}")
         complete_sql = with_sql + """
@@ -664,7 +695,7 @@ ORDER BY
         params["doc_ids"] = doc_ids_str
     if partition_by_k_slider_input > 0:
         params["partition_by"] = partition_by_k_slider_input
-    if text_search_checkbox_input and search_texts:
+    if use_full_text_search:
         params["search_texts"] = " ACCUM ".join(search_texts)
 
     # Add sub-query texts if they exist

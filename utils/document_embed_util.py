@@ -8,7 +8,6 @@ unstructured形式のドキュメント処理に特化しています。
 import chardet
 import json
 import re
-from typing import Tuple
 
 import gradio as gr
 import oracledb
@@ -16,6 +15,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from unstructured.partition.auto import partition
 from langchain_community.document_loaders import TextLoader
 
+from utils.common_util import get_dict_value
 from utils.embedding_util import generate_embedding_response, generate_image_embedding_response
 
 
@@ -160,41 +160,76 @@ def embed_save_document_by_unstructured(doc_id, chunks_by, chunks_max_size,
                                  chunk_size=chunks_max_size - chunks_overlap,
                                  chunk_overlap=chunks_overlap)
 
-    output_sql = ""
+    # OCI embedding generation may take several minutes for a large document.
+    # Do not retain an idle Oracle connection for that whole duration. Fetch
+    # scalar chunk data first, then acquire a fresh connection for each update
+    # batch so completed work is resumable after a transient failure.
+    select_sql = f"""
+SELECT doc_id, embed_id, embed_data
+FROM {default_collection_name}_embedding
+WHERE doc_id = :doc_id
+  AND embed_vector IS NULL
+ORDER BY embed_id
+"""
     with pool.acquire() as conn:
         with conn.cursor() as cursor:
-            # 既存の埋め込みデータを取得
-            select_sql = f"""
-SELECT doc_id, embed_id, embed_data FROM {default_collection_name}_embedding  WHERE doc_id = :doc_id
-"""
             cursor.execute(select_sql, doc_id=doc_id)
-            records = cursor.fetchall()
-            embed_datas = [record[2] for record in records]
+            records = [
+                (
+                    record[0],
+                    record[1],
+                    record[2].read() if hasattr(record[2], "read") else str(record[2]),
+                )
+                for record in cursor
+            ]
 
-            # 埋め込みベクトルを生成
-            embed_vectors = generate_embedding_response(embed_datas)
-
-            # 埋め込みベクトルを更新するSQL
-            update_sql = f"""
+    update_sql = f"""
 UPDATE {default_collection_name}_embedding
 SET embed_vector = :embed_vector
 WHERE doc_id = :doc_id and embed_id = :embed_id
 """
+    output_sql = update_sql.replace(
+        ':doc_id', "'" + str(doc_id) + "'"
+    ).replace(
+        ':embed_id', "'" + str('...') + "'"
+    ).replace(
+        ':embed_vector', "'" + str('...') + "'"
+    ).strip() + ";"
+    print(f"{output_sql=}")
 
-            # SQLサイズ設定
-            cursor.setinputsizes(embed_vector=oracledb.DB_TYPE_VECTOR)
+    # Keep Oracle commits bounded and resumable without recreating the OCI
+    # client for every 96-item API batch. generate_embedding_response applies
+    # its own 96-item service limit inside each persistence batch.
+    batch_size = 1920
+    for start in range(0, len(records), batch_size):
+        batch = records[start:start + batch_size]
+        embed_vectors = generate_embedding_response([record[2] for record in batch])
+        if len(embed_vectors) != len(batch):
+            raise RuntimeError(
+                "Embedding generation returned "
+                f"{len(embed_vectors)} vectors for {len(batch)} chunks"
+            )
 
-            # 出力用SQL文を生成（参照用）
-            output_sql += update_sql.replace(':doc_id', "'" + str(doc_id) + "'"
-                                             ).replace(':embed_id', "'" + str('...') + "'"
-                                                       ).replace(':embed_vector', "'" + str('...') + "'").strip() + ";"
-            print(f"{output_sql=}")
-
-            # バッチで埋め込みベクトルを更新
-            cursor.executemany(update_sql,
-                               [{'doc_id': record[0], 'embed_id': record[1], 'embed_vector': embed_vector}
-                                for record, embed_vector in zip(records, embed_vectors)])
+        with pool.acquire() as conn:
+            with conn.cursor() as cursor:
+                # SQLサイズ設定
+                cursor.setinputsizes(embed_vector=oracledb.DB_TYPE_VECTOR)
+                cursor.executemany(
+                    update_sql,
+                    [
+                        {
+                            'doc_id': record[0],
+                            'embed_id': record[1],
+                            'embed_vector': embed_vector,
+                        }
+                        for record, embed_vector in zip(batch, embed_vectors)
+                    ],
+                )
             conn.commit()
+        print(
+            f"埋め込み保存バッチ {start // batch_size + 1} / "
+            f"{(len(records) - 1) // batch_size + 1} をコミットしました"
+        )
 
     return (
         gr.Textbox(output_sql),

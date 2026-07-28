@@ -67,7 +67,7 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
                     provider="meta",
                     service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
                     compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+                    model_kwargs={"temperature": 0.0, "top_p": 1.0, "seed": 42, "max_tokens": 3600},
                 )
             elif model == "oci_xai/grok-4.3":
                 llm = ChatOCIGenAI(
@@ -75,7 +75,7 @@ async def process_single_image_streaming(image_url, query_text, llm_answer_check
                     provider="xai",
                     service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
                     compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+                    model_kwargs={"temperature": 0.0, "top_p": 1.0, "seed": 42, "max_tokens": 3600},
                 )
             elif model == OPENAI_COMPATIBLE_MODEL_KEY:
                 load_dotenv(find_dotenv())
@@ -1004,7 +1004,7 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
                     provider="meta",
                     service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
                     compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+                    model_kwargs={"temperature": 0.0, "top_p": 1.0, "seed": 42, "max_tokens": 3600},
                 )
             elif model == "oci_xai/grok-4.3":
                 llm = ChatOCIGenAI(
@@ -1012,7 +1012,7 @@ async def process_multiple_images_streaming(image_data_list, query_text, llm_ans
                     provider="xai",
                     service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
                     compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-                    model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+                    model_kwargs={"temperature": 0.0, "top_p": 1.0, "seed": 42, "max_tokens": 3600},
                 )
             elif model == OPENAI_COMPATIBLE_MODEL_KEY:
                 load_dotenv(find_dotenv())

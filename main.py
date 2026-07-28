@@ -32,7 +32,11 @@ from utils.common_util import get_region
 from utils.css_gradio_util import custom_css
 from utils.database_util import create_table as create_table_util
 from utils.document_conversion_util import (
-    convert_pdf_to_markdown, convert_excel_to_text_document, convert_xml_to_text_document, convert_json_to_text_document
+    convert_excel_to_text_document,
+    convert_json_to_text_document,
+    convert_pdf_to_markdown,
+    convert_word_to_text_document,
+    convert_xml_to_text_document,
 )
 from utils.document_embed_util import embed_save_document_by_unstructured as embed_save_document_util
 from utils.document_loader_util import load_document as load_document_util
@@ -507,7 +511,7 @@ def generate_query(query_text, generate_query_radio):
     #         provider="xai",
     #         service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
     #         compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-    #         model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 2048},
+    #         model_kwargs={"temperature": 0.0, "top_p": 1.0, "seed": 42, "max_tokens": 2048},
     #     )
     # else:
     chat_llm = ChatOCIGenAI(
@@ -515,7 +519,7 @@ def generate_query(query_text, generate_query_radio):
         provider="cohere",
         service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
         compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-        model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 600},
+        model_kwargs={"temperature": 0.0, "top_p": 1.0, "seed": 42, "max_tokens": 600},
     )
 
     # RAG-Fusion
@@ -1281,10 +1285,61 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
                                 type="filepath",
                                 interactive=True,
                             )
+                    with gr.Accordion(label="構造化設定", open=False):
+                        with gr.Row():
+                            tab_convert_document_excel_mode = gr.Radio(
+                                choices=[
+                                    ("自動判定", "auto"),
+                                    ("表形式", "table"),
+                                    ("作業手順形式", "procedure"),
+                                ],
+                                value="auto",
+                                label="変換モード",
+                            )
+                            tab_convert_document_excel_excluded_sheets = gr.Textbox(
+                                value="質問,QA,Q&A,Answer,Answers",
+                                label="除外するシート",
+                                info="カンマ区切り。質問・模範回答シートはRAGへ登録しないでください。",
+                            )
+                        with gr.Row():
+                            tab_convert_document_excel_include_hidden = gr.Checkbox(
+                                value=False,
+                                label="非表示シートも読み込む",
+                            )
+                            tab_convert_document_excel_max_block_chars = gr.Number(
+                                value=3000,
+                                minimum=512,
+                                maximum=30000,
+                                precision=0,
+                                label="証拠ブロック最大文字数",
+                            )
                     with gr.Row():
                         with gr.Column():
                             tab_convert_excel_to_text_button = gr.Button(
                                 value="ExcelをTextへ変換",
+                                variant="primary")
+                with gr.TabItem(label="Word2Text") as tab_convert_word_to_text_document:
+                    with gr.Row():
+                        with gr.Column():
+                            tab_convert_document_convert_word_to_text_file_text = gr.File(
+                                label="変換前のファイル*",
+                                file_types=[".docx"],
+                                type="filepath",
+                                interactive=True,
+                            )
+                    with gr.Row():
+                        with gr.Column():
+                            tab_convert_document_word_max_block_chars = gr.Number(
+                                value=3000,
+                                minimum=512,
+                                maximum=30000,
+                                precision=0,
+                                label="証拠ブロック最大文字数",
+                            )
+                    with gr.Row():
+                        with gr.Column():
+                            tab_convert_word_to_text_button = gr.Button(
+                                value="WordをTextへ変換",
                                 variant="primary")
                 with gr.TabItem(label="Xml2Text", visible=True) as tab_convert_xml_to_text_document:
                     with gr.Row():
@@ -2386,9 +2441,25 @@ with gr.Blocks(css=custom_css, theme=theme) as app:
         convert_excel_to_text_document,
         inputs=[
             tab_convert_document_convert_excel_to_text_file_text,
+            tab_convert_document_excel_excluded_sheets,
+            tab_convert_document_excel_include_hidden,
+            tab_convert_document_excel_mode,
+            tab_convert_document_excel_max_block_chars,
         ],
         outputs=[
             tab_convert_document_convert_excel_to_text_file_text,
+            tab_load_document_file_text,
+        ],
+    )
+
+    tab_convert_word_to_text_button.click(
+        convert_word_to_text_document,
+        inputs=[
+            tab_convert_document_convert_word_to_text_file_text,
+            tab_convert_document_word_max_block_chars,
+        ],
+        outputs=[
+            tab_convert_document_convert_word_to_text_file_text,
             tab_load_document_file_text,
         ],
     )

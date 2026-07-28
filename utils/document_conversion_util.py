@@ -7,9 +7,17 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import gradio as gr
-import pandas as pd
 from PIL import Image
 from pdf2image import convert_from_path
+
+from utils.office_preprocess_util import (
+    DEFAULT_EXCLUDED_SHEETS,
+    DEFAULT_MAX_BLOCK_CHARS,
+    create_preprocessed_output_path,
+    excel_to_blocks,
+    word_to_blocks,
+    write_evidence_document,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -622,12 +630,22 @@ def _xml_element_to_dict(element, root_element, global_tag=None, fixed_tag=None,
     return result
 
 
-def convert_excel_to_text_document(file_path):
+def convert_excel_to_text_document(
+        file_path,
+        excluded_sheets=DEFAULT_EXCLUDED_SHEETS,
+        include_hidden=False,
+        mode="auto",
+        max_block_chars=DEFAULT_MAX_BLOCK_CHARS,
+):
     """
-    ExcelファイルをJSONライン形式のテキストドキュメントに変換する
+    Excelファイルを構造化JSONライン形式のテキストドキュメントに変換する
 
     Args:
         file_path: アップロードされたファイルのパス
+        excluded_sheets: 除外するシート名
+        include_hidden: 非表示シートを読み込むか
+        mode: auto、table、procedureのいずれか
+        max_block_chars: 1証拠ブロックの最大文字数
 
     Returns:
         tuple: (クリアされたファイル入力, 変換されたファイル)
@@ -639,39 +657,58 @@ def convert_excel_to_text_document(file_path):
     if has_error:
         return gr.File(value=None), gr.File()
 
-    output_file_path = file_path.name + '.txt'
-    ext = Path(file_path.name).suffix.lower()
     try:
-        if ext == '.csv':
-            try:
-                df = pd.read_csv(file_path.name, encoding='utf-8')
-            except UnicodeDecodeError:
-                df = pd.read_csv(file_path.name, encoding='cp932')
-        elif ext in ('.xls', '.xlsx'):
-            engine = 'openpyxl' if ext == '.xlsx' else None
-            df = pd.read_excel(file_path.name, engine=engine) if engine else pd.read_excel(file_path.name)
-        else:
-            gr.Warning("CSVまたはExcelファイルのみ対応しています")
+        source_path = Path(getattr(file_path, "name", file_path))
+        blocks = excel_to_blocks(
+            source_path,
+            excluded_sheets=excluded_sheets,
+            include_hidden=bool(include_hidden),
+            mode=mode or "auto",
+            max_block_chars=max_block_chars or DEFAULT_MAX_BLOCK_CHARS,
+        )
+        if not blocks:
+            gr.Warning("変換対象となるデータが見つかりませんでした")
             return gr.File(value=None), gr.File()
+        output_file_path = create_preprocessed_output_path(source_path)
+        write_evidence_document(blocks, output_file_path)
     except Exception as e:
-        gr.Warning(f"ファイル読込みに失敗しました: {str(e)}")
+        logger.exception("Excelファイルの構造化変換に失敗しました")
+        gr.Warning(f"ファイル変換に失敗しました: {str(e)}")
         return gr.File(value=None), gr.File()
-    data = df.to_dict('records')
-    with open(output_file_path, 'w', encoding='utf-8') as f:
-        for row in data:
-            processed_row = {}
-            for key, value in row.items():
-                if pd.isna(value):
-                    processed_row[key] = None
-                elif isinstance(value, pd.Timestamp):
-                    processed_row[key] = value.isoformat()
-                else:
-                    processed_row[key] = value
-            json_line = json.dumps(processed_row, ensure_ascii=False)
-            f.write(json_line + ' <FIXED_DELIMITER>\n')
     return (
         gr.File(),
-        gr.File(value=output_file_path)
+        gr.File(value=str(output_file_path.resolve()))
+    )
+
+
+def convert_word_to_text_document(
+        file_path,
+        max_block_chars=DEFAULT_MAX_BLOCK_CHARS,
+):
+    """Wordファイルを見出し構造付きJSONライン形式へ変換する。"""
+    if not file_path:
+        gr.Warning("ファイルを選択してください")
+        return gr.File(value=None), gr.File()
+
+    try:
+        source_path = Path(getattr(file_path, "name", file_path))
+        blocks = word_to_blocks(
+            source_path,
+            max_block_chars=max_block_chars or DEFAULT_MAX_BLOCK_CHARS,
+        )
+        if not blocks:
+            gr.Warning("変換対象となるデータが見つかりませんでした")
+            return gr.File(value=None), gr.File()
+        output_file_path = create_preprocessed_output_path(source_path)
+        write_evidence_document(blocks, output_file_path)
+    except Exception as e:
+        logger.exception("Wordファイルの構造化変換に失敗しました")
+        gr.Warning(f"ファイル変換に失敗しました: {str(e)}")
+        return gr.File(value=None), gr.File()
+
+    return (
+        gr.File(),
+        gr.File(value=str(output_file_path.resolve()))
     )
 
 

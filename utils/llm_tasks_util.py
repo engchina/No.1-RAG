@@ -33,7 +33,7 @@ async def oci_xai_grok_4_task(system_text, query_image, query_text, oci_xai_grok
             provider="xai",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+            model_kwargs={"temperature": 0.0, "top_p": 1.0, "seed": 42, "max_tokens": 3600},
         )
 
         if query_image is not None:
@@ -98,7 +98,7 @@ async def oci_cohere_command_a_task(system_text, query_text, oci_cohere_command_
             provider="cohere",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+            model_kwargs={"temperature": 0.0, "top_p": 1.0, "seed": 42, "max_tokens": 3600},
         )
 
         if system_text:
@@ -149,7 +149,7 @@ async def oci_meta_llama_4_scout_task(system_text, query_image, query_text, oci_
             provider="meta",
             service_endpoint=f"https://inference.generativeai.{region}.oci.oraclecloud.com",
             compartment_id=os.environ["OCI_COMPARTMENT_OCID"],
-            model_kwargs={"temperature": 0.0, "top_p": 0.75, "seed": 42, "max_tokens": 3600},
+            model_kwargs={"temperature": 0.0, "top_p": 1.0, "seed": 42, "max_tokens": 3600},
         )
 
         # 画像がある場合とない場合でメッセージを分ける
