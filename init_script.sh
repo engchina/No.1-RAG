@@ -16,6 +16,8 @@ LIBAIO_DEB="libaio1_0.3.113-4_amd64.deb"
 LIBAIO_URL="http://ftp.de.debian.org/debian/pool/main/liba/libaio/${LIBAIO_DEB}"
 INSTANTCLIENT_DIR="${INSTALL_DIR}/instantclient_23_26"
 
+source "${PROJECT_DIR}/install_utils.sh"
+
 retry_command() {
     local max_attempts=5
     local timeout=10
@@ -80,7 +82,7 @@ if [ ! -d "${INSTANTCLIENT_DIR}" ]; then
     if [ ! -f "${LIBAIO_DEB}" ]; then
         retry_command wget "${LIBAIO_URL}" -O "${LIBAIO_DEB}"
     fi
-    dpkg -i "${LIBAIO_DEB}" || apt-get install -f -y
+    dpkg -i "${LIBAIO_DEB}" || apt_get_with_retry install -f -y
 
     sh -c "echo ${INSTANTCLIENT_DIR} > /etc/ld.so.conf.d/oracle-instantclient.conf"
     ldconfig
